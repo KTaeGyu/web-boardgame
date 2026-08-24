@@ -65,13 +65,24 @@ export function GamePage() {
   // 내 홀카드와 이미 공개된 보드만으로 구한다. 남의 정보는 쓰지 않으므로 새는 것이 없다.
   const myHolding = useMemo(() => bestHolding([...hand, ...(game?.community ?? [])]), [hand, game?.community])
 
-  /** 뱃지를 짚고 있는 동안에만 그 조합을 밝힌다. 평소에는 판을 어지럽히지 않는다. */
-  const [showCombo, setShowCombo] = useState(false)
+  /**
+   * 뱃지를 짚고 있는 동안에만 그 조합을 밝힌다. 평소에는 판을 어지럽히지 않는다.
+   *
+   * 눌러서 켜두면 마우스를 치워도 남고, 다시 누르면 꺼진다. 이때 마우스가
+   * 아직 뱃지 위에 있으면 hover 가 곧바로 다시 켜버리므로, 벗어날 때까지
+   * hover 를 한 번 무시한다. 「눌렀는데 안 꺼진다」로 보이지 않게 하려는 것이다.
+   */
+  const [hovering, setHovering] = useState(false)
   const [pinned, setPinned] = useState(false)
-  const lit = new Set<string>(showCombo || pinned ? (myHolding?.used ?? []) : [])
+  const [ignoreHover, setIgnoreHover] = useState(false)
+  const comboOn = pinned || (hovering && !ignoreHover)
+  const lit = new Set<string>(comboOn ? (myHolding?.used ?? []) : [])
 
   // 라운드가 바뀌면 조합도 바뀐다. 켜둔 채로 넘어가면 엉뚱한 카드가 밝혀진 것처럼 보인다.
-  useEffect(() => setPinned(false), [game?.round, game?.heist])
+  useEffect(() => {
+    setPinned(false)
+    setIgnoreHover(false)
+  }, [game?.round, game?.heist])
 
   // 진입·새로고침·재연결이 모두 같은 요청이다. 서버가 자리와 손패를 되돌려준다.
   useEffect(() => {
@@ -319,12 +330,24 @@ export function GamePage() {
               {myHolding && (
                 <button
                   type="button"
-                  className={`my-seat__holding ${pinned ? 'my-seat__holding--on' : ''}`}
-                  onMouseEnter={() => setShowCombo(true)}
-                  onMouseLeave={() => setShowCombo(false)}
-                  onFocus={() => setShowCombo(true)}
-                  onBlur={() => setShowCombo(false)}
-                  onClick={() => setPinned((on) => !on)}
+                  className={`my-seat__holding ${comboOn ? 'my-seat__holding--on' : ''}`}
+                  onMouseEnter={() => setHovering(true)}
+                  onMouseLeave={() => {
+                    setHovering(false)
+                    setIgnoreHover(false)
+                  }}
+                  onFocus={() => setHovering(true)}
+                  onBlur={() => {
+                    setHovering(false)
+                    setIgnoreHover(false)
+                  }}
+                  onClick={() => {
+                    setPinned((on) => {
+                      // 끄는 클릭이라면, 커서가 아직 위에 있어도 다시 켜지지 않게 막는다.
+                      if (on) setIgnoreHover(true)
+                      return !on
+                    })
+                  }}
                   title="어떤 카드로 만든 족보인지 보기"
                 >
                   {myHolding.description}
