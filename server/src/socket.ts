@@ -299,10 +299,13 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
 
     socket.on('game:ready', ({ ready }, ack) => {
       withGame(ack, (game, code, playerId) => {
+        const before = game.view().round
         const result = game.setReady(playerId, Boolean(ready))
         ack(result)
-        // 라운드가 넘어가도 손패는 그대로다. 새로 깔린 커뮤니티 카드는 공개 상태에 실린다.
-        if (result.ok) sendGame(code)
+        if (!result.ok) return
+        // 라운드가 넘어갈 때는 손패도 함께 보낸다. 감지기가 누군가의 카드를
+        // 갈아엎었을 수 있는데, 그 사람 화면에는 옛 카드가 남는다.
+        sendGame(code, { hands: game.view().round !== before })
       })
     })
 

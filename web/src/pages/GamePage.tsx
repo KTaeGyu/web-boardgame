@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
+  CHALLENGES,
   ROUNDS,
   ROUND_LABEL,
   TOKEN_LOCK_MS,
@@ -207,6 +208,8 @@ export function GamePage() {
    * 공개 순서는 ref 로 읽는다. 의존성에 넣으면 누가 「다음 금고로」를 누를 때마다
    * 새 상태가 도착해 공개가 처음부터 다시 시작된다.
    */
+  /** 감지기 알림은 판마다 한 번만 띄운다. 상태가 다시 올 때마다 뜨면 곤란하다. */
+  const shownSensor = useRef('')
   const revealsRef = useRef(game?.showdown?.reveals ?? [])
   revealsRef.current = game?.showdown?.reveals ?? []
   const successRef = useRef(false)
@@ -252,6 +255,23 @@ export function GamePage() {
       timers.current = []
     }
   }, [showdownKey, revealCount, phase])
+
+  const sensor = game?.sensor ?? null
+  const sensorKey = sensor ? `${game?.heist}:${sensor.challenge}` : ''
+
+  useEffect(() => {
+    if (!sensor || shownSensor.current === sensorKey) return
+    shownSensor.current = sensorKey
+
+    setFlash({
+      key: sensorKey,
+      text: `${CHALLENGES[sensor.challenge].name} 작동!`,
+      tone: 'bad',
+      final: true,
+    })
+    const timer = setTimeout(() => setFlash((current) => (current?.key === sensorKey ? null : current)), FINAL_MS)
+    return () => clearTimeout(timer)
+  }, [sensor, sensorKey])
 
   async function take(token: number) {
     const result = await call<null>('game:take', { token })

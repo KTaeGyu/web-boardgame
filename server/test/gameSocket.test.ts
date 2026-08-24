@@ -265,8 +265,9 @@ describe('한 판 끝까지', () => {
     assert.equal(next.round, 1)
     assert.deepEqual(next.community, [])
     await new Promise((resolve) => setTimeout(resolve, 100))
-    assert.equal(people[0].hands.length, 2, '새 판에는 새 손패가 온다')
-    assert.notDeepEqual(people[0].hands[0], people[0].hands[1])
+    // 손패는 라운드가 넘어갈 때도 다시 온다(감지기가 카드를 갈아엎을 수 있어서).
+    // 그래서 횟수가 아니라 내용으로 본다.
+    assert.notDeepEqual(people[0].hands.at(-1), people[0].hands[0], '새 판에는 새 손패가 온다')
   })
 })
 

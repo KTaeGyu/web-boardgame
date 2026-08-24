@@ -133,6 +133,8 @@ export class Game {
    * 동작 감지기와 레이저 감지선이 이 값을 보고 대상을 고른다.
    */
   private roundOneTokens = new Map<string, number>()
+  /** 감지기가 누구의 손을 갈아엎었는지. 판이 바뀔 때까지 남는다. */
+  private sensorFired: { challenge: ChallengeId; playerId: string } | null = null
   /** 딜 직후 다 같이 하는 단계. 「조율가」와 「사기꾼」이 쓴다. */
   private setup: { kind: 'pass' | 'memorize'; picks: Map<string, number>; done: Set<string> } | null = null
   /** 한 장을 더 받아 지금 버릴 카드를 고르고 있는 사람. */
@@ -197,6 +199,7 @@ export class Game {
     this.continued.clear()
     this.roundOneTokens.clear()
     this.scan = null
+    this.sensorFired = null
     this.setup = null
     this.discardingId = null
 
@@ -629,7 +632,13 @@ export class Game {
     const victimId = [...this.roundOneTokens].find(([, token]) => token === target)?.[0]
     const victim = this.seats.find((seat) => seat.id === victimId)
     if (!victim) return
+
     victim.hole = victim.hole.map(() => this.draw())
+    this.sensorFired = { challenge: this.has(3) ? 3 : 7, playerId: victim.id }
+    this.announcements.push({
+      playerId: victim.id,
+      text: `${this.nameOf(victim.id)} — 카드를 새로 받았습니다`,
+    })
   }
 
   /**
@@ -812,6 +821,7 @@ export class Game {
       ),
       stuckTokens: stuck,
       canConfirm: this.phase === 'picking' && this.everyoneHasToken(),
+      sensor: this.sensorFired,
       setup: this.setupView(),
       discardingId: this.discardingId,
       scan: this.scanView(),

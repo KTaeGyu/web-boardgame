@@ -135,6 +135,11 @@ export interface GameView {
   stuckTokens: number[]
   /** 모두가 토큰을 쥐어서 확정 버튼이 열렸는지. */
   canConfirm: boolean
+  /**
+   * 감지기가 누군가의 손을 갈아엎었다는 사실. 판이 바뀌면 사라진다.
+   * 조용히 바뀌면 아무도 눈치채지 못하므로 화면에 크게 알린다.
+   */
+  sensor: { challenge: ChallengeId; playerId: string } | null
   /** 딜 직후 다 같이 하는 단계. 끝나면 null 이 된다. */
   setup: SetupState | null
   /** 한 장을 더 받아 지금 버릴 카드를 고르고 있는 사람. */

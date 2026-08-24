@@ -473,6 +473,16 @@ describe('카드를 새로 받게 만드는 감지기', () => {
     assert.equal(ctx.game.handOf('p1')?.length, 2, '장수는 그대로다')
   })
 
+  it('감지기가 작동하면 그 사실이 남는다', () => {
+    const { ctx } = findFlop(3, true)
+    const view = ctx.game.view()
+    assert.deepEqual(view.sensor, { challenge: 3, playerId: 'p1' })
+    assert.ok(
+      view.announcements.some((a) => a.playerId === 'p1' && a.text.includes('새로 받았습니다')),
+      '누가 새로 받았는지 모두에게 알려야 한다',
+    )
+  })
+
   it('동작 감지기 — 그림카드가 없으면 아무 일도 없다', () => {
     const { ctx, before } = findFlop(3, false)
     for (const p of players) assert.equal(ctx.game.handOf(p.id)!.join(' '), before.get(p.id))
@@ -487,6 +497,7 @@ describe('카드를 새로 받게 만드는 감지기', () => {
   it('레이저 감지선 — 그림카드가 있으면 아무 일도 없다', () => {
     const { ctx, before } = findFlop(7, true)
     for (const p of players) assert.equal(ctx.game.handOf(p.id)!.join(' '), before.get(p.id))
+    assert.equal(ctx.game.view().sensor, null, '작동하지 않았으면 알릴 것도 없다')
   })
 
   it('빠른 접근과 겹치면 대상을 고를 수 없어 넘어간다', () => {
