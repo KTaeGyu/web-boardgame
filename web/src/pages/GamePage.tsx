@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   ALARMS_TO_LOSE,
@@ -6,6 +6,7 @@ import {
   ROUND_LABEL,
   TOKEN_LOCK_MS,
   VAULTS_TO_WIN,
+  describeHolding,
   type Card,
   type GamePlayerView,
   type GameView,
@@ -34,6 +35,12 @@ export function GamePage() {
   const [revealed, setRevealed] = useState(0)
 
   const tokenRef = useTokenFlight(TOKEN_LOCK_MS)
+
+  // 내 홀카드와 이미 공개된 보드만으로 구한다. 남의 정보는 쓰지 않으므로 새는 것이 없다.
+  const myHolding = useMemo(
+    () => describeHolding([...hand, ...(game?.community ?? [])]),
+    [hand, game?.community],
+  )
 
   // 진입·새로고침·재연결이 모두 같은 요청이다. 서버가 자리와 손패를 되돌려준다.
   useEffect(() => {
@@ -227,7 +234,10 @@ export function GamePage() {
             )}
           </div>
           <div className="my-seat__info">
-            <span className="my-seat__name">{me.nickname} (나)</span>
+            <span className="my-seat__name">
+              {me.nickname} (나)
+              {myHolding && <em className="my-seat__holding">{myHolding}</em>}
+            </span>
             <TokenTrack
               player={me}
               round={game.round}

@@ -26,8 +26,8 @@ export type HandCategory = (typeof HandCategory)[keyof typeof HandCategory]
 
 export const CATEGORY_LABEL: Record<HandCategory, string> = {
   [HandCategory.HighCard]: '하이카드',
-  [HandCategory.Pair]: '원페어',
-  [HandCategory.TwoPair]: '투페어',
+  [HandCategory.Pair]: '원 페어',
+  [HandCategory.TwoPair]: '투 페어',
   [HandCategory.ThreeOfAKind]: '트리플',
   [HandCategory.Straight]: '스트레이트',
   [HandCategory.Flush]: '플러시',
@@ -126,28 +126,53 @@ export function evaluateHoleAndCommunity(hole: readonly Card[], community: reado
   return evaluateBest([...hole, ...community])
 }
 
-/** 화면 표기용 짧은 설명. 예: "풀하우스 (K over 7)" 대신 "풀하우스 K" 정도로 간결하게. */
+/**
+ * 사람이 읽는 족보 이름. `이름(인자)` 형태로 통일한다.
+ *
+ * 인자는 그 족보를 결정지은 숫자다 — 투 페어는 높은 쪽부터, 풀하우스는
+ * 트리플이 먼저다. 로열은 인자가 없어도 무엇인지 분명하다.
+ */
 export function describeHand(value: HandValue): string {
   const name = (v: number) => RANKS[v - 2] ?? String(v)
   const [, ...tb] = value.score
+  const label = CATEGORY_LABEL[value.category]
+
   switch (value.category) {
     case HandCategory.StraightFlush:
-      return tb[0] === 14 ? '로열 스트레이트 플러시' : `스트레이트 플러시 ${name(tb[0])} 탑`
-    case HandCategory.FourOfAKind:
-      return `포카드 ${name(tb[0])}`
+      return tb[0] === 14 ? '로열 스트레이트 플러시' : `${label}(${name(tb[0])})`
     case HandCategory.FullHouse:
-      return `풀하우스 ${name(tb[0])} / ${name(tb[1])}`
-    case HandCategory.Flush:
-      return `플러시 ${name(tb[0])} 탑`
-    case HandCategory.Straight:
-      return `스트레이트 ${name(tb[0])} 탑`
-    case HandCategory.ThreeOfAKind:
-      return `트리플 ${name(tb[0])}`
     case HandCategory.TwoPair:
-      return `투페어 ${name(tb[0])} / ${name(tb[1])}`
-    case HandCategory.Pair:
-      return `원페어 ${name(tb[0])}`
+      return `${label}(${name(tb[0])}, ${name(tb[1])})`
     default:
-      return `하이카드 ${name(tb[0])}`
+      // 나머지는 최상위 숫자 하나로 충분하다. 플러시와 스트레이트는 탑 카드다.
+      return `${label}(${name(tb[0])})`
   }
+}
+
+/**
+ * 지금 손에 잡힌 최선의 족보. 카드가 몇 장이든 답한다.
+ *
+ * 프리플롭에는 홀카드 두 장뿐이라 5장 평가기를 쓸 수 없다. 그때도
+ * "원 페어인지 하이카드인지"는 말할 수 있어야 해서 따로 센다.
+ */
+export function describeHolding(cards: readonly Card[]): string | null {
+  if (cards.length < 2) return null
+  if (cards.length >= 5) return describeHand(evaluateBest(cards))
+
+  const name = (v: number) => RANKS[v - 2] ?? String(v)
+  const values = cards.map(rankValueOf).sort((a, b) => b - a)
+  const counts = new Map<number, number>()
+  for (const v of values) counts.set(v, (counts.get(v) ?? 0) + 1)
+  const groups = [...counts.entries()]
+    .sort((a, b) => b[1] - a[1] || b[0] - a[0])
+    .map(([rank, count]) => ({ rank, count }))
+
+  const [first, second] = groups
+  if (first.count === 4) return `${CATEGORY_LABEL[HandCategory.FourOfAKind]}(${name(first.rank)})`
+  if (first.count === 3) return `${CATEGORY_LABEL[HandCategory.ThreeOfAKind]}(${name(first.rank)})`
+  if (first.count === 2 && second?.count === 2) {
+    return `${CATEGORY_LABEL[HandCategory.TwoPair]}(${name(first.rank)}, ${name(second.rank)})`
+  }
+  if (first.count === 2) return `${CATEGORY_LABEL[HandCategory.Pair]}(${name(first.rank)})`
+  return `${CATEGORY_LABEL[HandCategory.HighCard]}(${name(values[0])})`
 }

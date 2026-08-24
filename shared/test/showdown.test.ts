@@ -86,7 +86,7 @@ describe('쇼다운 판정', () => {
 
   it('각 공개마다 사람이 읽을 수 있는 족보 설명이 붙는다', () => {
     const result = judgeShowdown([entry('a', 1, 'Kh Kd')], board)
-    assert.equal(result.reveals[0].description, '트리플 K')
+    assert.equal(result.reveals[0].description, '트리플(K)')
   })
 })
 

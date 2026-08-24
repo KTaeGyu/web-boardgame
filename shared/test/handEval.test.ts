@@ -4,6 +4,7 @@ import assert from 'node:assert/strict'
 import { type Card, freshDeck, hasDuplicates, shuffle } from '../src/cards.ts'
 import {
   CATEGORY_LABEL,
+  describeHolding,
   HandCategory,
   compareHands,
   describeHand,
@@ -107,7 +108,7 @@ describe('7장 중 최선의 5장', () => {
   it('풀하우스 재료가 있으면 트리플에 머물지 않는다', () => {
     const best = evaluateBest(hand('7s 7h 7d 4c 4h Ks 2d'))
     assert.equal(best.category, HandCategory.FullHouse)
-    assert.equal(describeHand(best), '풀하우스 7 / 4')
+    assert.equal(describeHand(best), '풀하우스(7, 4)')
   })
 
   it('홀카드를 쓰지 않고 보드 5장이 최선일 수 있다', () => {
@@ -119,8 +120,28 @@ describe('7장 중 최선의 5장', () => {
   it('두 페어 재료가 셋이면 높은 쪽 둘만 쓴다', () => {
     const best = evaluateBest(hand('Ks Kh 9d 9c 4s 4h Ad'))
     assert.equal(best.category, HandCategory.TwoPair)
-    assert.equal(describeHand(best), '투페어 K / 9')
+    assert.equal(describeHand(best), '투 페어(K, 9)')
     assert.equal(best.score[3], 14) // 키커는 A
+  })
+})
+
+describe('지금 손에 잡힌 족보', () => {
+  const holding = (s: string) => describeHolding(hand(s))
+
+  it('프리플롭에도 답한다 — 카드 두 장뿐이어도', () => {
+    assert.equal(holding('Ks 9h'), '하이카드(K)')
+    assert.equal(holding('3s 3h'), '원 페어(3)')
+  })
+
+  it('보드가 깔리면 일곱 장 중 최선으로 답한다', () => {
+    assert.equal(holding('Ks Kh 3d 3c 9s'), '투 페어(K, 3)')
+    assert.equal(holding('3s 3h 3d Kc Ks 9d 2c'), '풀하우스(3, K)')
+    assert.equal(holding('9h 8s 7d 6c 5h Kd 2c'), '스트레이트(9)')
+    assert.equal(holding('As Ks Qs Js Ts 2h 3d'), '로열 스트레이트 플러시')
+  })
+
+  it('족보를 이룰 만큼 못 받았으면 답하지 않는다', () => {
+    assert.equal(describeHolding([]), null)
   })
 })
 

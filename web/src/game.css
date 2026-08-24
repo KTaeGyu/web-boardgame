@@ -188,7 +188,24 @@
 }
 
 .my-seat__name {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
   font-weight: 700;
+}
+
+/* 지금 내 손에 잡힌 최선의 족보. 내 카드와 공개된 보드로만 구한 값이다. */
+.my-seat__holding {
+  padding: 2px 10px;
+  border: 1px solid var(--gold-dim);
+  border-radius: 999px;
+  background: rgba(212, 175, 55, 0.1);
+  color: var(--gold);
+  font-size: 13px;
+  font-weight: 600;
+  font-style: normal;
+  letter-spacing: 0.02em;
 }
 
 /* ── 카드 ─────────────────────────────── */
