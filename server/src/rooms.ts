@@ -1,0 +1,256 @@
+/**
+ * 방 저장소. 상태는 전부 이 프로세스의 메모리에 있고 DB 는 없다.
+ *
+ * 소켓을 전혀 모른다. 그래야 네트워크 없이 규칙만 테스트할 수 있다.
+ * 시간도 주입받는다 — 재접속 유예를 테스트하려면 시계를 마음대로 돌려야 한다.
+ */
+
+import {
+  DEFAULT_SETTINGS,
+  GAME_MODES,
+  MAX_PLAYERS_LIMIT,
+  MIN_PLAYERS,
+  PENALTIES,
+  type ErrorCode,
+  type GameMode,
+  type Penalty,
+  type Result,
+  type RoomPhase,
+  type RoomSettings,
+  type RoomSummary,
+  type RoomView,
+} from '@the-gang/shared'
+
+/** 끊긴 사람의 자리를 지켜주는 시간. 새로고침이나 잠깐의 전파 끊김을 흡수한다. */
+export const DISCONNECT_GRACE_MS = 30_000
+
+interface Player {
+  id: string
+  nickname: string
+  connected: boolean
+  disconnectedAt: number | null
+  joinedAt: number
+}
+
+interface Room {
+  code: string
+  hostId: string
+  /** 배열인 이유는 입장 순서를 유지하기 위해서다. 방장 인계가 이 순서를 따른다. */
+  players: Player[]
+  settings: RoomSettings
+  phase: RoomPhase
+  createdAt: number
+}
+
+function err<T>(code: ErrorCode, message: string): Result<T> {
+  return { ok: false, code, message }
+}
+
+function ok<T>(value: T): Result<T> {
+  return { ok: true, value }
+}
+
+export interface RoomStoreOptions {
+  now?: () => number
+  makeCode?: (taken: (code: string) => boolean) => string
+  graceMs?: number
+}
+
+export class RoomStore {
+  private readonly rooms = new Map<string, Room>()
+  /** playerId → 방 코드. 사람은 한 번에 한 방에만 있는다. */
+  private readonly whereIs = new Map<string, string>()
+  private readonly now: () => number
+  private readonly makeCode: (taken: (code: string) => boolean) => string
+  private readonly graceMs: number
+
+  constructor(options: RoomStoreOptions = {}) {
+    this.now = options.now ?? Date.now
+    this.makeCode = options.makeCode ?? defaultCodeFactory
+    this.graceMs = options.graceMs ?? DISCONNECT_GRACE_MS
+  }
+
+  createRoom(playerId: string, nickname: string): Result<RoomView> {
+    this.leaveRoom(playerId) // 다른 방에 남아 있었다면 정리하고 시작한다
+    const code = this.makeCode((candidate) => this.rooms.has(candidate))
+    const now = this.now()
+    const room: Room = {
+      code,
+      hostId: playerId,
+      players: [{ id: playerId, nickname, connected: true, disconnectedAt: null, joinedAt: now }],
+      settings: { ...DEFAULT_SETTINGS, penalties: [] },
+      phase: 'lobby',
+      createdAt: now,
+    }
+    this.rooms.set(code, room)
+    this.whereIs.set(playerId, code)
+    return ok(toView(room))
+  }
+
+  joinRoom(playerId: string, nickname: string, code: string): Result<RoomView> {
+    const room = this.rooms.get(code.toUpperCase())
+    if (!room) return err('ROOM_NOT_FOUND', '없는 방입니다. 방 번호를 다시 확인해 주세요.')
+
+    const existing = room.players.find((p) => p.id === playerId)
+    if (existing) {
+      // 같은 방에 다시 들어온 것은 입장이 아니라 재접속이다. 게임 중이어도 받아줘야 한다.
+      existing.connected = true
+      existing.disconnectedAt = null
+      existing.nickname = nickname
+      this.whereIs.set(playerId, room.code)
+      return ok(toView(room))
+    }
+
+    if (room.phase !== 'lobby') return err('ROOM_IN_GAME', '이미 게임이 시작된 방입니다.')
+    if (room.players.length >= room.settings.maxPlayers) return err('ROOM_FULL', '정원이 찼습니다.')
+
+    this.leaveRoom(playerId)
+    room.players.push({ id: playerId, nickname, connected: true, disconnectedAt: null, joinedAt: this.now() })
+    this.whereIs.set(playerId, room.code)
+    return ok(toView(room))
+  }
+
+  /** 스스로 나가는 경우. 끊김과 달리 유예 없이 즉시 자리를 비운다. */
+  leaveRoom(playerId: string): { room: RoomView | null; closedCode: string | null } {
+    const code = this.whereIs.get(playerId)
+    if (!code) return { room: null, closedCode: null }
+    this.whereIs.delete(playerId)
+
+    const room = this.rooms.get(code)
+    if (!room) return { room: null, closedCode: null }
+
+    room.players = room.players.filter((p) => p.id !== playerId)
+    if (room.players.length === 0) {
+      this.rooms.delete(room.code)
+      return { room: null, closedCode: room.code }
+    }
+    if (room.hostId === playerId) room.hostId = nextHost(room)
+    return { room: toView(room), closedCode: null }
+  }
+
+  /** 소켓이 끊겼을 뿐이다. 자리는 유예 시간 동안 남겨둔다. */
+  markDisconnected(playerId: string): RoomView | null {
+    const room = this.roomOf(playerId)
+    const player = room?.players.find((p) => p.id === playerId)
+    if (!room || !player) return null
+    player.connected = false
+    player.disconnectedAt = this.now()
+    return toView(room)
+  }
+
+  /** 유예를 넘긴 자리를 실제로 비운다. 소켓 계층이 주기적으로 부른다. */
+  sweep(): { changed: RoomView[]; closedCodes: string[] } {
+    const deadline = this.now() - this.graceMs
+    const changed: RoomView[] = []
+    const closedCodes: string[] = []
+
+    for (const room of [...this.rooms.values()]) {
+      const expired = room.players.filter(
+        (p) => !p.connected && p.disconnectedAt !== null && p.disconnectedAt <= deadline,
+      )
+      if (expired.length === 0) continue
+
+      for (const player of expired) this.whereIs.delete(player.id)
+      const expiredIds = new Set(expired.map((p) => p.id))
+      room.players = room.players.filter((p) => !expiredIds.has(p.id))
+
+      if (room.players.length === 0) {
+        this.rooms.delete(room.code)
+        closedCodes.push(room.code)
+        continue
+      }
+      if (expiredIds.has(room.hostId)) room.hostId = nextHost(room)
+      changed.push(toView(room))
+    }
+    return { changed, closedCodes }
+  }
+
+  updateSettings(playerId: string, patch: Partial<RoomSettings>): Result<RoomView> {
+    const room = this.roomOf(playerId)
+    if (!room) return err('NOT_IN_ROOM', '방에 들어와 있지 않습니다.')
+    if (room.hostId !== playerId) return err('NOT_HOST', '방장만 설정을 바꿀 수 있습니다.')
+
+    const next: RoomSettings = { ...room.settings, ...patch }
+    if (!GAME_MODES.includes(next.mode as GameMode)) return err('INVALID_SETTINGS', '알 수 없는 모드입니다.')
+    if (!Number.isInteger(next.maxPlayers) || next.maxPlayers < MIN_PLAYERS || next.maxPlayers > MAX_PLAYERS_LIMIT) {
+      return err('INVALID_SETTINGS', `최대 인원은 ${MIN_PLAYERS}~${MAX_PLAYERS_LIMIT}명입니다.`)
+    }
+    if (next.maxPlayers < room.players.length) {
+      return err('INVALID_SETTINGS', '이미 들어와 있는 인원보다 적게 줄일 수 없습니다.')
+    }
+    if (next.penalties.some((p) => !PENALTIES.includes(p as Penalty))) {
+      return err('INVALID_SETTINGS', '알 수 없는 패널티입니다.')
+    }
+
+    room.settings = { ...next, penalties: [...new Set(next.penalties)] }
+    return ok(toView(room))
+  }
+
+  /** 방 목록. 접속 중인 사람이 하나도 없는 방은 보이지 않는다. */
+  list(): RoomSummary[] {
+    const summaries: RoomSummary[] = []
+    for (const room of this.rooms.values()) {
+      const connected = room.players.filter((p) => p.connected)
+      if (connected.length === 0) continue
+      summaries.push({
+        code: room.code,
+        hostNickname: room.players.find((p) => p.id === room.hostId)?.nickname ?? '(알 수 없음)',
+        playerCount: connected.length,
+        maxPlayers: room.settings.maxPlayers,
+        phase: room.phase,
+      })
+    }
+    return summaries.sort((a, b) => a.code.localeCompare(b.code))
+  }
+
+  /** 게임 계층이 방의 단계를 옮긴다. 목록 노출과 입장 가능 여부가 여기에 달려 있다. */
+  setPhase(code: string, phase: RoomPhase): RoomView | null {
+    const room = this.rooms.get(code.toUpperCase())
+    if (!room) return null
+    room.phase = phase
+    return toView(room)
+  }
+
+  view(code: string): RoomView | null {
+    const room = this.rooms.get(code.toUpperCase())
+    return room ? toView(room) : null
+  }
+
+  codeOf(playerId: string): string | null {
+    return this.whereIs.get(playerId) ?? null
+  }
+
+  get size(): number {
+    return this.rooms.size
+  }
+
+  private roomOf(playerId: string): Room | undefined {
+    const code = this.whereIs.get(playerId)
+    return code ? this.rooms.get(code) : undefined
+  }
+}
+
+function defaultCodeFactory(): string {
+  throw new Error('RoomStore 에 makeCode 를 넘겨야 한다')
+}
+
+/** 접속 중인 사람 중 가장 먼저 들어온 사람. 아무도 접속 중이 아니면 남은 사람 중 가장 먼저 들어온 사람. */
+function nextHost(room: Room): string {
+  const byJoin = [...room.players].sort((a, b) => a.joinedAt - b.joinedAt)
+  return (byJoin.find((p) => p.connected) ?? byJoin[0]).id
+}
+
+function toView(room: Room): RoomView {
+  return {
+    code: room.code,
+    hostId: room.hostId,
+    players: room.players.map((p) => ({
+      id: p.id,
+      nickname: p.nickname,
+      isHost: p.id === room.hostId,
+      connected: p.connected,
+    })),
+    settings: { ...room.settings, penalties: [...room.settings.penalties] },
+    phase: room.phase,
+  }
+}

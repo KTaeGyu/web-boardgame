@@ -9,11 +9,13 @@
     "web"
   ],
   "scripts": {
-    "test": "node --test \"shared/test/**/*.test.ts\"",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "test": "node --test \"shared/test/**/*.test.ts\" \"server/test/**/*.test.ts\"",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "dev:server": "npm run dev --workspace @the-gang/server"
   },
   "devDependencies": {
     "@types/node": "^26.2.0",
+    "socket.io-client": "^4.8.3",
     "typescript": "^5.7.2"
   },
   "engines": {

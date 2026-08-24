@@ -1,0 +1,328 @@
+import { describe, it, beforeEach } from 'node:test'
+import assert from 'node:assert/strict'
+
+import { RoomStore } from '../src/rooms.ts'
+
+/** 시계와 방 코드를 손으로 돌리는 저장소. 테스트는 우연에 기대지 않는다. */
+function makeStore(graceMs = 30_000) {
+  let clock = 1_000_000
+  let counter = 0
+  const store = new RoomStore({
+    now: () => clock,
+    makeCode: () => `R${counter++}`,
+    graceMs,
+  })
+  return {
+    store,
+    advance: (ms: number) => {
+      clock += ms
+    },
+  }
+}
+
+const nicknames = new Map([
+  ['p1', '태규'],
+  ['p2', '민수'],
+  ['p3', '지연'],
+  ['p4', '하늘'],
+])
+
+/** 방을 하나 만들고 지정한 사람들을 순서대로 넣는다. */
+function seed(store: RoomStore, ids: string[]) {
+  const created = store.createRoom(ids[0], nicknames.get(ids[0]) ?? ids[0])
+  assert.equal(created.ok, true)
+  const code = created.ok ? created.value.code : ''
+  for (const id of ids.slice(1)) {
+    const joined = store.joinRoom(id, nicknames.get(id) ?? id, code)
+    assert.equal(joined.ok, true, `${id} 입장 실패`)
+  }
+  return code
+}
+
+describe('방 만들기', () => {
+  it('만든 사람이 방장이고 혼자 들어가 있다', () => {
+    const { store } = makeStore()
+    const result = store.createRoom('p1', '태규')
+    assert.equal(result.ok, true)
+    if (!result.ok) return
+    assert.equal(result.value.hostId, 'p1')
+    assert.equal(result.value.phase, 'lobby')
+    assert.deepEqual(result.value.players.map((p) => [p.nickname, p.isHost]), [['태규', true]])
+  })
+
+  it('기본 설정으로 시작한다', () => {
+    const { store } = makeStore()
+    const result = store.createRoom('p1', '태규')
+    assert.equal(result.ok, true)
+    if (!result.ok) return
+    assert.deepEqual(result.value.settings, { penalties: [], mode: 'basic', maxPlayers: 6 })
+  })
+
+  it('다른 방에 있던 사람이 방을 만들면 이전 방에서 빠진다', () => {
+    const { store } = makeStore()
+    const first = seed(store, ['p1', 'p2'])
+    store.createRoom('p2', '민수')
+    assert.equal(store.view(first)?.players.length, 1)
+    assert.equal(store.codeOf('p2') !== first, true)
+  })
+})
+
+describe('방 입장', () => {
+  let ctx: ReturnType<typeof makeStore>
+  beforeEach(() => {
+    ctx = makeStore()
+  })
+
+  it('없는 방이면 거절한다', () => {
+    const result = ctx.store.joinRoom('p1', '태규', 'ZZZZ')
+    assert.equal(result.ok, false)
+    if (!result.ok) assert.equal(result.code, 'ROOM_NOT_FOUND')
+  })
+
+  it('방 코드는 대소문자를 가리지 않는다', () => {
+    const code = seed(ctx.store, ['p1'])
+    assert.equal(ctx.store.joinRoom('p2', '민수', code.toLowerCase()).ok, true)
+  })
+
+  it('정원이 차면 거절한다', () => {
+    const code = seed(ctx.store, ['p1'])
+    ctx.store.updateSettings('p1', { maxPlayers: 3 })
+    ctx.store.joinRoom('p2', '민수', code)
+    ctx.store.joinRoom('p3', '지연', code)
+    const result = ctx.store.joinRoom('p4', '하늘', code)
+    assert.equal(result.ok, false)
+    if (!result.ok) assert.equal(result.code, 'ROOM_FULL')
+  })
+
+  it('게임 중인 방에는 새로 들어갈 수 없다', () => {
+    const code = seed(ctx.store, ['p1', 'p2', 'p3'])
+    ctx.store.setPhase(code, 'playing')
+    const result = ctx.store.joinRoom('p4', '하늘', code)
+    assert.equal(result.ok, false)
+    if (!result.ok) assert.equal(result.code, 'ROOM_IN_GAME')
+  })
+
+  it('이미 그 방에 있던 사람은 게임 중이어도 다시 들어올 수 있다 (재접속)', () => {
+    const code = seed(ctx.store, ['p1', 'p2', 'p3'])
+    ctx.store.setPhase(code, 'playing')
+    ctx.store.markDisconnected('p2')
+
+    const result = ctx.store.joinRoom('p2', '민수', code)
+    assert.equal(result.ok, true)
+    if (!result.ok) return
+    assert.equal(result.value.players.find((p) => p.id === 'p2')?.connected, true)
+    assert.equal(result.value.players.length, 3)
+  })
+
+  it('재접속하면서 닉네임을 바꿔 달고 들어올 수 있다', () => {
+    const code = seed(ctx.store, ['p1', 'p2'])
+    const result = ctx.store.joinRoom('p2', '민수2', code)
+    assert.equal(result.ok, true)
+    if (!result.ok) return
+    assert.equal(result.value.players.find((p) => p.id === 'p2')?.nickname, '민수2')
+  })
+})
+
+describe('방 나가기와 방장 인계', () => {
+  it('나가면 자리가 즉시 빈다', () => {
+    const { store } = makeStore()
+    const code = seed(store, ['p1', 'p2'])
+    store.leaveRoom('p2')
+    assert.deepEqual(store.view(code)?.players.map((p) => p.id), ['p1'])
+  })
+
+  it('방장이 나가면 가장 먼저 들어온 남은 사람에게 넘어간다', () => {
+    const { store } = makeStore()
+    const code = seed(store, ['p1', 'p2', 'p3'])
+    const { room } = store.leaveRoom('p1')
+    assert.equal(room?.hostId, 'p2')
+    assert.equal(store.view(code)?.players.find((p) => p.isHost)?.id, 'p2')
+  })
+
+  it('접속 중인 사람이 끊긴 사람보다 우선해서 방장이 된다', () => {
+    const { store } = makeStore()
+    seed(store, ['p1', 'p2', 'p3'])
+    store.markDisconnected('p2') // 먼저 들어왔지만 지금 끊겨 있다
+    const { room } = store.leaveRoom('p1')
+    assert.equal(room?.hostId, 'p3')
+  })
+
+  it('마지막 사람이 나가면 방이 사라진다', () => {
+    const { store } = makeStore()
+    const code = seed(store, ['p1'])
+    const { room, closedCode } = store.leaveRoom('p1')
+    assert.equal(room, null)
+    assert.equal(closedCode, code)
+    assert.equal(store.size, 0)
+    assert.equal(store.view(code), null)
+  })
+
+  it('방에 없는 사람이 나가도 아무 일도 없다', () => {
+    const { store } = makeStore()
+    assert.deepEqual(store.leaveRoom('없는사람'), { room: null, closedCode: null })
+  })
+})
+
+describe('끊김과 재접속 유예', () => {
+  it('끊겨도 자리는 남고 흐리게 표시된다', () => {
+    const { store } = makeStore()
+    const code = seed(store, ['p1', 'p2'])
+    store.markDisconnected('p2')
+    const view = store.view(code)
+    assert.equal(view?.players.length, 2)
+    assert.equal(view?.players.find((p) => p.id === 'p2')?.connected, false)
+  })
+
+  it('유예 시간 안에는 아무도 치우지 않는다', () => {
+    const { store, advance } = makeStore(30_000)
+    const code = seed(store, ['p1', 'p2'])
+    store.markDisconnected('p2')
+    advance(29_999)
+    assert.deepEqual(store.sweep(), { changed: [], closedCodes: [] })
+    assert.equal(store.view(code)?.players.length, 2)
+  })
+
+  it('유예를 넘기면 자리를 비운다', () => {
+    const { store, advance } = makeStore(30_000)
+    const code = seed(store, ['p1', 'p2'])
+    store.markDisconnected('p2')
+    advance(30_000)
+
+    const { changed, closedCodes } = store.sweep()
+    assert.equal(closedCodes.length, 0)
+    assert.deepEqual(changed.map((r) => r.code), [code])
+    assert.deepEqual(store.view(code)?.players.map((p) => p.id), ['p1'])
+    assert.equal(store.codeOf('p2'), null)
+  })
+
+  it('유예 안에 돌아오면 그대로 복구된다', () => {
+    const { store, advance } = makeStore(30_000)
+    const code = seed(store, ['p1', 'p2'])
+    store.markDisconnected('p2')
+    advance(20_000)
+    store.joinRoom('p2', '민수', code)
+    advance(20_000) // 끊긴 시점부터는 40초가 지났지만 이미 돌아왔다
+
+    assert.deepEqual(store.sweep(), { changed: [], closedCodes: [] })
+    assert.equal(store.view(code)?.players.length, 2)
+  })
+
+  it('유예를 넘긴 사람이 방장이었으면 방장도 넘어간다', () => {
+    const { store, advance } = makeStore(30_000)
+    const code = seed(store, ['p1', 'p2'])
+    store.markDisconnected('p1')
+    advance(30_000)
+    store.sweep()
+    assert.equal(store.view(code)?.hostId, 'p2')
+  })
+
+  it('전원이 유예를 넘기면 방이 사라진다', () => {
+    const { store, advance } = makeStore(30_000)
+    const code = seed(store, ['p1', 'p2'])
+    store.markDisconnected('p1')
+    store.markDisconnected('p2')
+    advance(30_000)
+
+    const { changed, closedCodes } = store.sweep()
+    assert.deepEqual(closedCodes, [code])
+    assert.equal(changed.length, 0)
+    assert.equal(store.size, 0)
+  })
+})
+
+describe('방 목록', () => {
+  it('접속 중인 인원수와 방장 닉네임을 보여준다', () => {
+    const { store } = makeStore()
+    const code = seed(store, ['p1', 'p2', 'p3'])
+    assert.deepEqual(store.list(), [
+      { code, hostNickname: '태규', playerCount: 3, maxPlayers: 6, phase: 'lobby' },
+    ])
+  })
+
+  it('끊긴 사람은 인원수에서 빠진다', () => {
+    const { store } = makeStore()
+    seed(store, ['p1', 'p2'])
+    store.markDisconnected('p2')
+    assert.equal(store.list()[0].playerCount, 1)
+  })
+
+  it('아무도 접속해 있지 않은 방은 목록에서 감춘다', () => {
+    const { store } = makeStore()
+    seed(store, ['p1'])
+    store.markDisconnected('p1')
+    assert.deepEqual(store.list(), [])
+  })
+
+  it('게임 중인 방도 보이되 단계가 함께 나간다 — 화면이 입장을 막을 수 있도록', () => {
+    const { store } = makeStore()
+    const code = seed(store, ['p1', 'p2', 'p3'])
+    store.setPhase(code, 'playing')
+    assert.equal(store.list()[0].phase, 'playing')
+  })
+})
+
+describe('방 설정', () => {
+  let ctx: ReturnType<typeof makeStore>
+  let code: string
+  beforeEach(() => {
+    ctx = makeStore()
+    code = seed(ctx.store, ['p1', 'p2'])
+  })
+
+  it('방장만 바꿀 수 있다', () => {
+    const result = ctx.store.updateSettings('p2', { maxPlayers: 4 })
+    assert.equal(result.ok, false)
+    if (!result.ok) assert.equal(result.code, 'NOT_HOST')
+  })
+
+  it('방에 없는 사람은 바꿀 수 없다', () => {
+    const result = ctx.store.updateSettings('없는사람', { maxPlayers: 4 })
+    assert.equal(result.ok, false)
+    if (!result.ok) assert.equal(result.code, 'NOT_IN_ROOM')
+  })
+
+  it('일부만 넘겨도 나머지는 유지된다', () => {
+    const result = ctx.store.updateSettings('p1', { mode: 'advanced' })
+    assert.equal(result.ok, true)
+    if (!result.ok) return
+    assert.equal(result.value.settings.mode, 'advanced')
+    assert.equal(result.value.settings.maxPlayers, 6)
+  })
+
+  it('최대 인원은 3~10명이다', () => {
+    for (const bad of [2, 11, 5.5]) {
+      const result = ctx.store.updateSettings('p1', { maxPlayers: bad })
+      assert.equal(result.ok, false, `${bad}명이 통과했다`)
+      if (!result.ok) assert.equal(result.code, 'INVALID_SETTINGS')
+    }
+    assert.equal(ctx.store.updateSettings('p1', { maxPlayers: 3 }).ok, true)
+    assert.equal(ctx.store.updateSettings('p1', { maxPlayers: 10 }).ok, true)
+  })
+
+  it('이미 들어와 있는 인원보다 적게 줄일 수 없다', () => {
+    ctx.store.joinRoom('p3', '지연', code)
+    ctx.store.joinRoom('p4', '하늘', code)
+    const result = ctx.store.updateSettings('p1', { maxPlayers: 3 })
+    assert.equal(result.ok, false)
+    if (!result.ok) assert.match(result.message, /적게 줄일 수 없습니다/)
+  })
+
+  it('모르는 모드나 패널티는 거절한다', () => {
+    assert.equal(ctx.store.updateSettings('p1', { mode: 'ultra' as never }).ok, false)
+    assert.equal(ctx.store.updateSettings('p1', { penalties: ['없는패널티' as never] }).ok, false)
+  })
+
+  it('같은 패널티를 여러 번 넣어도 한 번만 남는다', () => {
+    const result = ctx.store.updateSettings('p1', { penalties: ['retinaScan', 'retinaScan'] })
+    assert.equal(result.ok, true)
+    if (result.ok) assert.deepEqual(result.value.settings.penalties, ['retinaScan'])
+  })
+
+  it('돌려주는 설정은 복사본이라 밖에서 고쳐도 방이 오염되지 않는다', () => {
+    const result = ctx.store.updateSettings('p1', { penalties: ['retinaScan'] })
+    assert.equal(result.ok, true)
+    if (!result.ok) return
+    result.value.settings.penalties.push('quickAccess')
+    assert.deepEqual(ctx.store.view(code)?.settings.penalties, ['retinaScan'])
+  })
+})

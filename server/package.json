@@ -1,0 +1,16 @@
+{
+  "name": "@the-gang/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "scripts": {
+    "dev": "node --watch src/index.ts",
+    "start": "node src/index.ts",
+    "test": "node --test \"test/**/*.test.ts\""
+  },
+  "dependencies": {
+    "@the-gang/shared": "*",
+    "socket.io": "^4.8.1"
+  }
+}

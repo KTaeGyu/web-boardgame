@@ -13,5 +13,5 @@
     "erasableSyntaxOnly": true,
     "types": ["node"]
   },
-  "include": ["shared/**/*.ts"]
+  "include": ["shared/**/*.ts", "server/**/*.ts"]
 }
