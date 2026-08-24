@@ -124,11 +124,11 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
     unlockTimers.delete(code)
   }
 
-  /** 사람이 빠지면 판을 이어갈 수 없다. 판을 접고 방은 대기실로 되돌린다. */
-  function abortGame(code: string, message: string): void {
+  /** 판을 접고 방은 대기실로 되돌린다. 방 자체는 남는다. */
+  function abortGame(code: string, message: string, reason: 'playerLeft' | 'hostClosed' = 'playerLeft'): void {
     if (!games.has(code)) return
     forgetRoom(code)
-    io.to(code).emit('game:aborted', { reason: 'playerLeft', message })
+    io.to(code).emit('game:aborted', { reason, message })
     announce(store.setPhase(code, 'lobby'))
   }
 
@@ -269,6 +269,24 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
       announce(store.setPhase(code, 'playing'))
       ack({ ok: true, value: game.view() })
       sendGame(code, { hands: true })
+    })
+
+    socket.on('game:toLobby', (ack) => {
+      const playerId = playerOfSocket.get(socket.id)
+      const code = playerId ? store.codeOf(playerId) : null
+      const room = code ? store.view(code) : null
+      if (!playerId || !code || !room) {
+        return ack({ ok: false, code: 'NOT_IN_ROOM', message: '방에 들어와 있지 않습니다.' })
+      }
+      if (room.hostId !== playerId) {
+        return ack({ ok: false, code: 'NOT_HOST', message: '방장만 할 수 있습니다.' })
+      }
+      if (!games.has(code)) {
+        return ack({ ok: false, code: 'GAME_NOT_RUNNING', message: '진행 중인 판이 없습니다.' })
+      }
+
+      ack({ ok: true, value: null })
+      abortGame(code, '방장이 판을 접었습니다. 모두 대기실로 돌아갑니다.', 'hostClosed')
     })
 
     socket.on('game:take', ({ token }, ack) => {

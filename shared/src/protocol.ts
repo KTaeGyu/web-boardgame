@@ -121,6 +121,8 @@ export interface ClientToServerEvents {
   'game:continue': (ack: (result: Result<null>) => void) => void
   /** 게임이 끝난 뒤 재경기. 한 명이라도 거절하면 방이 닫힌다. */
   'game:rematch': (payload: { agree: boolean }, ack: (result: Result<null>) => void) => void
+  /** 방장이 판을 접고 모두를 대기실로 되돌린다. 방은 그대로 남는다. */
+  'game:toLobby': (ack: (result: Result<null>) => void) => void
   /** 딜 직후 다 같이 하는 단계에서 내 몫을 마친다. 넘길 카드가 필요하면 함께 보낸다. */
   'game:setupCard': (payload: { cardIndex?: number }, ack: (result: Result<null>) => void) => void
   /** 한 장을 더 받은 뒤 버릴 카드를 고른다. */

@@ -62,6 +62,8 @@ export function GamePage() {
   /** 마지막 결과까지 다 보여줬는가. 이때가 되어야 다음으로 넘어가는 버튼이 열린다. */
   const [finished, setFinished] = useState(false)
   const [confirmLeave, setConfirmLeave] = useState(false)
+  /** 방장인지. 방장은 나가는 대신 판을 접어 모두를 대기실로 되돌린다. */
+  const [hostId, setHostId] = useState('')
   /** 카드가 나에게만 알려준 것들. 이번 판 동안 드로어에 남는다. */
   const [notes, setNotes] = useState<CardNote[]>([])
   /** 방금 도착한 쪽지. 한 번 보여주고 나면 드로어에서 다시 볼 수 있다. */
@@ -97,7 +99,10 @@ export function GamePage() {
       navigate('/', { replace: true })
       return
     }
-    const enter = () => void call('room:join', { playerId, nickname, code })
+    const enter = () =>
+      void call<{ hostId: string }>('room:join', { playerId, nickname, code }).then((result) => {
+        if (result.ok) setHostId(result.value.hostId)
+      })
     enter()
     socket.on('connect', enter)
     return () => {
@@ -152,9 +157,11 @@ export function GamePage() {
   useServerEvent(
     'room:updated',
     useCallback(
-      (room: { code: string; phase: string }) => {
+      (room: { code: string; phase: string; hostId: string }) => {
+        if (room.code !== code) return
+        setHostId(room.hostId)
         // 판이 접혔거나 아직 시작 전이면 이 화면에 있을 이유가 없다.
-        if (room.code === code && room.phase === 'lobby') navigate(`/rooms/${code}`, { replace: true })
+        if (room.phase === 'lobby') navigate(`/rooms/${code}`, { replace: true })
       },
       [code, navigate],
     ),
@@ -252,6 +259,8 @@ export function GamePage() {
   const me = game.players.find((player) => player.id === playerId)
   const others = game.players.filter((player) => player.id !== playerId)
   const picking = game.phase === 'picking'
+  // 방장에게는 나가기 대신 「로비로」가 있다. 정말 나가려면 대기실에서 한 번 더 눌러야 한다.
+  const iAmHost = hostId === playerId
   const waitingFor = game.players.filter((player) => !player.connected)
 
   return (
@@ -275,7 +284,7 @@ export function GamePage() {
           {picking ? `${game.round}라운드 · ${ROUND_LABEL[game.round]}` : '쇼다운'}
         </span>
         <button type="button" className="game-bar__leave" onClick={() => setConfirmLeave(true)}>
-          나가기
+          {iAmHost ? '로비로' : '나가기'}
         </button>
       </header>
 
@@ -447,7 +456,22 @@ export function GamePage() {
         <Showdown game={game} revealed={revealed} flash={flash} finished={finished} playerId={playerId} />
       )}
 
-      {confirmLeave && (
+      {confirmLeave && iAmHost && (
+        <ConfirmModal
+          title="판을 접고 대기실로 돌아가시겠습니까?"
+          confirmLabel="대기실로"
+          cancelLabel="계속하기"
+          onConfirm={() => {
+            void call('game:toLobby')
+            setConfirmLeave(false)
+          }}
+          onCancel={() => setConfirmLeave(false)}
+        >
+          <strong>이 판이 취소되고</strong> 방에 있는 모두가 대기실로 돌아갑니다. 방은 그대로 남습니다.
+        </ConfirmModal>
+      )}
+
+      {confirmLeave && !iAmHost && (
         <ConfirmModal
           title="게임에서 나가시겠습니까?"
           confirmLabel="나가기"

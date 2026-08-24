@@ -118,7 +118,11 @@
   z-index: 6;
   display: flex;
   align-items: flex-start;
-  max-width: min(92vw, 340px);
+  /*
+   * 폭을 확실히 정해 둔다. max-width 만 주면 본체가 내용에 맞춰 줄어드는데,
+   * 그 안의 카드는 width:100% 라 서로를 참조해 아주 좁게 잡힌다.
+   */
+  width: min(92vw, 360px);
 }
 
 .drawer__tab {
@@ -155,9 +159,12 @@
 }
 
 .drawer__body {
+  flex: 1;
+  min-width: 0;
   display: grid;
-  gap: 8px;
-  padding: 12px;
+  gap: 10px;
+  justify-items: center;
+  padding: 14px;
   max-height: 70vh;
   overflow-y: auto;
   border: 1px solid var(--line);
@@ -173,8 +180,7 @@
  */
 .extra-card {
   width: 100%;
-  max-width: 210px;
-  margin: 0 auto;
+  max-width: 240px;
   aspect-ratio: 5 / 7;
   perspective: 900px;
   cursor: pointer;
