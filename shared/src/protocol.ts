@@ -121,6 +121,8 @@ export interface ClientToServerEvents {
   'game:continue': (ack: (result: Result<null>) => void) => void
   /** 게임이 끝난 뒤 재경기. 한 명이라도 거절하면 방이 닫힌다. */
   'game:rematch': (payload: { agree: boolean }, ack: (result: Result<null>) => void) => void
+  /** 스캔에 답한다. 접속 중인 사람이 모두 같은 답을 고르면 확정된다. */
+  'game:scanVote': (payload: { value: number }, ack: (result: Result<null>) => void) => void
   /** 해결사 카드를 쓴다. 누른 사람이 쓰는 사람이고, 카드에 따라 대상·숫자·내 카드가 더 필요하다. */
   'game:useSpecialist': (
     payload: { targetId?: string; value?: number; cardIndex?: number },
@@ -142,8 +144,19 @@ export interface ServerToClientEvents {
   'game:hand': (payload: { heist: number; hole: Card[] }) => void
   /** 사람이 빠져 판을 이어갈 수 없게 됐다. */
   'game:aborted': (payload: GameOverReason) => void
-  /** 「정보원」으로 남의 카드 한 장을 봤다. 본 사람에게만 간다. */
-  'game:peek': (payload: { fromName: string; card: Card }) => void
+  /**
+   * 카드가 나에게만 알려준 것. 드로어의 그 카드에 적히고, 눌러서 다시 볼 수 있다.
+   *
+   * 「정보원」으로 본 남의 카드, 「사기꾼」에게 넘어가기 전 내 카드처럼
+   * 나만 알아야 하는 정보는 모두 이 통로로 온다. 판이 바뀌면 사라진다.
+   */
+  'game:note': (payload: {
+    heist: number
+    specialist: number
+    title: string
+    text?: string
+    cards?: Card[]
+  }) => void
 }
 
 export const NICKNAME_MAX = 12

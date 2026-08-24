@@ -45,7 +45,7 @@ export const CHALLENGES: Record<ChallengeId, ExtraCard> = {
     id: 4,
     name: '망막 스캔',
     text: '가장 높은 토큰을 가진 사람이 공개하기 전에, 나머지가 그 사람의 카드 숫자 하나를 맞혀야 합니다.',
-    ready: false,
+    ready: true,
   },
   5: {
     id: 5,
@@ -75,7 +75,7 @@ export const CHALLENGES: Record<ChallengeId, ExtraCard> = {
     id: 9,
     name: '지문 스캔',
     text: '가장 높은 토큰을 가진 사람이 공개하기 전에, 나머지가 그 사람의 족보를 맞혀야 합니다.',
-    ready: false,
+    ready: true,
   },
   10: {
     id: 10,

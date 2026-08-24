@@ -9,13 +9,20 @@ import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 
 import {
+  CATEGORY_LABEL,
   CHALLENGES,
   READY_CHALLENGES,
   READY_SPECIALISTS,
   SPECIALISTS,
   TOKEN_LOCK_MS,
+  bestHolding,
+  rankValueOf,
   type ChallengeId,
 } from '@the-gang/shared'
+
+/** 족보 이름 → 카테고리 번호. 스캔이 족보를 숫자로 주고받으므로 되짚을 표가 필요하다. */
+const HAND_ORDER = Object.values(CATEGORY_LABEL)
+const rankValue = (card: string) => rankValueOf(card as never)
 import { ExtraDealer } from '../src/extras.ts'
 import { Game, type StartingPlayer } from '../src/game.ts'
 
@@ -309,6 +316,120 @@ describe('도전자 카드 효과', () => {
   })
 })
 
+describe('스캔 — 마지막 사람 차례에 답을 맞힌다', () => {
+  /** 4라운드까지 끝내 스캔이 열린 판을 만든다. */
+  function openScan(challenge: 4 | 9) {
+    const ctx = gameWith([challenge])
+    for (let round = 0; round < 4; round++) passRound(ctx)
+    return ctx
+  }
+
+  it('마지막 사람은 아직 공개되지 않는다', () => {
+    const { game } = openScan(4)
+    const view = game.view()
+
+    assert.equal(view.phase, 'scanning')
+    assert.equal(view.scan?.targetId, 'p3', '3번 토큰을 쥔 사람이 대상이다')
+    assert.equal(view.players.find((p) => p.id === 'p3')?.hole, null, '대상의 카드는 나가지 않는다')
+    assert.equal(view.players.find((p) => p.id === 'p1')?.hole?.length, 2, '나머지는 공개된다')
+    assert.equal(view.showdown?.reveals.length, 2, '먼저 공개되는 둘만 판정한다')
+  })
+
+  it('지목된 사람은 답할 수 없다', () => {
+    const { game } = openScan(4)
+    const result = game.voteScan('p3', 14)
+    assert.equal(result.ok, false)
+    if (!result.ok) assert.match(result.message, /지목된 사람/)
+  })
+
+  it('답이 갈리면 확정되지 않는다', () => {
+    const { game } = openScan(4)
+    game.voteScan('p1', 14)
+    game.voteScan('p2', 13)
+
+    const view = game.view()
+    assert.equal(view.scan?.decided, null)
+    assert.equal(view.phase, 'scanning')
+    assert.equal(view.scan?.votes.length, 2, '표는 서로 보인다')
+  })
+
+  it('답을 바꿔 맞추면 그때 확정된다', () => {
+    const { game } = openScan(4)
+    game.voteScan('p1', 14)
+    game.voteScan('p2', 13)
+    game.voteScan('p1', 13) // p1 이 p2 에게 맞춘다
+
+    const view = game.view()
+    assert.equal(view.scan?.decided, 13)
+    assert.notEqual(view.phase, 'scanning')
+  })
+
+  it('망막 스캔 — 대상이 그 숫자를 갖고 있으면 맞다', () => {
+    const ctx = openScan(4)
+    const targetRank = ctx.game.handOf('p3')![0][0]
+    const value = 'TJQKA'.includes(targetRank)
+      ? { T: 10, J: 11, Q: 12, K: 13, A: 14 }[targetRank as 'T' | 'J' | 'Q' | 'K' | 'A']!
+      : Number(targetRank)
+
+    ctx.game.voteScan('p1', value)
+    ctx.game.voteScan('p2', value)
+    assert.equal(ctx.game.view().scan?.correct, true)
+  })
+
+  it('망막 스캔을 틀리면 순서가 맞아도 실패한다', () => {
+    const ctx = openScan(4)
+    const hole = ctx.game.handOf('p3')!
+    // 대상이 갖고 있지 않은 숫자를 고른다
+    const wrong = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14].find(
+      (value) => !hole.some((card) => rankValue(card) === value),
+    )!
+
+    ctx.game.voteScan('p1', wrong)
+    ctx.game.voteScan('p2', wrong)
+
+    const view = ctx.game.view()
+    assert.equal(view.scan?.correct, false)
+    assert.equal(view.showdown?.success, false, '스캔을 틀리면 판이 실패한다')
+    assert.deepEqual(
+      view.showdown?.reveals.map((r) => r.ok),
+      [true, true, true],
+      '순서 자체는 맞았다는 것이 보여야 한다',
+    )
+  })
+
+  it('지문 스캔 — 대상의 족보를 맞혀야 한다', () => {
+    const ctx = openScan(9)
+    const view = ctx.game.view()
+    assert.equal(view.scan?.kind, 'category')
+
+    const actual = bestHolding([...ctx.game.handOf('p3')!, ...view.community])!
+    const category = HAND_ORDER.indexOf(actual.name)
+    ctx.game.voteScan('p1', category)
+    ctx.game.voteScan('p2', category)
+    assert.equal(ctx.game.view().scan?.correct, true)
+  })
+
+  it('맞히면 순서대로 성공한다', () => {
+    const ctx = openScan(9)
+    const actual = bestHolding([...ctx.game.handOf('p3')!, ...ctx.game.view().community])!
+    const category = HAND_ORDER.indexOf(actual.name)
+    ctx.game.voteScan('p1', category)
+    ctx.game.voteScan('p2', category)
+
+    const view = ctx.game.view()
+    assert.equal(view.players.find((p) => p.id === 'p3')?.hole?.length, 2, '이제 모두 공개된다')
+    assert.equal(view.showdown?.reveals.length, 3)
+    assert.equal(view.showdown?.success, true)
+  })
+
+  it('스캔이 없으면 바로 쇼다운이다', () => {
+    const ctx = gameWith([])
+    for (let round = 0; round < 4; round++) passRound(ctx)
+    assert.equal(ctx.game.view().scan, null)
+    assert.notEqual(ctx.game.view().phase, 'scanning')
+  })
+})
+
 describe('카드를 새로 받게 만드는 감지기', () => {
   /** 플롭에 그림카드가 있는지 없는지에 따라 갈리므로, 그 조건이 맞는 판을 찾는다. */
   function findFlop(challenge: ChallengeId, wantFace: boolean) {
@@ -449,10 +570,12 @@ describe('해결사 카드 효과', () => {
     assert.equal(used.ok, true)
     if (!used.ok) return
 
-    assert.deepEqual(used.value.peek, {
-      targetId: 'p2',
-      fromName: 'p1',
-      card: mine[1],
+    assert.deepEqual(used.value.note, {
+      toId: 'p2',
+      heist: game.view().heist,
+      specialist: 1,
+      title: 'p1의 카드',
+      cards: [mine[1]],
     })
     const said = game.view().announcements[0].text
     assert.match(said, /보여줬습니다/)

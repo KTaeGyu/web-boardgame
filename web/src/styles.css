@@ -558,6 +558,10 @@ select {
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
 }
 
+.modal--wide {
+  max-width: 460px;
+}
+
 .modal__title {
   margin: 0 0 8px;
   font-size: 18px;

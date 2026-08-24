@@ -262,21 +262,19 @@
   opacity: 1;
 }
 
-/* 「정보원」으로 내가 본 남의 카드. 나만 보인다. */
-.peeked {
+/* 카드가 나에게만 알려준 것. 도착하면 한 번 뜨고, 뒤에는 드로어에서 다시 본다. */
+.note-cards {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
-  border: 1px dashed var(--gold-dim);
-  border-radius: 10px;
-  background: rgba(212, 175, 55, 0.06);
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 14px;
 }
 
-.peeked__label {
+.note-hint {
+  margin: 0 0 16px;
   font-size: 12px;
-  color: var(--gold);
-  white-space: nowrap;
+  color: var(--ink-dim);
+  text-align: center;
 }
 
 /* 해결사가 카드를 나눠주자마자 밝힌 것들. */
@@ -746,6 +744,66 @@ button.token:hover:not(:disabled) {
     opacity: 0;
     transform: translate(-50%, -58%) scale(0.95);
   }
+}
+
+/*
+ * 스캔 투표. 표가 서로 보이는 것이 핵심이다 — 말을 주고받을 수 없으니
+ * 남이 무엇을 골랐는지 보면서 옮겨가야 만장일치에 닿는다.
+ */
+.scan-votes {
+  display: grid;
+  gap: 6px;
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 0;
+}
+
+.scan-vote {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 14px;
+  opacity: 0.6;
+}
+
+.scan-vote--in {
+  border-color: var(--gold-dim);
+  opacity: 1;
+}
+
+.scan-vote__value {
+  color: var(--gold);
+  font-weight: 700;
+}
+
+.scan-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.scan-choice {
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.scan-choice:hover {
+  border-color: var(--gold-dim);
+}
+
+.scan-choice--on {
+  border-color: var(--gold);
+  background: rgba(212, 175, 55, 0.18);
+  color: var(--gold);
+  font-weight: 700;
 }
 
 /* ── 쇼다운과 결과 ────────────────────── */

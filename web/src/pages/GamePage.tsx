@@ -12,7 +12,8 @@ import {
   type Round,
 } from '@the-gang/shared'
 
-import { ExtrasDrawer } from '../components/ExtrasDrawer.tsx'
+import { ExtrasDrawer, NoteCard, type CardNote } from '../components/ExtrasDrawer.tsx'
+import { ScanVote } from '../components/ScanVote.tsx'
 import { ConfirmModal } from '../components/Modal.tsx'
 import { CardSlot, PlayingCard } from '../components/PlayingCard.tsx'
 import { Token, TokenBlank } from '../components/Token.tsx'
@@ -60,8 +61,10 @@ export function GamePage() {
   /** 마지막 결과까지 다 보여줬는가. 이때가 되어야 다음으로 넘어가는 버튼이 열린다. */
   const [finished, setFinished] = useState(false)
   const [confirmLeave, setConfirmLeave] = useState(false)
-  /** 「정보원」으로 본 남의 카드. 나만 안다. */
-  const [peeked, setPeeked] = useState<{ fromName: string; card: Card } | null>(null)
+  /** 카드가 나에게만 알려준 것들. 이번 판 동안 드로어에 남는다. */
+  const [notes, setNotes] = useState<CardNote[]>([])
+  /** 방금 도착한 쪽지. 한 번 보여주고 나면 드로어에서 다시 볼 수 있다. */
+  const [fresh, setFresh] = useState<CardNote | null>(null)
 
   const tokenRef = useTokenFlight(TOKEN_LOCK_MS)
 
@@ -120,13 +123,17 @@ export function GamePage() {
     'game:hand',
     useCallback((payload: { hole: Card[] }) => {
       setHand(payload.hole)
-      setPeeked(null) // 새 판이면 본 것도 지운다
+      setNotes([]) // 새 판이면 지난 판의 쪽지도 지운다
+      setFresh(null)
     }, []),
   )
 
   useServerEvent(
-    'game:peek',
-    useCallback((payload: { fromName: string; card: Card }) => setPeeked(payload), []),
+    'game:note',
+    useCallback((payload: CardNote) => {
+      setNotes((current) => [...current.filter((n) => n.specialist !== payload.specialist), payload])
+      setFresh(payload) // 도착하자마자 한 번은 보여준다
+    }, []),
   )
 
   useServerEvent(
@@ -181,7 +188,7 @@ export function GamePage() {
     setRevealed(0)
     setFlash(null)
     setFinished(false)
-    if (phase === 'picking' || revealCount === 0) return
+    if (phase === 'picking' || phase === 'scanning' || revealCount === 0) return
 
     const at = (ms: number, run: () => void) => timers.current.push(setTimeout(run, ms))
 
@@ -347,12 +354,6 @@ export function GamePage() {
               </>
             )}
           </div>
-          {peeked && (
-            <div className="peeked">
-              <span className="peeked__label">{peeked.fromName}의 카드</span>
-              <PlayingCard card={peeked.card} size="sm" />
-            </div>
-          )}
           <div className="my-seat__info">
             <span className="my-seat__name">
               {me.displayName} (나)
@@ -421,10 +422,19 @@ export function GamePage() {
         game={game}
         playerId={playerId}
         hand={hand}
+        notes={notes}
         onUse={(input) => void call('game:useSpecialist', input)}
       />
 
-      {game.showdown && (
+      {fresh && <NoteCard note={fresh} onClose={() => setFresh(null)} />}
+
+      <ScanVote
+        game={game}
+        playerId={playerId}
+        onVote={(value) => void call('game:scanVote', { value })}
+      />
+
+      {game.showdown && game.phase !== 'scanning' && (
         <Showdown game={game} revealed={revealed} flash={flash} finished={finished} playerId={playerId} />
       )}
 

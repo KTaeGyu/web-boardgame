@@ -21,6 +21,7 @@ import {
   AUTOMATIC_SPECIALISTS,
   SPECIALIST_NEEDS,
   bestHolding,
+  evaluateHoleAndCommunity,
   displayNames,
   freshDeck,
   judgeShowdown,
@@ -37,6 +38,7 @@ import {
   type GameView,
   type Result,
   type Round,
+  type ScanState,
   type ShowdownEntry,
   type ShowdownResult,
   type SpecialistId,
@@ -69,6 +71,16 @@ export interface GameOptions {
   mode?: GameMode
   /** 「직접 고르기」에서 방장이 고른 도전자 카드. */
   pickedChallenges?: readonly ChallengeId[]
+}
+
+/** 카드가 특정 한 사람에게만 알려주는 것. 드로어의 그 카드에 적힌다. */
+export interface PrivateNote {
+  toId: string
+  heist: number
+  specialist: number
+  title: string
+  text?: string
+  cards?: Card[]
 }
 
 export interface StartingPlayer {
@@ -118,6 +130,14 @@ export class Game {
    * 동작 감지기와 레이저 감지선이 이 값을 보고 대상을 고른다.
    */
   private roundOneTokens = new Map<string, number>()
+  /** 스캔이 열려 있는 동안의 상태. 답이 정해지면 쇼다운으로 넘어간다. */
+  private scan: {
+    kind: 'rank' | 'category'
+    targetId: string
+    votes: Map<string, number>
+    decided: number | null
+    correct: boolean | null
+  } | null = null
 
   constructor(roomCode: string, players: StartingPlayer[], options: GameOptions = {}) {
     this.roomCode = roomCode
@@ -168,6 +188,7 @@ export class Game {
     this.lockedUntil.clear()
     this.continued.clear()
     this.roundOneTokens.clear()
+    this.scan = null
 
     // 한 판 안에서 같은 카드가 두 번 나오지 않도록 매 판 새 덱을 섞는다.
     this.deck = shuffle(freshDeck(), this.rng)
@@ -236,7 +257,7 @@ export class Game {
   useSpecialist(
     playerId: string,
     input: { targetId?: string; value?: number; cardIndex?: number },
-  ): Result<{ peek: { targetId: string; fromName: string; card: Card } | null }> {
+  ): Result<{ note: PrivateNote | null }> {
     if (this.phase !== 'picking') return err('WRONG_PHASE', '지금은 쓸 수 없습니다.')
     if (this.specialist === null) return err('WRONG_PHASE', '이번 판에는 해결사 카드가 없습니다.')
     if (this.specialistUsed) return err('WRONG_PHASE', '이미 쓴 카드입니다.')
@@ -255,13 +276,19 @@ export class Game {
       return err('INVALID_TOKEN', '보여줄 카드를 골라 주세요.')
     }
 
-    let peek: { targetId: string; fromName: string; card: Card } | null = null
+    let note: PrivateNote | null = null
     const say = (text: string) => this.announcements.push({ playerId, text })
 
     switch (this.specialist) {
       case 1: {
         // 무엇을 보여줬는지는 본 사람만 안다. 모두에게는 「보여줬다」는 사실만 남는다.
-        peek = { targetId: target!.id, fromName: this.nameOf(playerId), card: actor.hole[cardIndex] }
+        note = {
+          toId: target!.id,
+          heist: this.heist,
+          specialist: 1,
+          title: `${this.nameOf(playerId)}의 카드`,
+          cards: [actor.hole[cardIndex]],
+        }
         say(`${this.nameOf(playerId)} → ${this.nameOf(target!.id)}에게 카드 한 장을 보여줬습니다`)
         break
       }
@@ -286,7 +313,7 @@ export class Game {
     }
 
     this.specialistUsed = true
-    return { ok: true, value: { peek } }
+    return { ok: true, value: { note } }
   }
 
   // ── 사람의 입력 ──────────────────────────────────────────
@@ -413,7 +440,10 @@ export class Game {
     }
 
     if (finished === 4) {
-      this.runShowdown()
+      // 스캔이 걸려 있으면 마지막 사람이 공개하기 전에 답을 정해야 한다.
+      const scanning = this.has(4) ? 'rank' : this.has(9) ? 'category' : null
+      if (scanning) this.beginScan(scanning)
+      else this.runShowdown()
       return
     }
 
@@ -455,6 +485,65 @@ export class Game {
     victim.hole = victim.hole.map(() => this.draw())
   }
 
+  /**
+   * 마지막 사람을 빼고 먼저 공개한다.
+   *
+   * 대상의 카드는 답이 정해질 때까지 어디로도 나가지 않는다. 미리 보낸 뒤에
+   * 화면에서만 가리면, 통신을 들여다보는 것만으로 답을 알 수 있게 된다.
+   */
+  private beginScan(kind: 'rank' | 'category'): void {
+    const ordered = [...this.seats].sort((a, b) => (a.history[3] ?? 0) - (b.history[3] ?? 0))
+    const target = ordered[ordered.length - 1]
+
+    this.scan = { kind, targetId: target.id, votes: new Map(), decided: null, correct: null }
+    this.phase = 'scanning'
+    // 먼저 공개되는 사람들끼리의 순서는 이 시점에 이미 판정할 수 있다.
+    this.showdown = judgeShowdown(
+      ordered.slice(0, -1).map((seat) => ({
+        playerId: seat.id,
+        token: seat.history[3] ?? 0,
+        hole: seat.hole,
+      })),
+      this.community,
+      { muscleId: this.muscleId },
+    )
+  }
+
+  /** 스캔에 답한다. 대상을 뺀 접속자 전원이 같은 답을 고르면 확정된다. */
+  voteScan(playerId: string, value: number): Result<null> {
+    if (this.phase !== 'scanning' || !this.scan) return err('WRONG_PHASE', '지금은 답할 수 없습니다.')
+    if (playerId === this.scan.targetId) {
+      return err('WRONG_PHASE', '지목된 사람은 답할 수 없습니다.')
+    }
+    if (!this.seats.some((s) => s.id === playerId)) {
+      return err('NOT_IN_ROOM', '이 판에 참여하고 있지 않습니다.')
+    }
+    if (!Number.isInteger(value)) return err('INVALID_TOKEN', '답을 골라 주세요.')
+
+    this.scan.votes.set(playerId, value)
+
+    const voters = this.seats.filter((s) => s.connected && s.id !== this.scan!.targetId)
+    const answers = voters.map((s) => this.scan!.votes.get(s.id))
+    const allIn = answers.every((answer) => answer !== undefined)
+    const agreed = allIn && new Set(answers).size === 1
+    if (agreed) this.settleScan(answers[0]!)
+    return OK
+  }
+
+  private settleScan(value: number): void {
+    if (!this.scan) return
+    const target = this.seats.find((s) => s.id === this.scan!.targetId)
+    if (!target) return
+
+    this.scan.decided = value
+    this.scan.correct =
+      this.scan.kind === 'rank'
+        ? target.hole.some((card) => rankValueOf(card) === value)
+        : evaluateHoleAndCommunity(target.hole, this.community).category === value
+
+    this.runShowdown()
+  }
+
   private runShowdown(): void {
     const entries: ShowdownEntry[] = this.seats.map((seat) => ({
       playerId: seat.id,
@@ -462,7 +551,10 @@ export class Game {
       hole: seat.hole,
     }))
 
-    this.showdown = judgeShowdown(entries, this.community, { muscleId: this.muscleId })
+    const judged = judgeShowdown(entries, this.community, { muscleId: this.muscleId })
+    // 스캔을 틀리면 순서가 맞았어도 그 판은 실패다.
+    const scanOk = this.scan === null || this.scan.correct === true
+    this.showdown = { ...judged, success: judged.success && scanOk }
     this.lastSuccess = this.showdown.success
     if (this.showdown.success) this.vaults += 1
     else this.alarms += 1
@@ -513,6 +605,17 @@ export class Game {
     return seat ? [...seat.hole] : null
   }
 
+  private scanView(): ScanState | null {
+    if (!this.scan) return null
+    return {
+      kind: this.scan.kind,
+      targetId: this.scan.targetId,
+      votes: [...this.scan.votes].map(([playerId, value]) => ({ playerId, value })),
+      decided: this.scan.decided,
+      correct: this.scan.correct,
+    }
+  }
+
   /** 모두가 보는 상태. 쇼다운 전에는 어떤 홀카드도 담지 않는다. */
   view(): GameView {
     const now = this.now()
@@ -544,7 +647,11 @@ export class Game {
         currentToken: this.tokenOf(seat.id),
         history: ROUNDS.map((round) => seat.history[round - 1] ?? null),
         ready: seat.ready,
-        hole: revealed ? [...seat.hole] : null,
+        // 스캔 중에는 지목된 사람의 카드가 아직 아무 데도 나가지 않는다.
+        hole:
+          revealed && !(this.phase === 'scanning' && seat.id === this.scan?.targetId)
+            ? [...seat.hole]
+            : null,
       })),
       centerTokens: this.tokenNumbers.filter((token) => !this.holders.has(token)),
       // 붙박이 토큰은 주인이 정해진 뒤로는 만질 수 없으니 잠긴 것으로 보인다.
@@ -552,6 +659,7 @@ export class Game {
         (token) => this.isLocked(token, now) || (stuck.includes(token) && this.holders.has(token)),
       ),
       canConfirm: this.phase === 'picking' && this.everyoneHasToken(),
+      scan: this.scanView(),
       showdown: this.showdown,
       continued: [...this.continued],
       outcome: this.outcome,
