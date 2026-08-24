@@ -16,6 +16,8 @@ interface Props {
   options: readonly PickOption[]
   picked: readonly (number | string)[]
   single?: boolean
+  /** 고른 것의 설명을 목록 아래에 붙박이로 둔다. 늘 하나가 골라져 있는 목록에서만 뜻이 있다. */
+  describePicked?: boolean
   disabled?: boolean
   onToggle: (id: number | string) => void
 }
@@ -31,10 +33,11 @@ const LINGER_MS = 1600
  * 스무 장을 설명과 함께 늘어놓으면 화면이 한없이 길어진다. 이름만 칩으로 흘려 두고
  * 설명은 짚을 때만 보여준다 — 마우스는 올리면, 손가락은 길게 누르면 뜬다.
  */
-export function CardPicker({ label, hint, options, picked, single, disabled, onToggle }: Props) {
+export function CardPicker({ label, hint, options, picked, single, describePicked, disabled, onToggle }: Props) {
   const [tip, setTip] = useState<{ x: number; y: number; text: string } | null>(null)
   const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lingerTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const pickedOption = describePicked ? options.find((option) => picked.includes(option.id)) : undefined
   /** 길게 눌러 설명을 본 것이면 고르기까지 이어지지 않게 막는다. */
   const readingByTouch = useRef(false)
 
@@ -58,7 +61,6 @@ export function CardPicker({ label, hint, options, picked, single, disabled, onT
               className={`pick-chip ${on ? 'pick-chip--on' : ''}`}
               disabled={disabled}
               aria-pressed={on}
-              title={option.text}
               onMouseMove={(event) => setTip({ x: event.clientX, y: event.clientY, text: option.text })}
               onMouseLeave={() => setTip(null)}
               onTouchStart={(event) => {
@@ -92,6 +94,12 @@ export function CardPicker({ label, hint, options, picked, single, disabled, onT
           )
         })}
       </div>
+
+      {pickedOption && (
+        <p className="pick-picked" key={pickedOption.id}>
+          {pickedOption.text}
+        </p>
+      )}
 
       {tip && (
         <div className="card-tip" style={tipPosition(tip)}>

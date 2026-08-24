@@ -7,6 +7,23 @@
       content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content"
     />
     <title>더 갱</title>
+    <!--
+      화면이 그려지기 전에 어느 쪽인지 정해 붙인다. React 가 뜬 뒤에 하면
+      한 칠은 어두운 채로 나왔다가 밝아져 눈에 띄게 깜빡인다.
+      고른 적이 없으면(=null) 기기 설정을 따른다.
+    -->
+    <script>
+      (function () {
+        var saved = null
+        try {
+          saved = localStorage.getItem('the-gang:theme')
+        } catch (error) {
+          /* 시크릿 창 등에서 막힐 수 있다. 그때는 기기 설정을 따른다. */
+        }
+        var dark = saved ? saved === 'dark' : !window.matchMedia('(prefers-color-scheme: light)').matches
+        document.documentElement.dataset.theme = dark ? 'dark' : 'light'
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>

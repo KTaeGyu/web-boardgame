@@ -202,6 +202,7 @@ export function RoomPage() {
           <CardPicker
             label="진행 방식"
             single
+            describePicked
             options={GAME_MODES.map((mode) => ({
               id: mode,
               name: GAME_MODE_LABEL[mode],
