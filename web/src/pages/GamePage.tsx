@@ -20,7 +20,9 @@ import { call, socket, useServerEvent } from '../lib/socket.ts'
 import { useTokenFlight } from '../lib/useTokenFlight.ts'
 
 /** 쇼다운은 한 사람씩 차례로 뒤집어야 순서가 맞았는지 눈에 들어온다. */
-const REVEAL_STEP_MS = 900
+const REVEAL_STEP_MS = 1900
+/** 그 사람이 사슬을 이었는지 아닌지를 크게 띄워 두는 시간. */
+const VERDICT_MS = 1200
 
 export function GamePage() {
   const { code = '' } = useParams()
@@ -33,6 +35,8 @@ export function GamePage() {
   const [notice, setNotice] = useState('')
   const [rejected, setRejected] = useState<number | null>(null)
   const [revealed, setRevealed] = useState(0)
+  /** 방금 공개한 사람이 앞사람보다 셌는지. 두 번째 사람부터 의미가 생긴다. */
+  const [verdict, setVerdict] = useState<{ index: number; ok: boolean } | null>(null)
 
   const tokenRef = useTokenFlight(TOKEN_LOCK_MS)
 
@@ -109,18 +113,33 @@ export function GamePage() {
   const showdownKey = `${game?.heist ?? 0}:${phase}`
   const revealCount = game?.showdown?.reveals.length ?? 0
   const timers = useRef<ReturnType<typeof setTimeout>[]>([])
+  /**
+   * 공개 순서는 ref 로 읽는다. 의존성에 넣으면 누가 「다음 금고로」를 누를 때마다
+   * 새 상태가 도착해 공개가 처음부터 다시 시작된다.
+   */
+  const revealsRef = useRef(game?.showdown?.reveals ?? [])
+  revealsRef.current = game?.showdown?.reveals ?? []
 
   useEffect(() => {
     for (const timer of timers.current) clearTimeout(timer)
     timers.current = []
-
-    if (phase === 'picking' || revealCount === 0) {
-      setRevealed(0)
-      return
-    }
     setRevealed(0)
+    setVerdict(null)
+    if (phase === 'picking' || revealCount === 0) return
+
     for (let index = 1; index <= revealCount; index++) {
-      timers.current.push(setTimeout(() => setRevealed(index), REVEAL_STEP_MS * index))
+      timers.current.push(
+        setTimeout(() => {
+          setRevealed(index)
+          // 첫 사람은 비교할 상대가 없다. 두 번째부터 사슬이 이어졌는지 판정이 선다.
+          if (index < 2) return
+          const ok = revealsRef.current[index - 1]?.ok ?? true
+          setVerdict({ index, ok })
+          timers.current.push(
+            setTimeout(() => setVerdict((v) => (v?.index === index ? null : v)), VERDICT_MS),
+          )
+        }, REVEAL_STEP_MS * index),
+      )
     }
     return () => {
       for (const timer of timers.current) clearTimeout(timer)
@@ -298,7 +317,9 @@ export function GamePage() {
         )}
       </footer>
 
-      {game.showdown && <Showdown game={game} revealed={revealed} playerId={playerId} />}
+      {game.showdown && (
+        <Showdown game={game} revealed={revealed} verdict={verdict} playerId={playerId} />
+      )}
     </main>
   )
 }
@@ -376,16 +397,33 @@ function TokenTrack({ player, round, phase, lockedTokens, rejected, tokenRef, on
 
 // ── 쇼다운과 결과 ──────────────────────────────────────────
 
-function Showdown({ game, revealed, playerId }: { game: GameView; revealed: number; playerId: string }) {
+interface ShowdownProps {
+  game: GameView
+  revealed: number
+  verdict: { index: number; ok: boolean } | null
+  playerId: string
+}
+
+function Showdown({ game, revealed, verdict, playerId }: ShowdownProps) {
   const navigate = useNavigate()
   const reveals = game.showdown?.reveals ?? []
   const done = revealed >= reveals.length
   const over = game.phase === 'gameOver'
   const iAgreed = game.rematch.agreed.includes(playerId)
+  // 서버가 구버전이면 이 값이 없다. 없다고 화면이 깨지지는 않게 한다.
+  const continued = game.continued ?? []
+  const iContinued = continued.includes(playerId)
+  // 끊긴 사람은 기다려주지 않으므로 분모도 접속 중인 사람 수다.
+  const waitingOn = game.players.filter((player) => player.connected).length
   const askedToRematch = over && game.rematch.proposed && !iAgreed
 
   return (
     <div className="showdown">
+      {verdict && (
+        <div className={`verdict verdict--${verdict.ok ? 'ok' : 'bad'}`} key={verdict.index}>
+          {verdict.ok ? '성공' : '실패'}
+        </div>
+      )}
       <div className="showdown__panel">
         <h2 className="showdown__title">
           {done ? (game.showdown?.success ? '금고가 열렸습니다' : '경보가 울렸습니다') : '공개 중…'}
@@ -410,8 +448,15 @@ function Showdown({ game, revealed, playerId }: { game: GameView; revealed: numb
         </ol>
 
         {done && !over && (
-          <button type="button" className="btn btn--primary btn--block" onClick={() => void call('game:continue')}>
-            다음 금고로
+          <button
+            type="button"
+            className="btn btn--primary btn--block"
+            disabled={iContinued}
+            onClick={() => void call('game:continue')}
+          >
+            {iContinued
+              ? `다른 사람을 기다리는 중 (${continued.length}/${waitingOn})`
+              : `다음 금고로 (${continued.length}/${waitingOn})`}
           </button>
         )}
 

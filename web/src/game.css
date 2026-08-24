@@ -423,17 +423,72 @@ button.token:hover:not(:disabled) {
   }
 }
 
-/* ── 확정 ─────────────────────────────── */
+/*
+ * 확정. 안내문구를 옆에 두면 문구가 길어질 때마다 버튼이 좌우로 밀린다.
+ * 버튼은 언제나 가운데 같은 자리에 있고, 문구는 아래에서 바뀐다.
+ */
 .game-actions {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 14px;
+  gap: 8px;
+}
+
+.game-actions .btn {
+  min-width: 160px;
 }
 
 .game-actions__status {
   font-size: 13px;
   color: var(--ink-dim);
+  text-align: center;
+  min-height: 1.4em;
+}
+
+/*
+ * 매 공개의 판정. 앞사람보다 셌는지를 크게 한 번 띄운다.
+ * 두 번째 사람이 실패해도 세 번째가 성공이면 성공이라고 띄운다 —
+ * 그 사람의 판단은 맞았기 때문이다. 판 전체의 결과는 마지막에 따로 나온다.
+ */
+.verdict {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  z-index: 8;
+  pointer-events: none;
+  font-size: clamp(56px, 14vw, 128px);
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  animation: verdict-in 1.2s cubic-bezier(0.2, 0.9, 0.3, 1) forwards;
+}
+
+.verdict--ok {
+  color: var(--gold);
+  text-shadow: 0 0 40px rgba(212, 175, 55, 0.6), 0 6px 24px rgba(0, 0, 0, 0.8);
+}
+
+.verdict--bad {
+  color: #e2635a;
+  text-shadow: 0 0 40px rgba(181, 69, 58, 0.6), 0 6px 24px rgba(0, 0, 0, 0.8);
+}
+
+@keyframes verdict-in {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.5);
+  }
+  18% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  75% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -58%) scale(0.95);
+  }
 }
 
 /* ── 쇼다운과 결과 ────────────────────── */

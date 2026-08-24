@@ -317,6 +317,7 @@ export class Game {
       lockedTokens: this.tokenNumbers.filter((token) => this.isLocked(token, now)),
       canConfirm: this.phase === 'picking' && this.everyoneHasToken(),
       showdown: this.showdown,
+      continued: [...this.continued],
       outcome: this.outcome,
       rematch: { proposed: this.rematchAgreed.size > 0, agreed: [...this.rematchAgreed] },
     }

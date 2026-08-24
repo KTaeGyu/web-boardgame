@@ -75,6 +75,8 @@ export interface GameView {
   /** 모두가 토큰을 쥐어서 확정 버튼이 열렸는지. */
   canConfirm: boolean
   showdown: ShowdownResult | null
+  /** 쇼다운을 확인하고 다음 판으로 넘어가겠다고 누른 사람들. */
+  continued: string[]
   outcome: 'win' | 'lose' | null
   /** 게임이 끝난 뒤의 재경기 합의. 아무도 제안하지 않았으면 proposed 가 false 다. */
   rematch: { proposed: boolean; agreed: string[] }
