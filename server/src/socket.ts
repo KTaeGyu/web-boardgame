@@ -299,6 +299,43 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
       })
     })
 
+    /** 카드가 한 사람에게만 알려주는 것은 그 사람 소켓으로만 간다. */
+    function deliver(notes: { toId: string; heist: number; specialist: number; title: string; text?: string; cards?: string[] }[]) {
+      for (const note of notes) {
+        const socketId = socketOfPlayer.get(note.toId)
+        if (!socketId) continue
+        io.to(socketId).emit('game:note', {
+          heist: note.heist,
+          specialist: note.specialist,
+          title: note.title,
+          text: note.text,
+          cards: note.cards as never,
+        })
+      }
+    }
+
+    socket.on('game:setupCard', ({ cardIndex }, ack) => {
+      withGame(ack, (game, code, playerId) => {
+        const result = game.submitSetup(playerId, cardIndex)
+        if (!result.ok) return ack(result)
+        ack({ ok: true, value: null })
+        deliver(result.value.notes)
+        // 카드가 오갔으면 손패도 새로 보내야 한다.
+        sendGame(code, { hands: result.value.notes.length > 0 })
+      })
+    })
+
+    socket.on('game:discard', ({ cardIndex }, ack) => {
+      withGame(ack, (game, code, playerId) => {
+        const result = game.discard(playerId, Number(cardIndex))
+        if (!result.ok) return ack(result)
+        ack({ ok: true, value: null })
+        if (result.value.note) deliver([result.value.note])
+        sendGame(code)
+        sendHand(code, playerId)
+      })
+    })
+
     socket.on('game:scanVote', ({ value }, ack) => {
       withGame(ack, (game, code, playerId) => {
         const result = game.voteScan(playerId, Number(value))
@@ -313,21 +350,10 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
         if (!result.ok) return ack(result)
         ack({ ok: true, value: null })
 
-        // 카드가 한 사람에게만 알려주는 것은 그 사람 소켓으로만 간다.
-        const note = result.value.note
-        if (note) {
-          const socketId = socketOfPlayer.get(note.toId)
-          if (socketId) {
-            io.to(socketId).emit('game:note', {
-              heist: note.heist,
-              specialist: note.specialist,
-              title: note.title,
-              text: note.text,
-              cards: note.cards,
-            })
-          }
-        }
+        if (result.value.note) deliver([result.value.note])
         sendGame(code)
+        // 「해커」·「잭」은 손패가 늘어난다. 쓴 사람에게 새 손패를 보낸다.
+        sendHand(code, playerId)
       })
     })
 

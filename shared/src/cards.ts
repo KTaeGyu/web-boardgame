@@ -15,6 +15,20 @@ export const RANK_VALUE: Record<Rank, number> = {
 
 export const SUIT_LABEL: Record<Suit, string> = { s: '♠', h: '♥', d: '♦', c: '♣' }
 
+/**
+ * 해결사 「잭」이 주는 무늬 없는 J.
+ *
+ * 덱에는 없고 그 카드를 쓸 때만 손에 들어온다. 무늬가 어느 것과도 같지 않으므로
+ * 플러시에 낄 수 없다 — 그것이 이 카드의 유일한 약점이다.
+ */
+export const JACK_CARD = 'Jx' as Card
+export const NO_SUIT = 'x'
+
+export function suitSymbol(card: Card): string {
+  const suit = card[1]
+  return suit === NO_SUIT ? '✦' : (SUIT_LABEL[suit as Suit] ?? suit)
+}
+
 /** 사람에게 보일 숫자. 10 만 두 글자라 따로 처리한다. */
 export function rankLabel(value: number): string {
   if (value === 10) return '10'

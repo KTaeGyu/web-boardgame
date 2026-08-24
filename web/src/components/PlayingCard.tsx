@@ -1,4 +1,4 @@
-import { RANK_VALUE, SUIT_LABEL, rankLabel, type Card, type Rank, type Suit } from '@the-gang/shared'
+import { NO_SUIT, RANK_VALUE, rankLabel, suitSymbol, type Card, type Rank, type Suit } from '@the-gang/shared'
 
 interface Props {
   card?: Card | null
@@ -25,11 +25,17 @@ export function PlayingCard({ card, faceDown = false, size = 'md', delay = 0, hi
   const suit = card[1] as Suit
   const label = rankLabel(RANK_VALUE[rank])
   if (RED.includes(suit)) classes.push('card--red')
+  // 「잭」이 준 무늬 없는 J. 무늬가 없다는 것이 한눈에 보여야 플러시 착각을 막는다.
+  if (card[1] === NO_SUIT) classes.push('card--nosuit')
 
   return (
-    <div className={classes.join(' ')} style={{ animationDelay: `${delay}ms` }} aria-label={`${label}${SUIT_LABEL[suit]}`}>
+    <div
+      className={classes.join(' ')}
+      style={{ animationDelay: `${delay}ms` }}
+      aria-label={`${label}${suitSymbol(card)}`}
+    >
       <span className="card__rank">{label}</span>
-      <span className="card__suit">{SUIT_LABEL[suit]}</span>
+      <span className="card__suit">{suitSymbol(card)}</span>
     </div>
   )
 }

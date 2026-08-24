@@ -14,6 +14,7 @@ import {
 
 import { ExtrasDrawer, NoteCard, type CardNote } from '../components/ExtrasDrawer.tsx'
 import { ScanVote } from '../components/ScanVote.tsx'
+import { SetupStep } from '../components/SetupStep.tsx'
 import { ConfirmModal } from '../components/Modal.tsx'
 import { CardSlot, PlayingCard } from '../components/PlayingCard.tsx'
 import { Token, TokenBlank } from '../components/Token.tsx'
@@ -427,6 +428,14 @@ export function GamePage() {
       />
 
       {fresh && <NoteCard note={fresh} onClose={() => setFresh(null)} />}
+
+      <SetupStep
+        game={game}
+        playerId={playerId}
+        hand={hand}
+        onSubmit={(cardIndex) => void call('game:setupCard', { cardIndex })}
+        onDiscard={(cardIndex) => void call('game:discard', { cardIndex })}
+      />
 
       <ScanVote
         game={game}

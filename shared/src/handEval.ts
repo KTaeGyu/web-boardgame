@@ -80,6 +80,9 @@ export function evaluateFive(hand: readonly Card[]): HandValue {
   })
 
   if (isFlush && top !== null) return build(HandCategory.StraightFlush, [top])
+  // 「잭」 카드가 진짜 J 넷과 만나면 같은 랭크가 다섯 장이 된다.
+  // 룰북대로 J 포카드에 J 키커로 친다.
+  if (shape === '5') return build(HandCategory.FourOfAKind, [byGroup[0], byGroup[0]])
   if (shape === '41') return build(HandCategory.FourOfAKind, byGroup)
   if (shape === '32') return build(HandCategory.FullHouse, byGroup)
   if (isFlush) return build(HandCategory.Flush, values)

@@ -47,7 +47,19 @@ export const ROUND_COLOR: Record<Round, string> = {
  */
 export const TOKEN_LOCK_MS = 500
 
-export type GamePhase = 'picking' | 'scanning' | 'showdown' | 'gameOver'
+export type GamePhase = 'setup' | 'picking' | 'scanning' | 'showdown' | 'gameOver'
+
+/**
+ * 카드를 받자마자 다 같이 한 번씩 움직여야 하는 단계.
+ *
+ * 「조율가」는 넘길 카드를 각자 고르고, 「사기꾼」은 각자 자기 카드를 외운 뒤 확인한다.
+ * 전원이 마쳐야 다음으로 넘어가므로, 누가 아직인지 보여야 한다.
+ */
+export interface SetupState {
+  kind: 'pass' | 'memorize'
+  /** 이미 마친 사람들. */
+  done: string[]
+}
 
 /**
  * 스캔. 마지막 사람이 공개하기 전에 나머지가 답을 맞혀야 하는 상황.
@@ -118,6 +130,10 @@ export interface GameView {
   lockedTokens: number[]
   /** 모두가 토큰을 쥐어서 확정 버튼이 열렸는지. */
   canConfirm: boolean
+  /** 딜 직후 다 같이 하는 단계. 끝나면 null 이 된다. */
+  setup: SetupState | null
+  /** 한 장을 더 받아 지금 버릴 카드를 고르고 있는 사람. */
+  discardingId: string | null
   /** 스캔이 걸린 판이면 마지막 사람 차례에 이것이 열린다. */
   scan: ScanState | null
   showdown: ShowdownResult | null

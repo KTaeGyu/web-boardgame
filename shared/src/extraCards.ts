@@ -95,13 +95,13 @@ export const SPECIALISTS: Record<SpecialistId, ExtraCard> = {
     ready: true,
   },
   4: { id: 4, name: '두뇌', text: '숫자 하나를 정하고, 한 명이 그 숫자를 몇 장 가졌는지 알립니다.', ready: true },
-  5: { id: 5, name: '해커', text: '한 명이 카드를 한 장 더 받고 한 장을 버립니다.', ready: false },
-  6: { id: 6, name: '조율가', text: '각자 카드 한 장을 골라 동시에 왼쪽 사람에게 넘깁니다.', ready: false },
+  5: { id: 5, name: '해커', text: '한 명이 카드를 한 장 더 받고 한 장을 버립니다.', ready: true },
+  6: { id: 6, name: '조율가', text: '각자 카드 한 장을 골라 동시에 왼쪽 사람에게 넘깁니다.', ready: true },
   7: {
     id: 7,
     name: '잭',
     text: '한 명이 무늬 없는 J 카드를 받고 자기 카드 한 장을 버립니다. 플러시에는 쓸 수 없습니다.',
-    ready: false,
+    ready: true,
   },
   8: {
     id: 8,
@@ -109,7 +109,7 @@ export const SPECIALISTS: Record<SpecialistId, ExtraCard> = {
     text: '카드를 받자마자, 각자 카드 두 장의 합이 모두에게 공개됩니다. (J·Q·K는 10, A는 11)',
     ready: true,
   },
-  9: { id: 9, name: '사기꾼', text: '모두 카드를 본 뒤, 전원의 카드를 섞어 다시 나눕니다.', ready: false },
+  9: { id: 9, name: '사기꾼', text: '모두 카드를 본 뒤, 전원의 카드를 섞어 다시 나눕니다.', ready: true },
   10: { id: 10, name: '근육', text: '한 명은 같은 족보끼리는 무조건 이깁니다.', ready: true },
 }
 
@@ -143,8 +143,14 @@ export const SPECIALIST_NEEDS: Record<SpecialistId, SpecialistNeeds> = {
   10: NOTHING,
 }
 
-/** 카드를 받자마자 저절로 발동해서, 누가 쓸지 고를 것이 없는 해결사. */
-export const AUTOMATIC_SPECIALISTS: SpecialistId[] = [3, 8]
+/**
+ * 카드를 받자마자 저절로 시작해서, 「누가 쓸지」를 고를 것이 없는 해결사.
+ * 3·8 은 그 자리에서 끝나고, 6·9 는 전원이 한 번씩 움직여야 끝난다.
+ */
+export const AUTOMATIC_SPECIALISTS: SpecialistId[] = [3, 6, 8, 9]
+
+/** 딜 직후 다 같이 한 번씩 움직여야 하는 해결사. */
+export const SETUP_SPECIALISTS: Record<number, 'pass' | 'memorize'> = { 6: 'pass', 9: 'memorize' }
 
 /** 더미에 넣을 카드. 규칙이 붙지 않은 카드는 뽑히지 않는다. */
 export const READY_CHALLENGES = CHALLENGE_IDS.filter((id) => CHALLENGES[id].ready)

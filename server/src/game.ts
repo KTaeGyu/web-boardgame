@@ -19,6 +19,8 @@ import {
   TOKEN_LOCK_MS,
   VAULTS_TO_WIN,
   AUTOMATIC_SPECIALISTS,
+  JACK_CARD,
+  SETUP_SPECIALISTS,
   SPECIALIST_NEEDS,
   bestHolding,
   evaluateHoleAndCommunity,
@@ -39,6 +41,7 @@ import {
   type Result,
   type Round,
   type ScanState,
+  type SetupState,
   type ShowdownEntry,
   type ShowdownResult,
   type SpecialistId,
@@ -130,6 +133,11 @@ export class Game {
    * 동작 감지기와 레이저 감지선이 이 값을 보고 대상을 고른다.
    */
   private roundOneTokens = new Map<string, number>()
+  /** 딜 직후 다 같이 하는 단계. 「조율가」와 「사기꾼」이 쓴다. */
+  private setup: { kind: 'pass' | 'memorize'; picks: Map<string, number>; done: Set<string> } | null = null
+  /** 한 장을 더 받아 지금 버릴 카드를 고르고 있는 사람. */
+  private discardingId: string | null = null
+
   /** 스캔이 열려 있는 동안의 상태. 답이 정해지면 쇼다운으로 넘어간다. */
   private scan: {
     kind: 'rank' | 'category'
@@ -189,6 +197,8 @@ export class Game {
     this.continued.clear()
     this.roundOneTokens.clear()
     this.scan = null
+    this.setup = null
+    this.discardingId = null
 
     // 한 판 안에서 같은 카드가 두 번 나오지 않도록 매 판 새 덱을 섞는다.
     this.deck = shuffle(freshDeck(), this.rng)
@@ -204,6 +214,111 @@ export class Game {
     // 「빠른 접근」은 1라운드를 통째로 건너뛴다. 카드만 받고 바로 플롭이다.
     this.round = this.has(1) ? 2 : 1
     this.fillCommunity()
+
+    // 다 같이 한 번씩 움직여야 하는 해결사가 있으면 토큰보다 그것이 먼저다.
+    const setupKind = this.specialist === null ? undefined : SETUP_SPECIALISTS[this.specialist]
+    if (setupKind) {
+      this.setup = { kind: setupKind, picks: new Map(), done: new Set() }
+      this.phase = 'setup'
+    }
+  }
+
+  /**
+   * 딜 직후 단계에서 내 몫을 마친다.
+   *
+   * 「조율가」는 넘길 카드를, 「사기꾼」은 「봤다」는 사실만 보낸다.
+   * 전원이 마쳐야 한꺼번에 처리된다 — 먼저 낸 사람의 카드가 먼저 움직이면
+   * 누가 무엇을 넘겼는지 순서로 새어 나간다.
+   */
+  submitSetup(playerId: string, cardIndex?: number): Result<{ notes: PrivateNote[] }> {
+    if (this.phase !== 'setup' || !this.setup) return err('WRONG_PHASE', '지금 할 일이 아닙니다.')
+    const seat = this.seats.find((s) => s.id === playerId)
+    if (!seat) return err('NOT_IN_ROOM', '이 판에 참여하고 있지 않습니다.')
+
+    if (this.setup.kind === 'pass') {
+      if (cardIndex === undefined || cardIndex < 0 || cardIndex >= seat.hole.length) {
+        return err('INVALID_TOKEN', '넘길 카드를 골라 주세요.')
+      }
+      this.setup.picks.set(playerId, cardIndex)
+    }
+    this.setup.done.add(playerId)
+
+    const waiting = this.seats.filter((s) => s.connected && !this.setup!.done.has(s.id))
+    if (waiting.length > 0) return { ok: true, value: { notes: [] } }
+
+    const notes = this.setup.kind === 'pass' ? this.runPass() : this.runShuffle()
+    this.setup = null
+    this.phase = 'picking'
+    return { ok: true, value: { notes } }
+  }
+
+  /** 각자 고른 한 장이 동시에 왼쪽으로 간다. */
+  private runPass(): PrivateNote[] {
+    const given = this.seats.map((seat) => {
+      const index = this.setup!.picks.get(seat.id) ?? 0
+      return seat.hole[index]
+    })
+    // 먼저 빼두고 한꺼번에 넣는다. 하나씩 옮기면 앞사람 자리가 어긋난다.
+    this.seats.forEach((seat, index) => {
+      seat.hole = seat.hole.filter((card) => card !== given[index])
+    })
+    return this.seats.map((seat, index) => {
+      const from = (index - 1 + this.seats.length) % this.seats.length
+      seat.hole.push(given[from])
+      return {
+        toId: seat.id,
+        heist: this.heist,
+        specialist: 6,
+        title: '조율가',
+        text: `${this.nameOf(this.seats[(index + 1) % this.seats.length].id)}에게 넘겼고, ${this.nameOf(this.seats[from].id)}에게서 받았습니다`,
+        cards: [given[index], given[from]],
+      }
+    })
+  }
+
+  /** 전원의 카드를 모아 섞어 다시 나눈다. 외워 둔 두 장이 어딘가에 있다. */
+  private runShuffle(): PrivateNote[] {
+    const before = this.seats.map((seat) => [...seat.hole])
+    const pool = shuffle(this.seats.flatMap((seat) => seat.hole), this.rng)
+
+    let cursor = 0
+    for (const seat of this.seats) {
+      const count = seat.hole.length
+      seat.hole = pool.slice(cursor, cursor + count)
+      cursor += count
+    }
+
+    return this.seats.map((seat, index) => ({
+      toId: seat.id,
+      heist: this.heist,
+      specialist: 9,
+      title: '사기꾼 — 섞이기 전 내 카드',
+      text: '이 카드들은 지금 누군가의 손에 있습니다.',
+      cards: before[index],
+    }))
+  }
+
+  /** 한 장을 더 받은 사람이 버릴 카드를 고른다. */
+  discard(playerId: string, cardIndex: number): Result<{ note: PrivateNote | null }> {
+    if (this.discardingId !== playerId) return err('WRONG_PHASE', '버릴 카드를 고를 차례가 아닙니다.')
+    const seat = this.seats.find((s) => s.id === playerId)
+    if (!seat) return err('NOT_IN_ROOM', '이 판에 참여하고 있지 않습니다.')
+    if (cardIndex < 0 || cardIndex >= seat.hole.length) return err('INVALID_TOKEN', '버릴 카드를 골라 주세요.')
+
+    seat.hole = seat.hole.filter((_, index) => index !== cardIndex)
+    this.discardingId = null
+    return {
+      ok: true,
+      value: {
+        note: {
+          toId: playerId,
+          heist: this.heist,
+          specialist: this.specialist ?? 0,
+          title: '내 카드',
+          cards: [...seat.hole],
+        },
+      },
+    }
   }
 
   /** 「보안 카메라」가 걸리면 세 장씩 받는다. */
@@ -303,6 +418,35 @@ export class Game {
         say(`${this.nameOf(target!.id)} — ${rankLabel(input.value!)} ${count}장`)
         break
       }
+      case 5: {
+        // 한 장을 더 받는다. 무엇을 버릴지는 새 카드를 보고 나서 고른다.
+        actor.hole.push(this.draw())
+        this.discardingId = playerId
+        note = {
+          toId: playerId,
+          heist: this.heist,
+          specialist: 5,
+          title: '해커 — 한 장을 더 받았습니다',
+          text: '이 중 한 장을 버립니다.',
+          cards: [...actor.hole],
+        }
+        say(`${this.nameOf(playerId)}가 카드를 한 장 더 받았습니다`)
+        break
+      }
+      case 7: {
+        actor.hole.push(JACK_CARD)
+        this.discardingId = playerId
+        note = {
+          toId: playerId,
+          heist: this.heist,
+          specialist: 7,
+          title: '잭 — 무늬 없는 J 를 받았습니다',
+          text: '이 중 한 장을 버립니다. 무늬가 없어 플러시에는 쓸 수 없습니다.',
+          cards: [...actor.hole],
+        }
+        say(`${this.nameOf(playerId)}가 무늬 없는 J 를 받았습니다`)
+        break
+      }
       case 10: {
         this.muscleId = playerId
         say(`${this.nameOf(playerId)}가 근육을 맡았습니다 — 같은 족보끼리는 이깁니다`)
@@ -369,6 +513,9 @@ export class Game {
     if (!seat) return err('NOT_IN_ROOM', '이 판에 참여하고 있지 않습니다.')
     if (ready && !this.everyoneHasToken()) {
       return err('WRONG_PHASE', '모두가 토큰을 가져가야 확정할 수 있습니다.')
+    }
+    if (ready && this.discardingId !== null) {
+      return err('WRONG_PHASE', '버릴 카드를 고르는 사람이 있습니다.')
     }
 
     seat.ready = ready
@@ -605,6 +752,11 @@ export class Game {
     return seat ? [...seat.hole] : null
   }
 
+  private setupView(): SetupState | null {
+    if (!this.setup) return null
+    return { kind: this.setup.kind, done: [...this.setup.done] }
+  }
+
   private scanView(): ScanState | null {
     if (!this.scan) return null
     return {
@@ -659,6 +811,8 @@ export class Game {
         (token) => this.isLocked(token, now) || (stuck.includes(token) && this.holders.has(token)),
       ),
       canConfirm: this.phase === 'picking' && this.everyoneHasToken(),
+      setup: this.setupView(),
+      discardingId: this.discardingId,
       scan: this.scanView(),
       showdown: this.showdown,
       continued: [...this.continued],

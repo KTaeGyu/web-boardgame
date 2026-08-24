@@ -15,7 +15,9 @@ import {
   READY_SPECIALISTS,
   SPECIALISTS,
   TOKEN_LOCK_MS,
+  JACK_CARD,
   bestHolding,
+  evaluateBest,
   rankValueOf,
   type ChallengeId,
 } from '@the-gang/shared'
@@ -609,6 +611,113 @@ describe('해결사 카드 효과', () => {
   it('판에 없는 사람은 쓸 수 없다', () => {
     const game = gameWithSpecialist(2)
     assert.equal(game.useSpecialist('구경꾼', {}).ok, false)
+  })
+
+  it('해커 — 한 장을 더 받고 한 장을 버린다', () => {
+    const game = gameWithSpecialist(5)
+    const before = game.handOf('p1')!
+
+    const used = game.useSpecialist('p1', {})
+    assert.equal(used.ok, true)
+    assert.equal(game.handOf('p1')?.length, 3, '먼저 늘어난다')
+    assert.equal(game.view().discardingId, 'p1')
+
+    // 고르는 동안에는 라운드가 넘어가지 않는다
+    const blocked = game.setReady('p1', true)
+    assert.equal(blocked.ok, false)
+
+    const dropped = game.discard('p1', 0)
+    assert.equal(dropped.ok, true)
+    const after = game.handOf('p1')!
+    assert.equal(after.length, 2)
+    assert.equal(after.includes(before[0]), false, '고른 카드가 빠져야 한다')
+    assert.equal(game.view().discardingId, null)
+  })
+
+  it('해커 — 차례가 아닌 사람은 버릴 수 없다', () => {
+    const game = gameWithSpecialist(5)
+    game.useSpecialist('p1', {})
+    assert.equal(game.discard('p2', 0).ok, false)
+    assert.equal(game.discard('p1', 9).ok, false)
+  })
+
+  it('잭 — 무늬 없는 J 가 손에 들어온다', () => {
+    const game = gameWithSpecialist(7)
+    assert.equal(game.useSpecialist('p2', {}).ok, true)
+
+    const hand = game.handOf('p2')!
+    assert.equal(hand.length, 3)
+    assert.ok(hand.includes(JACK_CARD), '무늬 없는 J 가 있어야 한다')
+    assert.equal(game.discard('p2', 0).ok, true)
+    assert.ok(game.handOf('p2')!.includes(JACK_CARD), '버린 것은 원래 카드다')
+  })
+
+  it('잭 — 무늬가 없어 플러시에 끼지 못한다', () => {
+    const flush = evaluateBest(['2s', '5s', '9s', 'Js', 'Ks'] as never)
+    assert.equal(flush.label, '플러시')
+
+    // 스페이드 넷에 무늬 없는 J 를 얹어도 플러시가 되지 않는다
+    const withJack = evaluateBest(['2s', '5s', '9s', 'Ks', JACK_CARD] as never)
+    assert.notEqual(withJack.label, '플러시')
+  })
+
+  it('잭 — 진짜 J 넷과 만나면 J 포카드에 J 키커다', () => {
+    const five = evaluateBest(['Js', 'Jh', 'Jd', 'Jc', JACK_CARD] as never)
+    assert.equal(five.label, '포카드')
+    assert.deepEqual(five.score.slice(1), [11, 11], 'J 포카드에 J 키커')
+  })
+
+  it('조율가 — 전원이 고른 뒤에 한꺼번에 왼쪽으로 넘어간다', () => {
+    const game = gameWithSpecialist(6)
+    assert.equal(game.view().phase, 'setup')
+    assert.equal(game.view().setup?.kind, 'pass')
+
+    const before = new Map(players.map((p) => [p.id, [...game.handOf(p.id)!]]))
+    assert.equal(game.submitSetup('p1', 0).ok, true)
+    assert.equal(game.view().phase, 'setup', '한 명이 냈다고 움직이지 않는다')
+    assert.deepEqual(game.handOf('p1'), before.get('p1'), '아직 그대로다')
+
+    game.submitSetup('p2', 0)
+    const done = game.submitSetup('p3', 0)
+    assert.equal(done.ok, true)
+    if (!done.ok) return
+
+    assert.equal(game.view().phase, 'picking')
+    assert.equal(done.value.notes.length, 3, '각자 무엇을 주고받았는지 알려준다')
+
+    // p1 이 낸 카드는 p2 에게 가 있다
+    assert.ok(game.handOf('p2')!.includes(before.get('p1')![0]))
+    assert.equal(game.handOf('p1')!.includes(before.get('p1')![0]), false)
+    for (const p of players) assert.equal(game.handOf(p.id)?.length, 2, '장수는 그대로다')
+  })
+
+  it('조율가 — 카드를 고르지 않으면 거절한다', () => {
+    const game = gameWithSpecialist(6)
+    assert.equal(game.submitSetup('p1').ok, false)
+    assert.equal(game.submitSetup('p1', 9).ok, false)
+  })
+
+  it('사기꾼 — 전원이 확인하면 섞여서 다시 나뉜다', () => {
+    const game = gameWithSpecialist(9)
+    assert.equal(game.view().setup?.kind, 'memorize')
+
+    const before = players.flatMap((p) => game.handOf(p.id)!)
+    game.submitSetup('p1')
+    game.submitSetup('p2')
+    const done = game.submitSetup('p3')
+    assert.equal(done.ok, true)
+    if (!done.ok) return
+
+    const after = players.flatMap((p) => game.handOf(p.id)!)
+    assert.equal(game.view().phase, 'picking')
+    assert.deepEqual([...after].sort(), [...before].sort(), '카드 구성은 그대로고 자리만 바뀐다')
+    assert.equal(done.value.notes.length, 3)
+    assert.equal(done.value.notes[0].title.includes('섞이기 전'), true)
+  })
+
+  it('딜 직후 단계에서는 토큰을 집을 수 없다', () => {
+    const game = gameWithSpecialist(6)
+    assert.equal(game.takeToken('p1', 1).ok, false)
   })
 
   it('해결사가 없으면 아무것도 공개되지 않는다', () => {
