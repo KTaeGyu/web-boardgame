@@ -129,10 +129,15 @@ export class Game {
   /** 직전 판의 결과. 다음 판에 무엇이 걸릴지가 여기서 갈린다. */
   private lastSuccess: boolean | null = null
   /**
-   * 1라운드에 누가 몇 번을 쥐었는지. 「정전」이 이력을 지워도 이건 남아야 한다 —
+   * 토큰을 처음 나눈 라운드. 보통 1이지만 「빠른 접근」이 걸리면 2다.
+   * 감지기가 「처음 선언」을 보고 대상을 고르므로 그 기준이 필요하다.
+   */
+  private firstChipRound: Round = 1
+  /**
+   * 그 라운드에 누가 몇 번을 쥐었는지. 「정전」이 이력을 지워도 이건 남아야 한다 —
    * 동작 감지기와 레이저 감지선이 이 값을 보고 대상을 고른다.
    */
-  private roundOneTokens = new Map<string, number>()
+  private firstRoundTokens = new Map<string, number>()
   /** 감지기가 누구의 손을 갈아엎었는지. 판이 바뀔 때까지 남는다. */
   private sensorFired: { challenge: ChallengeId; playerId: string } | null = null
   /** 딜 직후 다 같이 하는 단계. 「조율가」와 「사기꾼」이 쓴다. */
@@ -199,7 +204,7 @@ export class Game {
     this.holders.clear()
     this.lockedUntil.clear()
     this.continued.clear()
-    this.roundOneTokens.clear()
+    this.firstRoundTokens.clear()
     this.scan = null
     this.sensorFired = null
     this.setup = null
@@ -218,6 +223,7 @@ export class Game {
 
     // 「빠른 접근」은 1라운드를 통째로 건너뛴다. 카드만 받고 바로 플롭이다.
     this.round = this.has(1) ? 2 : 1
+    this.firstChipRound = this.round
     this.fillCommunity()
 
     // 다 같이 한 번씩 움직여야 하는 해결사가 있으면 토큰보다 그것이 먼저다.
@@ -587,8 +593,8 @@ export class Game {
       seat.history[finished - 1] = this.tokenOf(seat.id)
       seat.ready = false
     }
-    if (finished === 1) {
-      this.roundOneTokens = new Map(this.seats.map((seat) => [seat.id, this.tokenOf(seat.id) ?? 0]))
+    if (finished === this.firstChipRound) {
+      this.firstRoundTokens = new Map(this.seats.map((seat) => [seat.id, this.tokenOf(seat.id) ?? 0]))
     }
 
     if (finished === 4) {
@@ -615,7 +621,9 @@ export class Game {
       }
     }
 
-    if (this.round === 2) this.checkSensors()
+    // 감지기는 「처음 선언」이 끝난 직후에 친다. 보통 1라운드지만
+    // 「빠른 접근」이 걸리면 토큰을 처음 나눈 라운드가 2라운드다.
+    if (finished === this.firstChipRound) this.checkSensors()
   }
 
   /**
@@ -623,10 +631,10 @@ export class Game {
    *
    * 동작 감지기는 그림카드가 있을 때 가장 약하다고 말한 사람을,
    * 레이저 감지선은 그림카드가 없을 때 가장 세다고 말한 사람을 친다.
-   * 1라운드가 통째로 없었다면(빠른 접근) 대상을 고를 수 없으므로 아무 일도 없다.
+   * 보는 것은 언제나 플롭(앞의 세 장)이고, 대상은 토큰을 처음 나눈 라운드의 선언이다.
    */
   private checkSensors(): void {
-    if (this.roundOneTokens.size === 0) return
+    if (this.firstRoundTokens.size === 0) return
 
     const flopHasFace = this.community.slice(0, 3).some((card) => FACE_RANKS.has(rankOf(card)))
     let target: number | null = null
@@ -634,7 +642,7 @@ export class Game {
     if (this.has(7) && !flopHasFace) target = this.seats.length
     if (target === null) return
 
-    const victimId = [...this.roundOneTokens].find(([, token]) => token === target)?.[0]
+    const victimId = [...this.firstRoundTokens].find(([, token]) => token === target)?.[0]
     const victim = this.seats.find((seat) => seat.id === victimId)
     if (!victim) return
 

@@ -554,15 +554,44 @@ describe('카드를 새로 받게 만드는 감지기', () => {
     assert.equal(ctx.game.view().sensor, null, '작동하지 않았으면 알릴 것도 없다')
   })
 
-  it('빠른 접근과 겹치면 대상을 고를 수 없어 넘어간다', () => {
-    const ctx = gameWith([1, 3])
-    const before = players.map((p) => ctx.game.handOf(p.id)!.join(' '))
-    assert.equal(ctx.game.view().round, 2, '1라운드가 없었다')
-    assert.deepEqual(
-      players.map((p) => ctx.game.handOf(p.id)!.join(' ')),
-      before,
-      '1라운드 토큰이 없으니 아무도 바뀌지 않는다',
-    )
+  it('빠른 접근과 겹쳐도 작동한다 — 토큰을 처음 나눈 라운드를 기준으로', () => {
+    // 「빠른 접근」이 1라운드를 없애므로 처음 선언은 2라운드다.
+    // 그 선언이 끝난 뒤에 감지기가 친다.
+    for (let seed = 1; seed < 400; seed++) {
+      const ctx = gameWith([1, 3], seed)
+      assert.equal(ctx.game.view().round, 2, '1라운드가 없었다')
+      const flop = ctx.game.view().community.slice(0, 3)
+      if (!flop.some((card) => 'JQK'.includes(card[0]))) continue
+
+      const before = new Map(players.map((p) => [p.id, ctx.game.handOf(p.id)!.join(' ')]))
+      assert.deepEqual(
+        players.map((p) => ctx.game.handOf(p.id)!.join(' ')),
+        [...before.values()],
+        '선언이 끝나기 전에는 아무 일도 없다',
+      )
+
+      passRound(ctx) // 2라운드 선언 완료
+      const changed = players.filter((p) => ctx.game.handOf(p.id)!.join(' ') !== before.get(p.id))
+      assert.deepEqual(changed.map((p) => p.id), ['p1'], '1번을 쥔 사람이 새로 받는다')
+      assert.deepEqual(ctx.game.view().sensor, { challenge: 3, playerId: 'p1' })
+      return
+    }
+    throw new Error('조건에 맞는 판을 못 찾았다')
+  })
+
+  it('빠른 접근 + 레이저 감지선도 같다', () => {
+    for (let seed = 1; seed < 400; seed++) {
+      const ctx = gameWith([1, 7], seed)
+      const flop = ctx.game.view().community.slice(0, 3)
+      if (flop.some((card) => 'JQK'.includes(card[0]))) continue
+
+      const before = new Map(players.map((p) => [p.id, ctx.game.handOf(p.id)!.join(' ')]))
+      passRound(ctx)
+      const changed = players.filter((p) => ctx.game.handOf(p.id)!.join(' ') !== before.get(p.id))
+      assert.deepEqual(changed.map((p) => p.id), ['p3'], '가장 큰 토큰을 쥔 사람이 새로 받는다')
+      return
+    }
+    throw new Error('조건에 맞는 판을 못 찾았다')
   })
 })
 
