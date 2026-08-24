@@ -195,9 +195,12 @@
   font-weight: 700;
 }
 
-/* 지금 내 손에 잡힌 최선의 족보. 내 카드와 공개된 보드로만 구한 값이다. */
+/*
+ * 지금 내 손에 잡힌 최선의 족보. 내 카드와 공개된 보드로만 구한 값이다.
+ * 짚고 있는 동안 그 조합을 이루는 카드가 밝아진다.
+ */
 .my-seat__holding {
-  padding: 2px 10px;
+  padding: 3px 12px;
   border: 1px solid var(--gold-dim);
   border-radius: 999px;
   background: rgba(212, 175, 55, 0.1);
@@ -206,6 +209,17 @@
   font-weight: 600;
   font-style: normal;
   letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, transform 0.12s;
+}
+
+.my-seat__holding:hover,
+.my-seat__holding:focus-visible,
+.my-seat__holding--on {
+  background: rgba(212, 175, 55, 0.2);
+  border-color: var(--gold);
+  transform: translateY(-1px);
+  outline: none;
 }
 
 /* ── 카드 ─────────────────────────────── */
@@ -279,6 +293,38 @@
   to {
     opacity: 1;
     transform: none;
+  }
+}
+
+/*
+ * 족보를 이루는 카드. 커지면서 이웃을 가리므로 위로 올린다.
+ * 숨쉬듯 오가는 편이 고정된 테두리보다 눈에 먼저 들어온다.
+ */
+.card--highlight {
+  position: relative;
+  z-index: 3;
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+  animation: card-highlight 0.85s ease-in-out infinite alternate;
+}
+
+@keyframes card-highlight {
+  from {
+    transform: scale(1.06) translateY(-2px);
+    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.5), 0 0 6px rgba(212, 175, 55, 0.35);
+  }
+  to {
+    transform: scale(1.1) translateY(-4px);
+    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.55), 0 0 22px rgba(212, 175, 55, 0.65);
+  }
+}
+
+/* 움직임을 원치 않는 사람에게는 밝기만 바꿔 보여준다. */
+@media (prefers-reduced-motion: reduce) {
+  .card--highlight {
+    animation: none;
+    transform: scale(1.08);
+    box-shadow: 0 0 18px rgba(212, 175, 55, 0.6);
   }
 }
 

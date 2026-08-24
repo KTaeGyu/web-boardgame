@@ -6,7 +6,7 @@ import {
   ROUND_LABEL,
   TOKEN_LOCK_MS,
   VAULTS_TO_WIN,
-  describeHolding,
+  bestHolding,
   type Card,
   type GamePlayerView,
   type GameView,
@@ -37,10 +37,15 @@ export function GamePage() {
   const tokenRef = useTokenFlight(TOKEN_LOCK_MS)
 
   // 내 홀카드와 이미 공개된 보드만으로 구한다. 남의 정보는 쓰지 않으므로 새는 것이 없다.
-  const myHolding = useMemo(
-    () => describeHolding([...hand, ...(game?.community ?? [])]),
-    [hand, game?.community],
-  )
+  const myHolding = useMemo(() => bestHolding([...hand, ...(game?.community ?? [])]), [hand, game?.community])
+
+  /** 뱃지를 짚고 있는 동안에만 그 조합을 밝힌다. 평소에는 판을 어지럽히지 않는다. */
+  const [showCombo, setShowCombo] = useState(false)
+  const [pinned, setPinned] = useState(false)
+  const lit = new Set<string>(showCombo || pinned ? (myHolding?.used ?? []) : [])
+
+  // 라운드가 바뀌면 조합도 바뀐다. 켜둔 채로 넘어가면 엉뚱한 카드가 밝혀진 것처럼 보인다.
+  useEffect(() => setPinned(false), [game?.round, game?.heist])
 
   // 진입·새로고침·재연결이 모두 같은 요청이다. 서버가 자리와 손패를 되돌려준다.
   useEffect(() => {
@@ -197,7 +202,12 @@ export function GamePage() {
         <div className="table__community">
           {Array.from({ length: 5 }, (_, index) =>
             game.community[index] ? (
-              <PlayingCard key={game.community[index]} card={game.community[index]} delay={index * 90} />
+              <PlayingCard
+                key={game.community[index]}
+                card={game.community[index]}
+                delay={index * 90}
+                highlight={lit.has(game.community[index])}
+              />
             ) : (
               <CardSlot key={`slot-${index}`} />
             ),
@@ -225,7 +235,9 @@ export function GamePage() {
         <section className="my-seat">
           <div className="my-seat__cards">
             {hand.length > 0 ? (
-              hand.map((card, index) => <PlayingCard key={card} card={card} delay={index * 120} />)
+              hand.map((card, index) => (
+                <PlayingCard key={card} card={card} delay={index * 120} highlight={lit.has(card)} />
+              ))
             ) : (
               <>
                 <CardSlot />
@@ -236,7 +248,20 @@ export function GamePage() {
           <div className="my-seat__info">
             <span className="my-seat__name">
               {me.nickname} (나)
-              {myHolding && <em className="my-seat__holding">{myHolding}</em>}
+              {myHolding && (
+                <button
+                  type="button"
+                  className={`my-seat__holding ${pinned ? 'my-seat__holding--on' : ''}`}
+                  onMouseEnter={() => setShowCombo(true)}
+                  onMouseLeave={() => setShowCombo(false)}
+                  onFocus={() => setShowCombo(true)}
+                  onBlur={() => setShowCombo(false)}
+                  onClick={() => setPinned((on) => !on)}
+                  title="어떤 카드로 만든 족보인지 보기"
+                >
+                  {myHolding.description}
+                </button>
+              )}
             </span>
             <TokenTrack
               player={me}

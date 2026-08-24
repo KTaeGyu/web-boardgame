@@ -7,12 +7,15 @@ interface Props {
   size?: 'sm' | 'md'
   /** 등장 순서. 딜과 커뮤니티 공개가 한 장씩 차례로 놓이도록 늦춘다. */
   delay?: number
+  /** 지금 내 족보를 이루는 카드인지. 어떤 조합인지 짚어 보여줄 때 켠다. */
+  highlight?: boolean
 }
 
 const RED: Suit[] = ['h', 'd']
 
-export function PlayingCard({ card, faceDown = false, size = 'md', delay = 0 }: Props) {
+export function PlayingCard({ card, faceDown = false, size = 'md', delay = 0, highlight = false }: Props) {
   const classes = ['card', `card--${size}`, faceDown || !card ? 'card--back' : 'card--face']
+  if (highlight) classes.push('card--highlight')
 
   if (faceDown || !card) {
     return <div className={classes.join(' ')} style={{ animationDelay: `${delay}ms` }} aria-label="뒷면 카드" />

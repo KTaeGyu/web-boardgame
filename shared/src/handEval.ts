@@ -149,30 +149,59 @@ export function describeHand(value: HandValue): string {
   }
 }
 
+export interface Holding {
+  description: string
+  /** 그 족보를 이루는 카드들. 화면에서 어떤 조합인지 짚어 보여주는 데 쓴다. */
+  used: Card[]
+}
+
 /**
- * 지금 손에 잡힌 최선의 족보. 카드가 몇 장이든 답한다.
+ * 지금 손에 잡힌 최선의 족보와, 그것을 이루는 카드들. 카드가 몇 장이든 답한다.
  *
  * 프리플롭에는 홀카드 두 장뿐이라 5장 평가기를 쓸 수 없다. 그때도
  * "원 페어인지 하이카드인지"는 말할 수 있어야 해서 따로 센다.
  */
-export function describeHolding(cards: readonly Card[]): string | null {
+export function bestHolding(cards: readonly Card[]): Holding | null {
   if (cards.length < 2) return null
-  if (cards.length >= 5) return describeHand(evaluateBest(cards))
+  if (cards.length >= 5) {
+    const value = evaluateBest(cards)
+    return { description: describeHand(value), used: value.cards }
+  }
 
   const name = (v: number) => RANKS[v - 2] ?? String(v)
-  const values = cards.map(rankValueOf).sort((a, b) => b - a)
-  const counts = new Map<number, number>()
-  for (const v of values) counts.set(v, (counts.get(v) ?? 0) + 1)
-  const groups = [...counts.entries()]
-    .sort((a, b) => b[1] - a[1] || b[0] - a[0])
-    .map(([rank, count]) => ({ rank, count }))
+  const byRank = new Map<number, Card[]>()
+  for (const card of cards) {
+    const rank = rankValueOf(card)
+    byRank.set(rank, [...(byRank.get(rank) ?? []), card])
+  }
+  const groups = [...byRank.entries()]
+    .map(([rank, members]) => ({ rank, members }))
+    .sort((a, b) => b.members.length - a.members.length || b.rank - a.rank)
 
   const [first, second] = groups
-  if (first.count === 4) return `${CATEGORY_LABEL[HandCategory.FourOfAKind]}(${name(first.rank)})`
-  if (first.count === 3) return `${CATEGORY_LABEL[HandCategory.ThreeOfAKind]}(${name(first.rank)})`
-  if (first.count === 2 && second?.count === 2) {
-    return `${CATEGORY_LABEL[HandCategory.TwoPair]}(${name(first.rank)}, ${name(second.rank)})`
+  const label = (category: HandCategory) => CATEGORY_LABEL[category]
+
+  if (first.members.length === 4) {
+    return { description: `${label(HandCategory.FourOfAKind)}(${name(first.rank)})`, used: first.members }
   }
-  if (first.count === 2) return `${CATEGORY_LABEL[HandCategory.Pair]}(${name(first.rank)})`
-  return `${CATEGORY_LABEL[HandCategory.HighCard]}(${name(values[0])})`
+  if (first.members.length === 3) {
+    return { description: `${label(HandCategory.ThreeOfAKind)}(${name(first.rank)})`, used: first.members }
+  }
+  if (first.members.length === 2 && second?.members.length === 2) {
+    return {
+      description: `${label(HandCategory.TwoPair)}(${name(first.rank)}, ${name(second.rank)})`,
+      used: [...first.members, ...second.members],
+    }
+  }
+  if (first.members.length === 2) {
+    return { description: `${label(HandCategory.Pair)}(${name(first.rank)})`, used: first.members }
+  }
+
+  const top = groups.reduce((best, group) => (group.rank > best.rank ? group : best))
+  return { description: `${label(HandCategory.HighCard)}(${name(top.rank)})`, used: top.members }
+}
+
+/** 이름만 필요할 때. */
+export function describeHolding(cards: readonly Card[]): string | null {
+  return bestHolding(cards)?.description ?? null
 }
