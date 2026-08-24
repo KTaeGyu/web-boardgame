@@ -214,6 +214,13 @@ describe('직접 고르기', () => {
     assert.equal(dealer.next(true).specialist, 10, '다섯째 판')
   })
 
+  it('같은 해결사가 판마다 다시 걸린다', () => {
+    const dealer = new ExtraDealer('custom', mulberry32(1), [], [10, 10, null, null, null])
+    assert.equal(dealer.next(null).specialist, 10, '첫 판')
+    assert.equal(dealer.next(true).specialist, 10, '둘째 판에도 같은 카드')
+    assert.equal(dealer.next(true).specialist, null, '셋째 판은 비어 있다')
+  })
+
   it('배치표를 넘어선 판은 해결사가 없다', () => {
     const dealer = new ExtraDealer('custom', mulberry32(1), [], [10])
     assert.equal(dealer.next(null).specialist, 10)

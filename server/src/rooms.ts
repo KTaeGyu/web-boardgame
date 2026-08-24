@@ -228,10 +228,8 @@ export class RoomStore {
     if (placed.some((id) => !READY_SPECIALISTS.includes(id))) {
       return err('INVALID_SETTINGS', '고를 수 없는 해결사 카드입니다.')
     }
-    // 한 장은 한 판에만. 같은 카드가 두 판에 앉으면 「썼는가」가 판을 넘나든다.
-    if (new Set(placed).size !== placed.length) {
-      return err('INVALID_SETTINGS', '같은 해결사 카드를 두 판에 놓을 수 없습니다.')
-    }
+    // 같은 카드가 여러 판에 서는 것은 막지 않는다. 「썼는가」는 판마다 새로 시작하므로
+    // (Game.startHeist) 앞 판의 사용 여부가 뒤 판으로 새지 않는다.
     room.settings = {
       ...next,
       pickedChallenges: [...new Set(next.pickedChallenges)].sort((a, b) => a - b),

@@ -368,13 +368,20 @@ describe('방 설정', () => {
     if (picked.ok) assert.deepEqual(picked.value.settings.specialistRounds, [...rounds])
   })
 
-  it('자리 수가 판 수와 다르거나, 없는 카드거나, 같은 카드가 둘이면 막는다', () => {
+  it('자리 수가 판 수와 다르거나 없는 카드면 막는다', () => {
     const bad = (rounds: unknown) =>
       ctx.store.updateSettings('p1', { specialistRounds: rounds as never }).ok
 
     assert.equal(bad([3, null, null]), false, '자리가 모자람')
     assert.equal(bad([99, null, null, null, null]), false, '없는 카드')
-    assert.equal(bad([3, null, 3, null, null]), false, '한 장이 두 판에')
+  })
+
+  it('같은 해결사를 여러 판에 세울 수 있다', () => {
+    // 카드가 판마다 새로 걸리므로 「썼는가」가 앞 판에서 넘어오지 않는다.
+    const rounds = [10, 10, 10, null, null] as const
+    const result = ctx.store.updateSettings('p1', { mode: 'custom', specialistRounds: [...rounds] })
+    assert.equal(result.ok, true)
+    if (result.ok) assert.deepEqual(result.value.settings.specialistRounds, [...rounds])
   })
 
   it('직접 고르기로 옮기는 것 자체는 막지 않는다', () => {

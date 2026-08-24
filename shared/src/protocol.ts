@@ -41,8 +41,8 @@ export interface RoomSettings {
    * 「직접 고르기」에서 판마다 걸릴 해결사. **자리 하나가 판 하나다** —
    * `[null, null, 10, null, null]` 이면 셋째 판에만 「근육」이 나오고 나머지 판은 비어 있다.
    *
-   * 한 판에 걸리는 해결사는 하나뿐이라 자리마다 한 장이고, 한 장이 여러 판에
-   * 나뉠 수도 없어 같은 카드가 두 자리에 앉지 않는다. 길이는 늘 SPECIALIST_ROUNDS 다.
+   * 한 판에 걸리는 해결사는 하나뿐이라 자리마다 한 장이다. 다만 같은 카드가 여러 판에
+   * 설 수는 있다 — 「썼는가」는 판마다 새로 시작한다. 길이는 늘 SPECIALIST_ROUNDS 다.
    */
   specialistRounds: (SpecialistId | null)[]
   maxPlayers: number

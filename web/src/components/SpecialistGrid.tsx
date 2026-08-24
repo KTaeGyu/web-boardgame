@@ -3,7 +3,8 @@
  *
  * 한 판에 걸리는 해결사는 하나뿐이다. 그래서 「무엇을 고를까」가 아니라
  * 「몇 번째 판에 둘까」가 물음이고, 표가 곧 답이다 — 가로 한 줄이 카드 하나,
- * 세로 한 칸이 판 하나이며 어느 쪽으로도 하나씩만 찍힌다.
+ * 세로 한 칸이 판 하나다. 세로로는 하나만 서지만 가로로는 여럿이어도 된다:
+ * 같은 카드를 1판부터 5판까지 내리 세워도 된다.
  *
  * 빈칸도 뜻이 있다. 다섯째 칸에만 하나 찍으면 앞의 네 판은 해결사 없이 지나간다.
  */
@@ -23,27 +24,23 @@ interface Props {
 
 export function SpecialistGrid({ rounds, disabled, onChange }: Props) {
   const { tip, handlers, wasReading } = useCardTip()
-  const placed = rounds.filter((id) => id !== null).length
+  /** 몇 판이 채워졌나. 같은 카드가 여러 판에 설 수 있으므로 「장」이 아니라 「판」이다. */
+  const filled = rounds.filter((id) => id !== null).length
 
   function toggle(id: SpecialistId, at: number) {
     const next = [...rounds]
-    if (next[at] === id) {
-      next[at] = null
-    } else {
-      // 한 장은 한 판에만 선다. 다른 판에 있었다면 그 자리를 비우고 옮겨온다.
-      const was = next.indexOf(id)
-      if (was >= 0) next[was] = null
-      // 그 판에 있던 카드는 자리를 내준다 — 한 판에 둘이 설 수는 없다.
-      next[at] = id
-    }
+    // 그 판에 있던 카드는 자리를 내준다 — 한 판에 둘이 설 수는 없다.
+    // 반대로 이 카드가 다른 판에 서 있는 것은 그대로 둔다.
+    next[at] = next[at] === id ? null : id
     onChange(next)
   }
 
   return (
     <div className="setting">
-      <span className="setting__label">해결사 카드 ({placed}장)</span>
+      <span className="setting__label">해결사 카드 ({filled}판)</span>
       <span className="pick-hint">
-        몇 번째 판에 나올지 정합니다. 한 판에 한 장이고, 비워 둔 판은 해결사 없이 지나갑니다.
+        몇 번째 판에 나올지 정합니다. 한 판에 한 장이고, 같은 카드를 여러 판에 둬도 됩니다.
+        비워 둔 판은 해결사 없이 지나갑니다.
       </span>
 
       <div className="slot-grid" style={{ '--rounds': rounds.length } as CSSProperties}>
