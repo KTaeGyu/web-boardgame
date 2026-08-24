@@ -99,14 +99,36 @@ export function GamePage() {
       navigate('/', { replace: true })
       return
     }
-    const enter = () =>
-      void call<{ hostId: string }>('room:join', { playerId, nickname, code }).then((result) => {
-        if (result.ok) setHostId(result.value.hostId)
+    let alive = true
+    const enter = async () => {
+      const result = await call<{ hostId: string; phase: string }>('room:join', {
+        playerId,
+        nickname,
+        code,
       })
-    enter()
-    socket.on('connect', enter)
+      if (!alive) return
+
+      // 실패를 삼키면 「테이블을 차리는 중」에서 영영 멈춘다. 서버가 다시 뜬 뒤
+      // 새로고침하면 방이 없으므로, 무슨 일인지 알리고 목록으로 돌려보낸다.
+      if (!result.ok) {
+        setNotice(
+          result.code === 'ROOM_NOT_FOUND'
+            ? '방이 사라졌습니다. 모두 나갔거나 서버가 다시 시작되었습니다.'
+            : result.message,
+        )
+        setTimeout(() => navigate('/rooms', { replace: true }), 2200)
+        return
+      }
+      setHostId(result.value.hostId)
+      // 방은 있는데 판이 없으면 여기 있을 이유가 없다.
+      if (result.value.phase === 'lobby') navigate(`/rooms/${code}`, { replace: true })
+    }
+
+    void enter()
+    socket.on('connect', () => void enter())
     return () => {
-      socket.off('connect', enter)
+      alive = false
+      socket.off('connect')
     }
   }, [code, nickname, playerId, navigate])
 

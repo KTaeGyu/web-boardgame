@@ -118,11 +118,16 @@
   z-index: 6;
   display: flex;
   align-items: flex-start;
-  /*
-   * 폭을 확실히 정해 둔다. max-width 만 주면 본체가 내용에 맞춰 줄어드는데,
-   * 그 안의 카드는 width:100% 라 서로를 참조해 아주 좁게 잡힌다.
-   */
-  width: min(92vw, 360px);
+  /* 접었을 때는 탭만 남아야 오른쪽 끝에 붙는다. 넓은 채로 두면 빈 공간이 화면을 가린다. */
+  width: auto;
+}
+
+/*
+ * 펼쳤을 때만 폭을 정해 둔다. max-width 만 주면 본체가 내용에 맞춰 줄어드는데,
+ * 그 안의 카드는 width:100% 라 서로를 참조해 아주 좁게 잡힌다.
+ */
+.drawer--open {
+  width: min(92vw, 300px);
 }
 
 .drawer__tab {
@@ -180,7 +185,7 @@
  */
 .extra-card {
   width: 100%;
-  max-width: 240px;
+  max-width: 170px;
   aspect-ratio: 5 / 7;
   perspective: 900px;
   cursor: pointer;
@@ -1082,10 +1087,14 @@ button.token:hover:not(:disabled) {
   }
 
   /* 좁은 화면에서는 드로어가 테이블을 다 덮지 않도록 위치를 낮추고 폭을 줄인다. */
+  /* 좁은 화면에서는 오른쪽 위. 아래는 확정 버튼이 차지하고 있다. */
   .drawer {
-    top: auto;
-    bottom: 110px;
-    max-width: 88vw;
+    top: 62px;
+    bottom: auto;
+  }
+
+  .drawer--open {
+    width: min(88vw, 260px);
   }
 
   .drawer__body {
