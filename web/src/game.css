@@ -689,11 +689,28 @@ button.token:hover:not(:disabled) {
   box-shadow: none;
 }
 
+/*
+ * 「소음 감지기」·「환기구」가 붙박이로 만든 토큰.
+ * 집기 전부터 보여야 판단이 달라진다 — 한 번 집으면 되돌릴 수 없기 때문이다.
+ */
+.token--stuck {
+  border-color: #0d0d0d;
+  border-width: 3px;
+  color: #0d0d0d;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6), 0 2px 6px rgba(0, 0, 0, 0.5);
+}
+
 /* 날아가는 중. 서버가 이 토큰을 거절하는 시간과 같다. */
 .token--locked {
   opacity: 0.5;
   cursor: not-allowed;
   animation: token-pulse 0.5s ease-in-out infinite alternate;
+}
+
+/* 붙박이가 주인을 만나 잠긴 것은 깜빡일 이유가 없다. 그 상태가 끝이다. */
+.token--stuck.token--locked {
+  opacity: 0.85;
+  animation: none;
 }
 
 @keyframes token-pulse {

@@ -332,6 +332,7 @@ export function GamePage() {
             round={game.round}
             phase={game.phase}
             lockedTokens={game.lockedTokens}
+            stuckTokens={game.stuckTokens}
             rejected={rejected}
             tokenRef={tokenRef}
             onTakeToken={take}
@@ -362,6 +363,7 @@ export function GamePage() {
               value={token}
               round={game.round}
               locked={game.lockedTokens.includes(token)}
+              stuck={game.stuckTokens.includes(token)}
               innerRef={tokenRef(token)}
               onClick={picking ? () => void take(token) : undefined}
             />
@@ -422,6 +424,7 @@ export function GamePage() {
               round={game.round}
               phase={game.phase}
               lockedTokens={game.lockedTokens}
+              stuckTokens={game.stuckTokens}
               rejected={rejected}
               tokenRef={tokenRef}
               onTakeToken={take}
@@ -520,6 +523,7 @@ interface SeatProps {
   round: Round
   phase: GameView['phase']
   lockedTokens: number[]
+  stuckTokens: number[]
   rejected: number | null
   tokenRef: (token: number) => (node: HTMLElement | null) => void
   onTakeToken: (token: number) => void
@@ -551,7 +555,16 @@ function PlayerSeat(props: SeatProps) {
  * 라운드별 판단의 흐름. 지난 라운드는 확정된 채로 굳어 있고,
  * 이번 라운드 토큰만 살아 있어 남이 뺏어갈 수 있다.
  */
-function TokenTrack({ player, round, phase, lockedTokens, rejected, tokenRef, onTakeToken }: SeatProps) {
+function TokenTrack({
+  player,
+  round,
+  phase,
+  lockedTokens,
+  stuckTokens,
+  rejected,
+  tokenRef,
+  onTakeToken,
+}: SeatProps) {
   return (
     <div className="track">
       {ROUNDS.map((r) => {
@@ -566,6 +579,7 @@ function TokenTrack({ player, round, phase, lockedTokens, rejected, tokenRef, on
               value={player.currentToken}
               round={r}
               locked={lockedTokens.includes(player.currentToken)}
+              stuck={stuckTokens.includes(player.currentToken)}
               innerRef={tokenRef(player.currentToken)}
               onClick={() => onTakeToken(player.currentToken as number)}
             />

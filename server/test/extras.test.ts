@@ -238,6 +238,26 @@ describe('도전자 카드 효과', () => {
     assert.ok(ctx.game.view().lockedTokens.includes(1), '화면에도 잠긴 것으로 보인다')
   })
 
+  it('붙박이 토큰은 집기 전부터 표시된다', () => {
+    const { game } = gameWith([2])
+    assert.deepEqual(game.view().stuckTokens, [1], '중앙에 있어도 미리 보여야 한다')
+
+    const ventilation = gameWith([6]).game
+    assert.deepEqual(ventilation.view().stuckTokens, [3], '세 명이면 3번이 가장 크다')
+
+    const both = gameWith([2, 6]).game
+    assert.deepEqual(both.view().stuckTokens, [1, 3])
+
+    assert.deepEqual(gameWith([]).game.view().stuckTokens, [], '카드가 없으면 붙박이도 없다')
+  })
+
+  it('붙박이 표시는 4라운드에 사라진다', () => {
+    const ctx = gameWith([2])
+    for (let round = 0; round < 3; round++) passRound(ctx)
+    assert.equal(ctx.game.view().round, 4)
+    assert.deepEqual(ctx.game.view().stuckTokens, [])
+  })
+
   it('소음 감지기 — 다른 토큰은 평소대로 오간다', () => {
     const ctx = gameWith([2])
     ctx.game.takeToken('p1', 2)

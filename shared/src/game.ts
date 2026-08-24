@@ -128,6 +128,11 @@ export interface GameView {
   centerTokens: number[]
   /** 지금 날아가는 중이라 만질 수 없는 토큰. */
   lockedTokens: number[]
+  /**
+   * 한 번 주인이 정해지면 바뀌지 않는 토큰. 「소음 감지기」와 「환기구」가 만든다.
+   * 집기 전부터 알아야 판단이 달라지므로, 아직 중앙에 있어도 표시된다.
+   */
+  stuckTokens: number[]
   /** 모두가 토큰을 쥐어서 확정 버튼이 열렸는지. */
   canConfirm: boolean
   /** 딜 직후 다 같이 하는 단계. 끝나면 null 이 된다. */

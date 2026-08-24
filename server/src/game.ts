@@ -810,6 +810,7 @@ export class Game {
       lockedTokens: this.tokenNumbers.filter(
         (token) => this.isLocked(token, now) || (stuck.includes(token) && this.holders.has(token)),
       ),
+      stuckTokens: stuck,
       canConfirm: this.phase === 'picking' && this.everyoneHasToken(),
       setup: this.setupView(),
       discardingId: this.discardingId,
