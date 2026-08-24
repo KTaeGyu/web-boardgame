@@ -112,6 +112,8 @@
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 12px;
+  /* 판을 위아래 가운데로 모으는 위쪽 절반. 아래쪽 절반은 화면 크기마다 다르다. */
+  margin-top: auto;
 }
 
 .seat {
@@ -698,10 +700,7 @@ button.token:hover:not(:disabled) {
  * 반씩 나눠 가진다. 내용이 화면보다 길어지면 여백이 0 이 되어 그냥 스크롤된다.
  */
 @media (min-width: 641px) {
-  .seats {
-    margin-top: auto;
-  }
-
+  /* 흐름의 마지막이 확정 버튼이므로 여기서 아래 절반을 받는다. */
   .game-actions {
     margin-bottom: auto;
   }
@@ -776,6 +775,11 @@ button.token:hover:not(:disabled) {
    */
   .game {
     padding-bottom: 104px;
+  }
+
+  /* 확정 버튼이 흐름 밖으로 나가므로, 아래 절반은 내 자리가 받는다. */
+  .my-seat {
+    margin-bottom: auto;
   }
 
   .game-actions {
