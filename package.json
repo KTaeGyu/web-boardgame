@@ -10,8 +10,9 @@
   ],
   "scripts": {
     "test": "node --test \"shared/test/**/*.test.ts\" \"server/test/**/*.test.ts\"",
-    "typecheck": "tsc --noEmit -p tsconfig.json",
-    "dev:server": "npm run dev --workspace @the-gang/server"
+    "typecheck": "tsc --noEmit -p tsconfig.json && npm run typecheck --workspace @the-gang/web",
+    "dev:server": "npm run dev --workspace @the-gang/server",
+    "dev:web": "npm run dev --workspace @the-gang/web"
   },
   "devDependencies": {
     "@types/node": "^26.2.0",
