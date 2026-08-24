@@ -291,6 +291,22 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
       })
     })
 
+    socket.on('game:useSpecialist', (payload, ack) => {
+      withGame(ack, (game, code, playerId) => {
+        const result = game.useSpecialist(playerId, payload ?? {})
+        if (!result.ok) return ack(result)
+        ack({ ok: true, value: null })
+
+        // 몰래 보여주는 카드는 본 사람에게만 간다. 나머지에게는 「보여줬다」는 사실만 남는다.
+        const peek = result.value.peek
+        if (peek) {
+          const socketId = socketOfPlayer.get(peek.targetId)
+          if (socketId) io.to(socketId).emit('game:peek', { fromName: peek.fromName, card: peek.card })
+        }
+        sendGame(code)
+      })
+    })
+
     socket.on('game:rematch', ({ agree }, ack) => {
       withGame(ack, (game, code, playerId) => {
         const result = game.proposeRematch(playerId, Boolean(agree))

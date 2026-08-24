@@ -1,11 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
-  CHALLENGES,
   ROUNDS,
   ROUND_LABEL,
   TOKEN_LOCK_MS,
-  SPECIALISTS,
   VAULTS_TO_WIN,
   bestHolding,
   type Card,
@@ -14,6 +12,7 @@ import {
   type Round,
 } from '@the-gang/shared'
 
+import { ExtrasDrawer } from '../components/ExtrasDrawer.tsx'
 import { ConfirmModal } from '../components/Modal.tsx'
 import { CardSlot, PlayingCard } from '../components/PlayingCard.tsx'
 import { Token, TokenBlank } from '../components/Token.tsx'
@@ -61,6 +60,8 @@ export function GamePage() {
   /** 마지막 결과까지 다 보여줬는가. 이때가 되어야 다음으로 넘어가는 버튼이 열린다. */
   const [finished, setFinished] = useState(false)
   const [confirmLeave, setConfirmLeave] = useState(false)
+  /** 「정보원」으로 본 남의 카드. 나만 안다. */
+  const [peeked, setPeeked] = useState<{ fromName: string; card: Card } | null>(null)
 
   const tokenRef = useTokenFlight(TOKEN_LOCK_MS)
 
@@ -117,7 +118,15 @@ export function GamePage() {
 
   useServerEvent(
     'game:hand',
-    useCallback((payload: { hole: Card[] }) => setHand(payload.hole), []),
+    useCallback((payload: { hole: Card[] }) => {
+      setHand(payload.hole)
+      setPeeked(null) // 새 판이면 본 것도 지운다
+    }, []),
+  )
+
+  useServerEvent(
+    'game:peek',
+    useCallback((payload: { fromName: string; card: Card }) => setPeeked(payload), []),
   )
 
   useServerEvent(
@@ -262,25 +271,6 @@ export function GamePage() {
         </button>
       </header>
 
-      {(game.challenges.length > 0 || game.specialist !== null) && (
-        <section className="extras">
-          {game.challenges.map((id) => (
-            <article key={`c${id}`} className="extra extra--challenge">
-              <span className="extra__kind">도전자</span>
-              <b className="extra__name">{CHALLENGES[id].name}</b>
-              <span className="extra__text">{CHALLENGES[id].text}</span>
-            </article>
-          ))}
-          {game.specialist !== null && (
-            <article className="extra extra--specialist">
-              <span className="extra__kind">해결사</span>
-              <b className="extra__name">{SPECIALISTS[game.specialist].name}</b>
-              <span className="extra__text">{SPECIALISTS[game.specialist].text}</span>
-            </article>
-          )}
-        </section>
-      )}
-
       {game.announcements.length > 0 && (
         <ul className="announcements">
           {game.announcements.map((item) => (
@@ -357,6 +347,12 @@ export function GamePage() {
               </>
             )}
           </div>
+          {peeked && (
+            <div className="peeked">
+              <span className="peeked__label">{peeked.fromName}의 카드</span>
+              <PlayingCard card={peeked.card} size="sm" />
+            </div>
+          )}
           <div className="my-seat__info">
             <span className="my-seat__name">
               {me.displayName} (나)
@@ -420,6 +416,13 @@ export function GamePage() {
           </span>
         )}
       </footer>
+
+      <ExtrasDrawer
+        game={game}
+        playerId={playerId}
+        hand={hand}
+        onUse={(input) => void call('game:useSpecialist', input)}
+      />
 
       {game.showdown && (
         <Showdown game={game} revealed={revealed} flash={flash} finished={finished} playerId={playerId} />

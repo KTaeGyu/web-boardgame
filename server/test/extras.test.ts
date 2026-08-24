@@ -403,6 +403,91 @@ describe('해결사 카드 효과', () => {
     }
   })
 
+  it('저절로 발동하는 카드는 「쓸지 말지」를 묻지 않는다', () => {
+    const game = gameWithSpecialist(3)
+    assert.equal(game.view().specialistUsed, true, '이미 쓴 것으로 둔다')
+    const again = game.useSpecialist('p1', {})
+    assert.equal(again.ok, false)
+  })
+
+  it('도주 운전사 — 족보 이름만 알린다. 무슨 페어인지는 밝히지 않는다', () => {
+    const game = gameWithSpecialist(2)
+    assert.equal(game.view().specialistUsed, false, '누군가 눌러야 쓰인다')
+
+    const used = game.useSpecialist('p1', {})
+    assert.equal(used.ok, true)
+
+    const said = game.view().announcements[0].text
+    assert.doesNotMatch(said, /\(/, '괄호 안 숫자가 새면 안 된다')
+    assert.match(said, /하이카드|원 페어|투 페어|트리플|스트레이트|플러시|풀하우스|포카드/)
+  })
+
+  it('두뇌 — 고른 사람이 그 숫자를 몇 장 가졌는지 알린다', () => {
+    const game = gameWithSpecialist(4)
+    const hole = game.handOf('p2')!
+    const value = 14 // A
+    const expected = hole.filter((card) => card[0] === 'A').length
+
+    const used = game.useSpecialist('p1', { targetId: 'p2', value })
+    assert.equal(used.ok, true)
+    assert.match(game.view().announcements[0].text, new RegExp(`A ${expected}장`))
+  })
+
+  it('두뇌 — 대상이나 숫자를 빠뜨리면 거절한다', () => {
+    const game = gameWithSpecialist(4)
+    assert.equal(game.useSpecialist('p1', { value: 14 }).ok, false)
+    assert.equal(game.useSpecialist('p1', { targetId: 'p2' }).ok, false)
+    assert.equal(game.useSpecialist('p1', { targetId: 'p2', value: 99 }).ok, false)
+    assert.equal(game.view().specialistUsed, false, '거절됐으면 쓰이지 않은 것이다')
+  })
+
+  it('정보원 — 무엇을 보여줬는지는 본 사람만 안다', () => {
+    const game = gameWithSpecialist(1)
+    const mine = game.handOf('p1')!
+
+    const used = game.useSpecialist('p1', { targetId: 'p2', cardIndex: 1 })
+    assert.equal(used.ok, true)
+    if (!used.ok) return
+
+    assert.deepEqual(used.value.peek, {
+      targetId: 'p2',
+      fromName: 'p1',
+      card: mine[1],
+    })
+    const said = game.view().announcements[0].text
+    assert.match(said, /보여줬습니다/)
+    assert.doesNotMatch(said, new RegExp(mine[1]), '공개 문구에 카드가 새면 안 된다')
+  })
+
+  it('정보원 — 없는 카드를 고르면 거절한다', () => {
+    const game = gameWithSpecialist(1)
+    assert.equal(game.useSpecialist('p1', { targetId: 'p2', cardIndex: 9 }).ok, false)
+    assert.equal(game.useSpecialist('p1', { targetId: 'p2' }).ok, false)
+  })
+
+  it('근육 — 같은 족보끼리는 이긴다', () => {
+    const game = gameWithSpecialist(10)
+    assert.equal(game.view().muscleId, null)
+
+    const used = game.useSpecialist('p3', {})
+    assert.equal(used.ok, true)
+    assert.equal(game.view().muscleId, 'p3')
+  })
+
+  it('한 판에 한 번만 쓸 수 있다', () => {
+    const game = gameWithSpecialist(2)
+    assert.equal(game.useSpecialist('p1', {}).ok, true)
+
+    const again = game.useSpecialist('p2', {})
+    assert.equal(again.ok, false)
+    if (!again.ok) assert.match(again.message, /이미 쓴/)
+  })
+
+  it('판에 없는 사람은 쓸 수 없다', () => {
+    const game = gameWithSpecialist(2)
+    assert.equal(game.useSpecialist('구경꾼', {}).ok, false)
+  })
+
   it('해결사가 없으면 아무것도 공개되지 않는다', () => {
     const { game } = gameWith([])
     assert.deepEqual(game.view().announcements, [])

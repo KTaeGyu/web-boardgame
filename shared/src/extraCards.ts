@@ -86,15 +86,15 @@ export const CHALLENGES: Record<ChallengeId, ExtraCard> = {
 }
 
 export const SPECIALISTS: Record<SpecialistId, ExtraCard> = {
-  1: { id: 1, name: '정보원', text: '한 명이 다른 한 명에게 자기 카드 한 장을 보여줍니다.', ready: false },
-  2: { id: 2, name: '도주 운전사', text: '한 명이 지금 자기 족보 이름만 모두에게 알립니다.', ready: false },
+  1: { id: 1, name: '정보원', text: '한 명이 다른 한 명에게 자기 카드 한 장을 보여줍니다.', ready: true },
+  2: { id: 2, name: '도주 운전사', text: '한 명이 지금 자기 족보 이름만 모두에게 알립니다.', ready: true },
   3: {
     id: 3,
     name: '투자자',
     text: '카드를 받자마자, 각자 가진 그림카드(J·Q·K) 수가 모두에게 공개됩니다.',
     ready: true,
   },
-  4: { id: 4, name: '두뇌', text: '숫자 하나를 정하고, 한 명이 그 숫자를 몇 장 가졌는지 알립니다.', ready: false },
+  4: { id: 4, name: '두뇌', text: '숫자 하나를 정하고, 한 명이 그 숫자를 몇 장 가졌는지 알립니다.', ready: true },
   5: { id: 5, name: '해커', text: '한 명이 카드를 한 장 더 받고 한 장을 버립니다.', ready: false },
   6: { id: 6, name: '조율가', text: '각자 카드 한 장을 골라 동시에 왼쪽 사람에게 넘깁니다.', ready: false },
   7: {
@@ -110,8 +110,41 @@ export const SPECIALISTS: Record<SpecialistId, ExtraCard> = {
     ready: true,
   },
   9: { id: 9, name: '사기꾼', text: '모두 카드를 본 뒤, 전원의 카드를 섞어 다시 나눕니다.', ready: false },
-  10: { id: 10, name: '근육', text: '한 명은 같은 족보끼리는 무조건 이깁니다.', ready: false },
+  10: { id: 10, name: '근육', text: '한 명은 같은 족보끼리는 무조건 이깁니다.', ready: true },
 }
+
+/**
+ * 해결사를 쓰려면 무엇을 더 골라야 하는가.
+ *
+ * 카드를 누른 사람이 곧 쓰는 사람이다. 그 위에 대상·숫자·내 카드가 더 필요할 수 있고,
+ * 화면은 이 표를 보고 무엇을 물을지 정한다.
+ */
+export interface SpecialistNeeds {
+  /** 다른 사람을 골라야 하는가. */
+  target: boolean
+  /** 숫자를 골라야 하는가. */
+  value: boolean
+  /** 내 카드 중 하나를 골라야 하는가. */
+  ownCard: boolean
+}
+
+const NOTHING: SpecialistNeeds = { target: false, value: false, ownCard: false }
+
+export const SPECIALIST_NEEDS: Record<SpecialistId, SpecialistNeeds> = {
+  1: { target: true, value: false, ownCard: true },
+  2: NOTHING,
+  3: NOTHING,
+  4: { target: true, value: true, ownCard: false },
+  5: NOTHING,
+  6: NOTHING,
+  7: NOTHING,
+  8: NOTHING,
+  9: NOTHING,
+  10: NOTHING,
+}
+
+/** 카드를 받자마자 저절로 발동해서, 누가 쓸지 고를 것이 없는 해결사. */
+export const AUTOMATIC_SPECIALISTS: SpecialistId[] = [3, 8]
 
 /** 더미에 넣을 카드. 규칙이 붙지 않은 카드는 뽑히지 않는다. */
 export const READY_CHALLENGES = CHALLENGE_IDS.filter((id) => CHALLENGES[id].ready)

@@ -121,6 +121,11 @@ export interface ClientToServerEvents {
   'game:continue': (ack: (result: Result<null>) => void) => void
   /** 게임이 끝난 뒤 재경기. 한 명이라도 거절하면 방이 닫힌다. */
   'game:rematch': (payload: { agree: boolean }, ack: (result: Result<null>) => void) => void
+  /** 해결사 카드를 쓴다. 누른 사람이 쓰는 사람이고, 카드에 따라 대상·숫자·내 카드가 더 필요하다. */
+  'game:useSpecialist': (
+    payload: { targetId?: string; value?: number; cardIndex?: number },
+    ack: (result: Result<null>) => void,
+  ) => void
 }
 
 /** 서버 → 클라이언트. */
@@ -137,6 +142,8 @@ export interface ServerToClientEvents {
   'game:hand': (payload: { heist: number; hole: Card[] }) => void
   /** 사람이 빠져 판을 이어갈 수 없게 됐다. */
   'game:aborted': (payload: GameOverReason) => void
+  /** 「정보원」으로 남의 카드 한 장을 봤다. 본 사람에게만 간다. */
+  'game:peek': (payload: { fromName: string; card: Card }) => void
 }
 
 export const NICKNAME_MAX = 12

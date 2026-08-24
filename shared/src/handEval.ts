@@ -151,6 +151,8 @@ export function describeHand(value: HandValue): string {
 
 export interface Holding {
   description: string
+  /** 족보 이름만. 「원 페어」까지고 무슨 페어인지는 담지 않는다. */
+  name: string
   /** 그 족보를 이루는 카드들. 화면에서 어떤 조합인지 짚어 보여주는 데 쓴다. */
   used: Card[]
 }
@@ -165,7 +167,7 @@ export function bestHolding(cards: readonly Card[]): Holding | null {
   if (cards.length < 2) return null
   if (cards.length >= 5) {
     const value = evaluateBest(cards)
-    return { description: describeHand(value), used: value.cards }
+    return { description: describeHand(value), name: CATEGORY_LABEL[value.category], used: value.cards }
   }
 
   const name = rankLabel
@@ -181,24 +183,21 @@ export function bestHolding(cards: readonly Card[]): Holding | null {
   const [first, second] = groups
   const label = (category: HandCategory) => CATEGORY_LABEL[category]
 
-  if (first.members.length === 4) {
-    return { description: `${label(HandCategory.FourOfAKind)}(${name(first.rank)})`, used: first.members }
-  }
-  if (first.members.length === 3) {
-    return { description: `${label(HandCategory.ThreeOfAKind)}(${name(first.rank)})`, used: first.members }
-  }
+  const made = (category: HandCategory, args: number[], used: Card[]): Holding => ({
+    description: `${label(category)}(${args.map(name).join(', ')})`,
+    name: label(category),
+    used,
+  })
+
+  if (first.members.length === 4) return made(HandCategory.FourOfAKind, [first.rank], first.members)
+  if (first.members.length === 3) return made(HandCategory.ThreeOfAKind, [first.rank], first.members)
   if (first.members.length === 2 && second?.members.length === 2) {
-    return {
-      description: `${label(HandCategory.TwoPair)}(${name(first.rank)}, ${name(second.rank)})`,
-      used: [...first.members, ...second.members],
-    }
+    return made(HandCategory.TwoPair, [first.rank, second.rank], [...first.members, ...second.members])
   }
-  if (first.members.length === 2) {
-    return { description: `${label(HandCategory.Pair)}(${name(first.rank)})`, used: first.members }
-  }
+  if (first.members.length === 2) return made(HandCategory.Pair, [first.rank], first.members)
 
   const top = groups.reduce((best, group) => (group.rank > best.rank ? group : best))
-  return { description: `${label(HandCategory.HighCard)}(${name(top.rank)})`, used: top.members }
+  return made(HandCategory.HighCard, [top.rank], top.members)
 }
 
 /** 이름만 필요할 때. */

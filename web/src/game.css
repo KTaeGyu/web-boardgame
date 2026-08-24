@@ -108,13 +108,63 @@
 }
 
 /*
- * 이번 판에 걸린 카드. 무엇이 달라졌는지 판 내내 보여야 한다 —
- * 한 번 읽고 사라지면 규칙을 기억에 맡기게 된다.
+ * 이번 판에 걸린 카드는 옆에 붙어 있다. 규칙이 바뀐 채로 진행되므로 언제든
+ * 다시 읽을 수 있어야 하지만, 늘 펼쳐 두면 테이블을 가린다. 그래서 접힌다.
  */
-.extras {
+.drawer {
+  position: fixed;
+  top: 84px;
+  right: 0;
+  z-index: 6;
+  display: flex;
+  align-items: flex-start;
+  max-width: min(92vw, 340px);
+}
+
+.drawer__tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 8px;
+  border: 1px solid var(--line);
+  border-right: none;
+  border-radius: 10px 0 0 10px;
+  background: var(--card);
+  color: var(--ink-dim);
+  font-size: 12px;
+  writing-mode: vertical-rl;
+  box-shadow: -4px 0 16px rgba(0, 0, 0, 0.4);
+}
+
+.drawer--open .drawer__tab {
+  color: var(--gold);
+  border-color: var(--gold-dim);
+}
+
+.drawer__tab-count {
+  padding: 3px 6px;
+  border-radius: 999px;
+  background: rgba(212, 175, 55, 0.18);
+  color: var(--gold);
+  font-weight: 800;
+  writing-mode: horizontal-tb;
+}
+
+.drawer__tab-arrow {
+  writing-mode: horizontal-tb;
+}
+
+.drawer__body {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 10px;
+  gap: 8px;
+  padding: 12px;
+  max-height: 70vh;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-right: none;
+  border-radius: 10px 0 0 10px;
+  background: var(--card);
+  box-shadow: -8px 0 28px rgba(0, 0, 0, 0.55);
 }
 
 .extra {
@@ -166,6 +216,67 @@
   color: var(--ink-dim);
   line-height: 1.45;
   word-break: keep-all;
+}
+
+.extra__state {
+  grid-column: 1 / -1;
+  font-size: 12px;
+  color: var(--ink-dim);
+}
+
+/* 지금 내가 누를 수 있는 카드. 누르면 쓸지 한 번 묻는다. */
+.extra--usable {
+  cursor: pointer;
+  border-color: var(--gold);
+  transition: transform 0.12s, box-shadow 0.15s;
+}
+
+.extra--usable:hover,
+.extra--usable:focus-visible {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5), 0 0 16px rgba(212, 175, 55, 0.25);
+  outline: none;
+}
+
+.extra--usable .extra__state {
+  color: var(--gold);
+  font-weight: 700;
+}
+
+/* 고를 카드들. 고른 것만 밝다. */
+.pick-cards {
+  display: flex;
+  gap: 8px;
+}
+
+.pick-card {
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: transparent;
+  opacity: 0.55;
+}
+
+.pick-card--on {
+  border-color: var(--gold);
+  opacity: 1;
+}
+
+/* 「정보원」으로 내가 본 남의 카드. 나만 보인다. */
+.peeked {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px dashed var(--gold-dim);
+  border-radius: 10px;
+  background: rgba(212, 175, 55, 0.06);
+}
+
+.peeked__label {
+  font-size: 12px;
+  color: var(--gold);
+  white-space: nowrap;
 }
 
 /* 해결사가 카드를 나눠주자마자 밝힌 것들. */
@@ -847,6 +958,17 @@ button.token:hover:not(:disabled) {
   .game-bar__leave {
     flex: none;
     padding: 6px 10px;
+  }
+
+  /* 좁은 화면에서는 드로어가 테이블을 다 덮지 않도록 위치를 낮추고 폭을 줄인다. */
+  .drawer {
+    top: auto;
+    bottom: 110px;
+    max-width: 88vw;
+  }
+
+  .drawer__body {
+    max-height: 46vh;
   }
 
   /*

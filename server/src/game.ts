@@ -18,9 +18,13 @@ import {
   ROUNDS,
   TOKEN_LOCK_MS,
   VAULTS_TO_WIN,
+  AUTOMATIC_SPECIALISTS,
+  SPECIALIST_NEEDS,
+  bestHolding,
   displayNames,
   freshDeck,
   judgeShowdown,
+  rankLabel,
   rankOf,
   rankValueOf,
   shuffle,
@@ -103,6 +107,9 @@ export class Game {
   /** 이번 판에 걸린 카드들. */
   private challenges: ChallengeId[] = []
   private specialist: SpecialistId | null = null
+  private specialistUsed = false
+  /** 「근육」을 맡은 사람. 쇼다운에서 같은 족보끼리의 우열을 뒤집는다. */
+  private muscleId: string | null = null
   private announcements: Announcement[] = []
   /** 직전 판의 결과. 다음 판에 무엇이 걸릴지가 여기서 갈린다. */
   private lastSuccess: boolean | null = null
@@ -153,6 +160,10 @@ export class Game {
     this.community = []
     this.showdown = null
     this.announcements = []
+    // 저절로 발동하는 카드는 「쓸지 말지」를 물을 것이 없으니 이미 쓴 것으로 둔다.
+    this.specialistUsed =
+      this.specialist === null || AUTOMATIC_SPECIALISTS.includes(this.specialist)
+    this.muscleId = null
     this.holders.clear()
     this.lockedUntil.clear()
     this.continued.clear()
@@ -206,6 +217,76 @@ export class Game {
       }, 0)
       return { playerId: seat.id, text: `${names[index]} — 합 ${sum}` }
     })
+  }
+
+  /** 화면에 부를 이름. 여러 곳에서 같은 이름을 써야 한다. */
+  private nameOf(playerId: string): string {
+    const names = displayNames(this.seats.map((seat) => seat.nickname))
+    const index = this.seats.findIndex((seat) => seat.id === playerId)
+    return index < 0 ? '?' : names[index]
+  }
+
+  /**
+   * 해결사 카드를 쓴다. 누른 사람이 곧 쓰는 사람이다.
+   *
+   * 원작은 「누가 언제 쓸지 다 같이 정한다」인데, 말을 주고받을 수 없는 자리에서는
+   * 합의 절차를 따로 만들어야 한다. 지금은 먼저 누른 사람이 쓰고 한 판에 한 번만 쓰인다.
+   * 결과로 무엇을 밖에 알려야 하는지 돌려준다 — 몰래 보여주는 카드가 있기 때문이다.
+   */
+  useSpecialist(
+    playerId: string,
+    input: { targetId?: string; value?: number; cardIndex?: number },
+  ): Result<{ peek: { targetId: string; fromName: string; card: Card } | null }> {
+    if (this.phase !== 'picking') return err('WRONG_PHASE', '지금은 쓸 수 없습니다.')
+    if (this.specialist === null) return err('WRONG_PHASE', '이번 판에는 해결사 카드가 없습니다.')
+    if (this.specialistUsed) return err('WRONG_PHASE', '이미 쓴 카드입니다.')
+
+    const actor = this.seats.find((s) => s.id === playerId)
+    if (!actor) return err('NOT_IN_ROOM', '이 판에 참여하고 있지 않습니다.')
+
+    const needs = SPECIALIST_NEEDS[this.specialist]
+    const target = needs.target ? this.seats.find((s) => s.id === input.targetId) : undefined
+    if (needs.target && !target) return err('INVALID_TOKEN', '대상을 골라 주세요.')
+    if (needs.value && (input.value === undefined || input.value < 2 || input.value > 14)) {
+      return err('INVALID_TOKEN', '숫자를 골라 주세요.')
+    }
+    const cardIndex = input.cardIndex ?? -1
+    if (needs.ownCard && (cardIndex < 0 || cardIndex >= actor.hole.length)) {
+      return err('INVALID_TOKEN', '보여줄 카드를 골라 주세요.')
+    }
+
+    let peek: { targetId: string; fromName: string; card: Card } | null = null
+    const say = (text: string) => this.announcements.push({ playerId, text })
+
+    switch (this.specialist) {
+      case 1: {
+        // 무엇을 보여줬는지는 본 사람만 안다. 모두에게는 「보여줬다」는 사실만 남는다.
+        peek = { targetId: target!.id, fromName: this.nameOf(playerId), card: actor.hole[cardIndex] }
+        say(`${this.nameOf(playerId)} → ${this.nameOf(target!.id)}에게 카드 한 장을 보여줬습니다`)
+        break
+      }
+      case 2: {
+        // 족보 이름만. 「원 페어」까지고 무슨 페어인지는 밝히지 않는다.
+        const holding = bestHolding([...actor.hole, ...this.community])
+        say(`${this.nameOf(playerId)} — ${holding?.name ?? '알 수 없음'}`)
+        break
+      }
+      case 4: {
+        const count = target!.hole.filter((card) => rankValueOf(card) === input.value).length
+        say(`${this.nameOf(target!.id)} — ${rankLabel(input.value!)} ${count}장`)
+        break
+      }
+      case 10: {
+        this.muscleId = playerId
+        say(`${this.nameOf(playerId)}가 근육을 맡았습니다 — 같은 족보끼리는 이깁니다`)
+        break
+      }
+      default:
+        return err('WRONG_PHASE', '아직 쓸 수 없는 카드입니다.')
+    }
+
+    this.specialistUsed = true
+    return { ok: true, value: { peek } }
   }
 
   // ── 사람의 입력 ──────────────────────────────────────────
@@ -381,7 +462,7 @@ export class Game {
       hole: seat.hole,
     }))
 
-    this.showdown = judgeShowdown(entries, this.community)
+    this.showdown = judgeShowdown(entries, this.community, { muscleId: this.muscleId })
     this.lastSuccess = this.showdown.success
     if (this.showdown.success) this.vaults += 1
     else this.alarms += 1
@@ -445,6 +526,8 @@ export class Game {
       alarmsToLose: this.alarmsToLose,
       challenges: [...this.challenges],
       specialist: this.specialist,
+      specialistUsed: this.specialistUsed,
+      muscleId: this.muscleId,
       announcements: [...this.announcements],
       holeCount: this.holeCount,
       heist: this.heist,

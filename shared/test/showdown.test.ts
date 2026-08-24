@@ -166,6 +166,37 @@ describe('완전히 같은 손끼리는 순서가 자유롭다', () => {
   })
 })
 
+describe('근육 — 같은 족보끼리는 이긴다', () => {
+  // 보드 2♠ 2♥ 5♦ 9♣ 7♠ — 둘 다 원 페어(2)지만 키커가 갈린다.
+  const board = cards('2s 2h 5d 9c 7s')
+  const 센손 = 'Ad Kh'
+  const 약한손 = 'Qd Jh'
+
+  it('근육이 없으면 키커가 낮은 쪽이 뒤에 설 수 없다', () => {
+    const result = judgeShowdown([entry('강', 1, 센손), entry('약', 2, 약한손)], board)
+    assert.equal(result.success, false)
+  })
+
+  it('근육을 쥐면 같은 족보를 뒤집는다', () => {
+    const result = judgeShowdown([entry('강', 1, 센손), entry('약', 2, 약한손)], board, {
+      muscleId: '약',
+    })
+    assert.equal(result.success, true, '약한 원 페어가 근육 덕에 더 세진다')
+  })
+
+  it('족보가 다르면 근육도 소용없다', () => {
+    // 병은 트리플이라 원 페어보다 세다. 근육이 있어도 족보를 넘지 못한다.
+    const result = judgeShowdown(
+      [entry('트리플', 1, '2c Kd'), entry('페어', 2, 약한손)],
+      board,
+      { muscleId: '페어' },
+    )
+    assert.equal(result.reveals[0].description, '트리플(2)')
+    assert.equal(result.reveals[1].description, '원 페어(2)')
+    assert.equal(result.success, false, '근육은 같은 족보끼리만 통한다')
+  })
+})
+
 describe('쇼다운 입력 검증', () => {
   it('커뮤니티가 5장이 아니면 거부한다', () => {
     assert.throws(() => judgeShowdown([entry('a', 1, 'Kh Kd')], cards('Ks 9h 4d')), /5장/)

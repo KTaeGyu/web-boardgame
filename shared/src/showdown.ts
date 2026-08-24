@@ -26,13 +26,22 @@ export interface ShowdownReveal {
   ok: boolean
 }
 
+export interface ShowdownOptions {
+  /** 「근육」을 가진 사람. 같은 족보끼리는 이 사람이 이긴다. */
+  muscleId?: string | null
+}
+
 export interface ShowdownResult {
   success: boolean
   /** 공개 순서(토큰 오름차순)대로. 화면에서 이 순서로 하나씩 뒤집으면 된다. */
   reveals: ShowdownReveal[]
 }
 
-export function judgeShowdown(entries: readonly ShowdownEntry[], community: readonly Card[]): ShowdownResult {
+export function judgeShowdown(
+  entries: readonly ShowdownEntry[],
+  community: readonly Card[],
+  options: ShowdownOptions = {},
+): ShowdownResult {
   if (community.length !== 5) throw new Error(`커뮤니티 카드는 5장이어야 한다: ${community.length}장 받음`)
 
   const tokens = entries.map((e) => e.token)
@@ -40,13 +49,19 @@ export function judgeShowdown(entries: readonly ShowdownEntry[], community: read
 
   const ordered = entries.slice().sort((a, b) => a.token - b.token)
 
-  let strongestSoFar: HandValue | null = null
+  /**
+   * 지금까지 나온 가장 센 손. 「근육」이 걸리면 같은 족보끼리의 우열이 뒤집히므로,
+   * 값만이 아니라 그것이 근육의 손이었는지도 함께 들고 다녀야 한다.
+   */
+  let strongestSoFar: { value: HandValue; muscle: boolean } | null = null
   const reveals: ShowdownReveal[] = []
 
   for (const entry of ordered) {
     const value = evaluateHoleAndCommunity(entry.hole, community)
-    const ok = strongestSoFar === null || compareHands(value, strongestSoFar) >= 0
-    if (strongestSoFar === null || compareHands(value, strongestSoFar) > 0) strongestSoFar = value
+    const mine = { value, muscle: entry.playerId === options.muscleId }
+    const diff = strongestSoFar === null ? 1 : compareWithMuscle(mine, strongestSoFar)
+    const ok = diff >= 0
+    if (strongestSoFar === null || diff > 0) strongestSoFar = mine
 
     reveals.push({
       playerId: entry.playerId,
@@ -59,4 +74,13 @@ export function judgeShowdown(entries: readonly ShowdownEntry[], community: read
   }
 
   return { success: reveals.every((r) => r.ok), reveals }
+}
+
+/** 족보가 같을 때만 근육이 끼어든다. 족보가 다르면 평소대로다. */
+function compareWithMuscle(
+  a: { value: HandValue; muscle: boolean },
+  b: { value: HandValue; muscle: boolean },
+): number {
+  if (a.value.category === b.value.category && a.muscle !== b.muscle) return a.muscle ? 1 : -1
+  return compareHands(a.value, b.value)
 }

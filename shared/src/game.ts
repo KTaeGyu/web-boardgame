@@ -79,6 +79,10 @@ export interface GameView {
   challenges: ChallengeId[]
   /** 이번 판에 쓸 수 있는 해결사 카드. */
   specialist: SpecialistId | null
+  /** 이미 썼는가. 한 판에 한 번뿐이다. */
+  specialistUsed: boolean
+  /** 「근육」을 맡은 사람. 같은 족보끼리는 이 사람이 이긴다. */
+  muscleId: string | null
   /** 해결사가 공개한 정보. 판이 바뀌면 사라진다. */
   announcements: Announcement[]
   /** 한 사람이 받은 카드 수. 「보안 카메라」가 걸리면 3장이다. */
