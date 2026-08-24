@@ -36,6 +36,7 @@ Node 22.18+ 필요. `.ts` 를 빌드 없이 그대로 실행하므로 `shared` �
 
 ## 문서
 
+- [`docs/context.md`](docs/context.md) — **지금 어디까지 왔고 무엇이 남았는지.** 이어서 작업할 때 여기부터
 - [`docs/도전자-해결사-카드.md`](docs/도전자-해결사-카드.md) — 원작 challenge / specialist 카드 20장의 효과와
   온라인으로 옮길 때 걸리는 지점
 
