@@ -15,6 +15,12 @@ export const RANK_VALUE: Record<Rank, number> = {
 
 export const SUIT_LABEL: Record<Suit, string> = { s: '♠', h: '♥', d: '♦', c: '♣' }
 
+/** 사람에게 보일 숫자. 10 만 두 글자라 따로 처리한다. */
+export function rankLabel(value: number): string {
+  if (value === 10) return '10'
+  return RANKS[value - 2] ?? String(value)
+}
+
 export function rankOf(card: Card): Rank {
   return card[0] as Rank
 }

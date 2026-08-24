@@ -7,7 +7,7 @@
  * score 가 완전히 일치하면 그것이 룰북의 true tie 다.
  */
 
-import { type Card, RANKS, rankValueOf, suitOf } from './cards.ts'
+import { type Card, rankLabel, rankValueOf, suitOf } from './cards.ts'
 
 /** 숫자가 클수록 강하다. 로열 스트레이트 플러시는 별도 카테고리가 아니라 A탑 스트레이트 플러시다. */
 export const HandCategory = {
@@ -133,7 +133,7 @@ export function evaluateHoleAndCommunity(hole: readonly Card[], community: reado
  * 트리플이 먼저다. 로열은 인자가 없어도 무엇인지 분명하다.
  */
 export function describeHand(value: HandValue): string {
-  const name = (v: number) => RANKS[v - 2] ?? String(v)
+  const name = rankLabel
   const [, ...tb] = value.score
   const label = CATEGORY_LABEL[value.category]
 
@@ -168,7 +168,7 @@ export function bestHolding(cards: readonly Card[]): Holding | null {
     return { description: describeHand(value), used: value.cards }
   }
 
-  const name = (v: number) => RANKS[v - 2] ?? String(v)
+  const name = rankLabel
   const byRank = new Map<number, Card[]>()
   for (const card of cards) {
     const rank = rankValueOf(card)

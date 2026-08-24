@@ -171,7 +171,9 @@ export function GamePage() {
             <i key={`a${i}`} className={`mark mark--alarm ${i < game.alarms ? 'mark--on' : ''}`} />
           ))}
         </span>
-        <span className="game-bar__round">{picking ? ROUND_LABEL[game.round] : '쇼다운'}</span>
+        <span className="game-bar__round">
+          {picking ? `${game.round}라운드 · ${ROUND_LABEL[game.round]}` : '쇼다운'}
+        </span>
         <button type="button" className="game-bar__leave" onClick={() => void leave(navigate)}>
           나가기
         </button>

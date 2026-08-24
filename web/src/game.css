@@ -120,7 +120,8 @@
 .seat__cards,
 .my-seat__cards {
   display: flex;
-  gap: 6px;
+  /* 강조된 카드가 살짝 커지므로 이웃과 붙지 않을 만큼 띄운다. */
+  gap: 10px;
 }
 
 .seat__name {
@@ -234,8 +235,16 @@
   gap: 2px;
   font-weight: 700;
   user-select: none;
-  /* 딜과 커뮤니티 공개가 한 장씩 놓이는 느낌. delay 는 컴포넌트가 준다. */
-  animation: card-in 0.32s cubic-bezier(0.2, 0.9, 0.3, 1) both;
+  /*
+   * 딜과 커뮤니티 공개가 한 장씩 놓이는 느낌. delay 는 컴포넌트가 준다.
+   *
+   * fill 이 backwards 인 것이 중요하다. both 로 두면 애니메이션이 끝난 뒤에도
+   * 마지막 키프레임(transform: none)을 계속 붙들어, 강조의 transform 이 먹지 않는다.
+   * 그래서 예전에는 강조를 애니메이션으로 만들 수밖에 없었고, 강조가 꺼질 때
+   * 등장 애니메이션이 처음부터 다시 돌아 카드가 다시 날아드는 것처럼 보였다.
+   */
+  animation: card-in 0.32s cubic-bezier(0.2, 0.9, 0.3, 1) backwards;
+  transition: transform 0.16s ease, box-shadow 0.16s ease;
 }
 
 .card--sm {
@@ -298,33 +307,26 @@
 
 /*
  * 족보를 이루는 카드. 커지면서 이웃을 가리므로 위로 올린다.
- * 숨쉬듯 오가는 편이 고정된 테두리보다 눈에 먼저 들어온다.
+ * 계속 움직이는 애니메이션은 매 프레임 그림자를 다시 그려 무겁다. 한 번만 올라온다.
  */
 .card--highlight {
   position: relative;
   z-index: 3;
+  transform: scale(1.05) translateY(-3px);
   outline: 2px solid var(--gold);
   outline-offset: 2px;
-  animation: card-highlight 0.85s ease-in-out infinite alternate;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.55), 0 0 12px rgba(212, 175, 55, 0.5);
 }
 
-@keyframes card-highlight {
-  from {
-    transform: scale(1.06) translateY(-2px);
-    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.5), 0 0 6px rgba(212, 175, 55, 0.35);
-  }
-  to {
-    transform: scale(1.1) translateY(-4px);
-    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.55), 0 0 22px rgba(212, 175, 55, 0.65);
-  }
-}
-
-/* 움직임을 원치 않는 사람에게는 밝기만 바꿔 보여준다. */
+/* 움직임을 원치 않는 사람에게는 테두리와 빛만. */
 @media (prefers-reduced-motion: reduce) {
-  .card--highlight {
+  .card {
     animation: none;
-    transform: scale(1.08);
-    box-shadow: 0 0 18px rgba(212, 175, 55, 0.6);
+    transition: none;
+  }
+
+  .card--highlight {
+    transform: none;
   }
 }
 

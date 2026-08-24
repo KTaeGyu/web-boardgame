@@ -1,4 +1,4 @@
-import { RANK_VALUE, SUIT_LABEL, type Card, type Rank, type Suit } from '@the-gang/shared'
+import { RANK_VALUE, SUIT_LABEL, rankLabel, type Card, type Rank, type Suit } from '@the-gang/shared'
 
 interface Props {
   card?: Card | null
@@ -23,7 +23,7 @@ export function PlayingCard({ card, faceDown = false, size = 'md', delay = 0, hi
 
   const rank = card[0] as Rank
   const suit = card[1] as Suit
-  const label = RANK_VALUE[rank] === 10 ? '10' : rank
+  const label = rankLabel(RANK_VALUE[rank])
   if (RED.includes(suit)) classes.push('card--red')
 
   return (

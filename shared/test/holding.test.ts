@@ -36,6 +36,12 @@ describe('족보를 이루는 카드', () => {
     for (const card of holding?.used ?? []) assert.ok(all.includes(card), `${card} 는 갖고 있지 않다`)
   })
 
+  it('10 은 T 가 아니라 10 으로 적는다', () => {
+    assert.equal(bestHolding(cards('Ts 9h'))?.description, '하이카드(10)')
+    assert.equal(bestHolding(cards('Ts Th'))?.description, '원 페어(10)')
+    assert.equal(bestHolding(cards('Ts 9h 8c 7d 6s 2h 3d'))?.description, '스트레이트(10)')
+  })
+
   it('카드가 없으면 짚을 것도 없다', () => {
     assert.equal(bestHolding([]), null)
     assert.equal(bestHolding(cards('Ks')), null)
