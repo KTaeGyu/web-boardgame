@@ -11,22 +11,6 @@
   padding-bottom: max(40px, env(safe-area-inset-bottom));
 }
 
-/*
- * 넓은 화면에서는 판을 위아래 가운데에 둔다.
- *
- * 상태 줄은 맨 위에 그대로 두고, 그 아래 덩어리만 남은 공간의 가운데로 모은다.
- * 첫 요소의 위쪽과 마지막 요소의 아래쪽에 auto 여백을 주면 둘이 남은 공간을
- * 반씩 나눠 가진다. 내용이 화면보다 길어지면 여백이 0 이 되어 그냥 스크롤된다.
- */
-@media (min-width: 641px) {
-  .seats {
-    margin-top: auto;
-  }
-
-  .game-actions {
-    margin-bottom: auto;
-  }
-}
 
 /* ── 위쪽 상태 줄 ─────────────────────── */
 .game-bar {
@@ -114,69 +98,6 @@
   color: #e2a29a;
 }
 
-/* 좁은 화면에서 상태 줄이 두 줄로 접히지 않게 한다. */
-@media (max-width: 640px) {
-  .game-bar {
-    flex-wrap: nowrap;
-    gap: 10px;
-    padding: 8px 12px;
-  }
-
-  /* 좁은 화면에서는 두 줄로 접어 가로 폭을 아낀다. 나가기가 밀려나지 않도록. */
-  .game-bar__marks {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 5px;
-  }
-
-  /* 위아래로 나뉘면 선이 없어도 갈린다. 세로선이 가로로 누우면 어색하다. */
-  .mark-row + .mark-row {
-    padding-left: 0;
-    border-left: none;
-  }
-
-  /*
-   * 상대 자리는 옆으로 밀어 본다. 좁은 화면에서 세로로 쌓으면 테이블이
-   * 화면 밖으로 밀려나, 정작 봐야 할 커뮤니티 카드가 안 보인다.
-   */
-  .seats {
-    display: flex;
-    grid-template-columns: none;
-    overflow-x: auto;
-    scroll-snap-type: x proximity;
-    -webkit-overflow-scrolling: touch;
-    padding-bottom: 6px;
-    margin: 0 -16px;
-    padding-left: 16px;
-    padding-right: 16px;
-    scrollbar-width: none;
-  }
-
-  .seats::-webkit-scrollbar {
-    display: none;
-  }
-
-  .seat {
-    flex: 0 0 auto;
-    width: 132px;
-    scroll-snap-align: start;
-  }
-
-  .game-bar__heist {
-    font-size: 14px;
-    white-space: nowrap;
-  }
-
-  .game-bar__round {
-    font-size: 12px;
-    white-space: nowrap;
-  }
-
-  .game-bar__leave {
-    flex: none;
-    padding: 6px 10px;
-  }
-}
 
 .game-waiting {
   margin: 0;
@@ -719,5 +640,94 @@ button.token:hover:not(:disabled) {
 
   .table__community {
     gap: 6px;
+  }
+}
+
+
+/* ══════════════════════════════════════════════════════════
+ * 화면 크기별 손질.
+ *
+ * 미디어 쿼리는 파일 끝에 모은다. 기본 규칙보다 앞에 두면 우선순위가 같아
+ * 나중에 오는 기본 규칙이 이겨버린다 — 조용히 안 먹는 종류의 실수다.
+ * ══════════════════════════════════════════════════════════ */
+
+/*
+ * 넓은 화면에서는 판을 위아래 가운데에 둔다.
+ *
+ * 상태 줄은 맨 위에 그대로 두고, 그 아래 덩어리만 남은 공간의 가운데로 모은다.
+ * 첫 요소의 위쪽과 마지막 요소의 아래쪽에 auto 여백을 주면 둘이 남은 공간을
+ * 반씩 나눠 가진다. 내용이 화면보다 길어지면 여백이 0 이 되어 그냥 스크롤된다.
+ */
+@media (min-width: 641px) {
+  .seats {
+    margin-top: auto;
+  }
+
+  .game-actions {
+    margin-bottom: auto;
+  }
+}
+
+/* 좁은 화면에서 상태 줄이 두 줄로 접히지 않게 한다. */
+@media (max-width: 640px) {
+  .game-bar {
+    flex-wrap: nowrap;
+    gap: 10px;
+    padding: 8px 12px;
+  }
+
+  /* 좁은 화면에서는 두 줄로 접어 가로 폭을 아낀다. 나가기가 밀려나지 않도록. */
+  .game-bar__marks {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 5px;
+  }
+
+  /* 위아래로 나뉘면 선이 없어도 갈린다. 세로선이 가로로 누우면 어색하다. */
+  .mark-row + .mark-row {
+    padding-left: 0;
+    border-left: none;
+  }
+
+  /*
+   * 상대 자리는 옆으로 밀어 본다. 좁은 화면에서 세로로 쌓으면 테이블이
+   * 화면 밖으로 밀려나, 정작 봐야 할 커뮤니티 카드가 안 보인다.
+   */
+  .seats {
+    display: flex;
+    grid-template-columns: none;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 6px;
+    margin: 0 -16px;
+    padding-left: 16px;
+    padding-right: 16px;
+    scrollbar-width: none;
+  }
+
+  .seats::-webkit-scrollbar {
+    display: none;
+  }
+
+  .seat {
+    flex: 0 0 auto;
+    width: 132px;
+    scroll-snap-align: start;
+  }
+
+  .game-bar__heist {
+    font-size: 14px;
+    white-space: nowrap;
+  }
+
+  .game-bar__round {
+    font-size: 12px;
+    white-space: nowrap;
+  }
+
+  .game-bar__leave {
+    flex: none;
+    padding: 6px 10px;
   }
 }
