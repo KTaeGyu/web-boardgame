@@ -5,6 +5,9 @@
  * 타입 검사가 잡아준다. 이 파일이 서버와 화면 사이의 유일한 합의다.
  */
 
+import type { Card } from './cards.ts'
+import type { GameOverReason, GameView } from './game.ts'
+
 /** 방 설정. 지금은 기본값 고정으로 시작하고, UI 는 자리만 잡아둔다. */
 export const GAME_MODES = ['basic', 'advanced', 'professional', 'masterThief'] as const
 export type GameMode = (typeof GAME_MODES)[number]
@@ -78,6 +81,13 @@ export type ErrorCode =
   | 'NOT_IN_ROOM'
   | 'INVALID_NICKNAME'
   | 'INVALID_SETTINGS'
+  | 'NOT_ENOUGH_PLAYERS'
+  | 'PLAYER_AWAY'
+  | 'GAME_NOT_RUNNING'
+  | 'ALREADY_STARTED'
+  | 'WRONG_PHASE'
+  | 'INVALID_TOKEN'
+  | 'TOKEN_LOCKED'
 
 export type Result<T> = { ok: true; value: T } | { ok: false; code: ErrorCode; message: string }
 
@@ -96,6 +106,14 @@ export interface ClientToServerEvents {
   'room:settings': (payload: Partial<RoomSettings>, ack: (result: Result<RoomView>) => void) => void
   /** 방 목록 페이지에 머무는 동안 갱신을 받기 위해 구독한다. */
   'rooms:watch': (payload: { watching: boolean }) => void
+
+  /** 방장이 판을 연다. */
+  'game:start': (ack: (result: Result<GameView>) => void) => void
+  /** 토큰을 집는다. 중앙에 있든 남이 쥐고 있든 같은 요청이다. */
+  'game:take': (payload: { token: number }, ack: (result: Result<null>) => void) => void
+  'game:ready': (payload: { ready: boolean }, ack: (result: Result<null>) => void) => void
+  /** 쇼다운을 보고 다음 판으로 넘어간다. 모두가 눌러야 넘어간다. */
+  'game:continue': (ack: (result: Result<null>) => void) => void
 }
 
 /** 서버 → 클라이언트. */
@@ -103,6 +121,13 @@ export interface ServerToClientEvents {
   'room:updated': (room: RoomView) => void
   'room:closed': (payload: { reason: 'empty' | 'hostClosed' }) => void
   'rooms:changed': (rooms: RoomSummary[]) => void
+
+  /** 모두가 보는 상태. 누구의 홀카드도 들어 있지 않다. */
+  'game:state': (game: GameView) => void
+  /** 내 카드. 나에게만 간다. 판이 바뀌거나 재접속할 때 다시 온다. */
+  'game:hand': (payload: { heist: number; hole: Card[] }) => void
+  /** 사람이 빠져 판을 이어갈 수 없게 됐다. */
+  'game:aborted': (payload: GameOverReason) => void
 }
 
 export const NICKNAME_MAX = 12

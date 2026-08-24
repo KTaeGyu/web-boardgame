@@ -1,5 +1,5 @@
 /**
- * 소켓 배선. 규칙은 RoomStore 가 갖고, 여기서는 누가 무엇을 듣는지만 정한다.
+ * 소켓 배선. 규칙은 RoomStore 와 Game 이 갖고, 여기서는 누가 무엇을 듣는지만 정한다.
  *
  * 요청/응답은 전부 ack 콜백으로 돌려준다. 실패도 예외가 아니라 값으로 오므로
  * 화면이 사유별로 다르게 안내할 수 있다.
@@ -7,7 +7,10 @@
 
 import type { Server, Socket } from 'socket.io'
 import {
+  MIN_PLAYERS,
+  TOKEN_LOCK_MS,
   type ClientToServerEvents,
+  type GameView,
   type Identity,
   type Result,
   type RoomSettings,
@@ -17,6 +20,7 @@ import {
 } from '@the-gang/shared'
 
 import { SWEEP_INTERVAL_MS } from './config.ts'
+import { Game } from './game.ts'
 import { uniqueRoomCode } from './ids.ts'
 import { RoomStore } from './rooms.ts'
 
@@ -44,16 +48,71 @@ function readIdentity(payload: Identity): Result<{ playerId: string; nickname: s
 
 export function attachGameServer(io: GameServer): { store: RoomStore; stop: () => void } {
   const store = new RoomStore({ makeCode: uniqueRoomCode })
-  /** 소켓 하나가 사람 하나를 대변한다. 끊길 때 누구였는지 알아야 자리를 지켜줄 수 있다. */
+  /** 방 코드 → 진행 중인 판. 방 하나에 판 하나다. */
+  const games = new Map<string, Game>()
+  /** 소켓 하나가 사람 하나를 대변한다. 양방향으로 들고 있어야 개인 정보를 골라 보낼 수 있다. */
   const playerOfSocket = new Map<string, string>()
+  const socketOfPlayer = new Map<string, string>()
+  /** 잠금이 풀리는 시점에 상태를 한 번 더 쏘기 위한 타이머. */
+  const unlockTimers = new Map<string, NodeJS.Timeout>()
 
   const sendRoom = (room: RoomView) => io.to(room.code).emit('room:updated', room)
   const sendRoomList = () => io.to(LOBBY_WATCHERS).emit('rooms:changed', store.list())
 
-  /** 방 안과 목록은 거의 항상 함께 바뀐다. 빠뜨리기 쉬워 한 곳으로 모았다. */
   const announce = (room: RoomView | null) => {
     if (room) sendRoom(room)
     sendRoomList()
+  }
+
+  /** 공개 상태는 방 전체에, 손패는 각자에게. 이 구분이 게임의 전부다. */
+  function sendGame(code: string, options: { hands?: boolean } = {}): void {
+    const game = games.get(code)
+    if (!game) return
+
+    const view = game.view()
+    io.to(code).emit('game:state', view)
+
+    if (options.hands) {
+      for (const player of view.players) sendHand(code, player.id)
+    }
+    scheduleUnlock(code, view)
+  }
+
+  function sendHand(code: string, playerId: string): void {
+    const game = games.get(code)
+    const socketId = socketOfPlayer.get(playerId)
+    const hole = game?.handOf(playerId)
+    if (!game || !socketId || !hole) return
+    io.to(socketId).emit('game:hand', { heist: game.view().heist, hole })
+  }
+
+  /**
+   * 토큰 잠금은 시간이 지나면 저절로 풀리지만, 아무도 그 사실을 알려주지 않으면
+   * 화면에는 계속 잠긴 채로 남는다. 풀리는 시점에 상태를 한 번 더 보낸다.
+   */
+  function scheduleUnlock(code: string, view: GameView): void {
+    if (view.lockedTokens.length === 0) return
+    if (unlockTimers.has(code)) return
+
+    const timer = setTimeout(() => {
+      unlockTimers.delete(code)
+      const game = games.get(code)
+      if (!game) return
+      const next = game.view()
+      io.to(code).emit('game:state', next)
+      scheduleUnlock(code, next)
+    }, TOKEN_LOCK_MS + 20)
+    timer.unref()
+    unlockTimers.set(code, timer)
+  }
+
+  /** 사람이 빠지면 판을 이어갈 수 없다. 판을 접고 방은 대기실로 되돌린다. */
+  function abortGame(code: string, message: string): void {
+    if (!games.delete(code)) return
+    clearTimeout(unlockTimers.get(code))
+    unlockTimers.delete(code)
+    io.to(code).emit('game:aborted', { reason: 'playerLeft', message })
+    announce(store.setPhase(code, 'lobby'))
   }
 
   io.on('connection', (socket: GameSocket) => {
@@ -62,10 +121,11 @@ export function attachGameServer(io: GameServer): { store: RoomStore; stop: () =
       if (!identity.ok) return ack(identity)
 
       const { playerId, nickname } = identity.value
-      detach(socket, playerId)
+      const previous = store.codeOf(playerId)
       const result = store.createRoom(playerId, nickname)
       if (!result.ok) return ack(result)
 
+      if (previous) leftRoom(previous, playerId)
       bind(socket, playerId, result.value.code)
       ack(result)
       sendRoomList()
@@ -79,13 +139,23 @@ export function attachGameServer(io: GameServer): { store: RoomStore; stop: () =
       }
 
       const { playerId, nickname } = identity.value
-      detach(socket, playerId)
+      const previous = store.codeOf(playerId)
       const result = store.joinRoom(playerId, nickname, payload.code.trim())
       if (!result.ok) return ack(result)
 
-      bind(socket, playerId, result.value.code)
+      const code = result.value.code
+      if (previous && previous !== code) leftRoom(previous, playerId)
+      bind(socket, playerId, code)
       ack(result)
       announce(result.value)
+
+      // 판이 도는 중에 돌아온 것이라면 자리와 손패를 되돌려준다.
+      const game = games.get(code)
+      if (game) {
+        game.setConnected(playerId, true)
+        sendGame(code)
+        sendHand(code, playerId)
+      }
     })
 
     socket.on('room:leave', (ack) => {
@@ -95,9 +165,10 @@ export function attachGameServer(io: GameServer): { store: RoomStore; stop: () =
       const code = store.codeOf(playerId)
       const { room, closedCode } = store.leaveRoom(playerId)
       if (code) socket.leave(code)
-      playerOfSocket.delete(socket.id)
+      unbind(socket.id, playerId)
 
       ack({ ok: true, value: null })
+      if (code) leftRoom(code, playerId)
       if (closedCode) io.to(closedCode).emit('room:closed', { reason: 'empty' })
       announce(room)
     })
@@ -122,35 +193,152 @@ export function attachGameServer(io: GameServer): { store: RoomStore; stop: () =
       if (result.ok) announce(result.value)
     })
 
+    // ── 게임 ────────────────────────────────────────────
+
+    socket.on('game:start', (ack) => {
+      const playerId = playerOfSocket.get(socket.id)
+      const code = playerId ? store.codeOf(playerId) : null
+      const room = code ? store.view(code) : null
+      if (!playerId || !code || !room) {
+        return ack({ ok: false, code: 'NOT_IN_ROOM', message: '방에 들어와 있지 않습니다.' })
+      }
+      if (room.hostId !== playerId) {
+        return ack({ ok: false, code: 'NOT_HOST', message: '방장만 시작할 수 있습니다.' })
+      }
+      if (games.has(code) || room.phase !== 'lobby') {
+        return ack({ ok: false, code: 'ALREADY_STARTED', message: '이미 진행 중입니다.' })
+      }
+      if (room.players.length < MIN_PLAYERS) {
+        return ack({
+          ok: false,
+          code: 'NOT_ENOUGH_PLAYERS',
+          message: `${MIN_PLAYERS}명부터 시작할 수 있습니다.`,
+        })
+      }
+      if (room.players.some((player) => !player.connected)) {
+        return ack({
+          ok: false,
+          code: 'PLAYER_AWAY',
+          message: '자리를 비운 사람이 있습니다. 돌아오기를 기다려 주세요.',
+        })
+      }
+
+      const game = new Game(code, room.players.map((p) => ({ ...p })))
+      games.set(code, game)
+      announce(store.setPhase(code, 'playing'))
+      ack({ ok: true, value: game.view() })
+      sendGame(code, { hands: true })
+    })
+
+    socket.on('game:take', ({ token }, ack) => {
+      withGame(ack, (game, code, playerId) => {
+        const result = game.takeToken(playerId, Number(token))
+        ack(result)
+        if (result.ok) sendGame(code)
+      })
+    })
+
+    socket.on('game:ready', ({ ready }, ack) => {
+      withGame(ack, (game, code, playerId) => {
+        const result = game.setReady(playerId, Boolean(ready))
+        ack(result)
+        // 라운드가 넘어가도 손패는 그대로다. 새로 깔린 커뮤니티 카드는 공개 상태에 실린다.
+        if (result.ok) sendGame(code)
+      })
+    })
+
+    socket.on('game:continue', (ack) => {
+      withGame(ack, (game, code, playerId) => {
+        const before = game.view().heist
+        const result = game.continueAfterHeist(playerId)
+        ack(result)
+        if (!result.ok) return
+        // 새 판이 시작됐다면 모두에게 새 손패를 돌린다.
+        sendGame(code, { hands: game.view().heist !== before })
+      })
+    })
+
     socket.on('disconnect', () => {
       const playerId = playerOfSocket.get(socket.id)
-      playerOfSocket.delete(socket.id)
+      unbind(socket.id, playerId)
       if (!playerId) return
+
+      const code = store.codeOf(playerId)
       // 나간 것이 아니라 끊긴 것이다. 자리는 유예 시간 동안 지켜준다.
       announce(store.markDisconnected(playerId))
+      if (code) {
+        games.get(code)?.setConnected(playerId, false)
+        sendGame(code)
+      }
     })
+
+    /** 게임 이벤트가 공통으로 밟는 확인 절차. */
+    function withGame(
+      ack: (result: Result<null>) => void,
+      run: (game: Game, code: string, playerId: string) => void,
+    ): void {
+      const playerId = playerOfSocket.get(socket.id)
+      const code = playerId ? store.codeOf(playerId) : null
+      const game = code ? games.get(code) : null
+      if (!playerId || !code || !game) {
+        return ack({ ok: false, code: 'GAME_NOT_RUNNING', message: '진행 중인 판이 없습니다.' })
+      }
+      run(game, code, playerId)
+    }
   })
 
-  /** 같은 사람이 다른 탭에서 붙었다면 이전 소켓의 연결 고리를 끊는다. */
-  function detach(socket: GameSocket, playerId: string) {
-    for (const [socketId, owner] of playerOfSocket) {
-      if (owner === playerId && socketId !== socket.id) playerOfSocket.delete(socketId)
-    }
+  /** 누군가 방에서 빠졌다. 판이 돌고 있었다면 이어갈 수 없다. */
+  function leftRoom(code: string, playerId: string): void {
+    const game = games.get(code)
+    if (!game) return
+    const seat = game.view().players.find((player) => player.id === playerId)
+    if (!seat) return
+    abortGame(code, `${seat.nickname}님이 나가서 판을 이어갈 수 없습니다.`)
   }
 
   function bind(socket: GameSocket, playerId: string, code: string) {
+    // 같은 사람이 다른 탭에서 붙었다면 이전 소켓의 연결 고리를 끊는다.
+    const stale = socketOfPlayer.get(playerId)
+    if (stale && stale !== socket.id) playerOfSocket.delete(stale)
+
     playerOfSocket.set(socket.id, playerId)
+    socketOfPlayer.set(playerId, socket.id)
     socket.join(code)
     socket.leave(LOBBY_WATCHERS)
   }
 
+  function unbind(socketId: string, playerId: string | undefined) {
+    playerOfSocket.delete(socketId)
+    if (playerId && socketOfPlayer.get(playerId) === socketId) socketOfPlayer.delete(playerId)
+  }
+
   const sweeper = setInterval(() => {
     const { changed, closedCodes } = store.sweep()
-    for (const room of changed) sendRoom(room)
-    for (const code of closedCodes) io.to(code).emit('room:closed', { reason: 'empty' })
+    for (const room of changed) {
+      sendRoom(room)
+      // 유예를 넘겨 자리가 비었다. 판이 돌고 있었다면 여기서 접는다.
+      const game = games.get(room.code)
+      if (game) {
+        const missing = game.view().players.find((seat) => !room.players.some((p) => p.id === seat.id))
+        if (missing) abortGame(room.code, `${missing.nickname}님이 돌아오지 않아 판을 접습니다.`)
+      }
+    }
+    for (const code of closedCodes) {
+      games.delete(code)
+      clearTimeout(unlockTimers.get(code))
+      unlockTimers.delete(code)
+      io.to(code).emit('room:closed', { reason: 'empty' })
+    }
     if (changed.length > 0 || closedCodes.length > 0) sendRoomList()
   }, SWEEP_INTERVAL_MS)
   sweeper.unref()
 
-  return { store, stop: () => clearInterval(sweeper) }
+  return {
+    store,
+    stop: () => {
+      clearInterval(sweeper)
+      for (const timer of unlockTimers.values()) clearTimeout(timer)
+      unlockTimers.clear()
+    },
+  }
 }
