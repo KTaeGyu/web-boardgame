@@ -769,4 +769,29 @@ button.token:hover:not(:disabled) {
     flex: none;
     padding: 6px 10px;
   }
+
+  /*
+   * 확정은 화면 아래에 붙인다. 상대 자리와 테이블이 길어지면 스크롤 밖으로
+   * 밀려나는데, 정작 매 라운드 눌러야 하는 것이 이 버튼이다.
+   */
+  .game {
+    padding-bottom: 104px;
+  }
+
+  .game-actions {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 4;
+    gap: 4px;
+    padding: 10px 16px max(10px, env(safe-area-inset-bottom));
+    background: linear-gradient(180deg, rgba(15, 21, 18, 0), var(--bg) 40%);
+    backdrop-filter: blur(8px);
+  }
+
+  .game-actions .btn {
+    width: 100%;
+    min-height: 52px;
+  }
 }
