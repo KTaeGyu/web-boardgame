@@ -11,6 +11,23 @@
   padding-bottom: max(40px, env(safe-area-inset-bottom));
 }
 
+/*
+ * 넓은 화면에서는 판을 위아래 가운데에 둔다.
+ *
+ * 상태 줄은 맨 위에 그대로 두고, 그 아래 덩어리만 남은 공간의 가운데로 모은다.
+ * 첫 요소의 위쪽과 마지막 요소의 아래쪽에 auto 여백을 주면 둘이 남은 공간을
+ * 반씩 나눠 가진다. 내용이 화면보다 길어지면 여백이 0 이 되어 그냥 스크롤된다.
+ */
+@media (min-width: 641px) {
+  .seats {
+    margin-top: auto;
+  }
+
+  .game-actions {
+    margin-bottom: auto;
+  }
+}
+
 /* ── 위쪽 상태 줄 ─────────────────────── */
 .game-bar {
   display: flex;
