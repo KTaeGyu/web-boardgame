@@ -198,9 +198,29 @@ describe('직접 고르기', () => {
     assert.equal(view.holeCount, 3, '보안 카메라')
   })
 
+  it('고른 해결사가 판마다 차례로 나온다', () => {
+    const dealer = new ExtraDealer('custom', mulberry32(1), [2], [3, 10])
+    assert.equal(dealer.next(null).specialist, 3, '첫 판')
+    assert.equal(dealer.next(true).specialist, 10, '둘째 판')
+    assert.equal(dealer.next(false).specialist, 3, '한 바퀴 돌면 처음으로')
+  })
+
+  it('해결사만 골라도 된다', () => {
+    const game = new Game('TEST', players, {
+      mode: 'custom',
+      pickedChallenges: [],
+      pickedSpecialists: [10],
+      rng: mulberry32(5),
+    })
+    const view = game.view()
+    assert.deepEqual(view.challenges, [])
+    assert.equal(view.specialist, 10)
+  })
+
   it('아무것도 고르지 않으면 기본 모드와 같아진다', () => {
     const game = new Game('TEST', players, { mode: 'custom', pickedChallenges: [], rng: mulberry32(4) })
     assert.deepEqual(game.view().challenges, [])
+    assert.equal(game.view().specialist, null)
   })
 })
 

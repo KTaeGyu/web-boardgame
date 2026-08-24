@@ -6,7 +6,7 @@
  */
 
 import type { Card } from './cards.ts'
-import type { ChallengeId } from './extraCards.ts'
+import type { ChallengeId, SpecialistId } from './extraCards.ts'
 import type { GameOverReason, GameView } from './game.ts'
 
 /** 방 설정. 지금은 기본값 고정으로 시작하고, UI 는 자리만 잡아둔다. */
@@ -26,7 +26,7 @@ export const GAME_MODE_HINT: Record<GameMode, string> = {
   advanced: '성공하면 도전자 카드, 실패하면 해결사 카드가 붙습니다.',
   professional: '도전자 한 장이 게임 내내 붙어 있고, 그 위에 고급 모드가 얹힙니다.',
   masterThief: '도전자 두 장이 언제나 걸립니다. 해결사는 없고 경보 두 번이면 끝납니다.',
-  custom: '원하는 도전자 카드를 골라 모든 판에 걸어 둡니다.',
+  custom: '원하는 카드를 직접 고릅니다. 도전자는 모든 판에 걸리고, 해결사는 판마다 차례로 나옵니다.',
 }
 
 export const MIN_PLAYERS = 3
@@ -36,12 +36,18 @@ export interface RoomSettings {
   mode: GameMode
   /** 「직접 고르기」에서 고른 도전자 카드. 다른 모드에서는 쓰이지 않는다. */
   pickedChallenges: ChallengeId[]
+  /**
+   * 「직접 고르기」에서 고른 해결사 카드.
+   * 한 판에 걸리는 해결사는 하나뿐이므로, 고른 것들이 판마다 차례로 나온다.
+   */
+  pickedSpecialists: SpecialistId[]
   maxPlayers: number
 }
 
 export const DEFAULT_SETTINGS: RoomSettings = {
   mode: 'basic',
   pickedChallenges: [],
+  pickedSpecialists: [],
   maxPlayers: 6,
 }
 

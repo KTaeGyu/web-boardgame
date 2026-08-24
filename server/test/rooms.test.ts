@@ -55,7 +55,12 @@ describe('방 만들기', () => {
     const result = store.createRoom('p1', '태규')
     assert.equal(result.ok, true)
     if (!result.ok) return
-    assert.deepEqual(result.value.settings, { mode: 'basic', pickedChallenges: [], maxPlayers: 6 })
+    assert.deepEqual(result.value.settings, {
+      mode: 'basic',
+      pickedChallenges: [],
+      pickedSpecialists: [],
+      maxPlayers: 6,
+    })
   })
 
   it('다른 방에 있던 사람이 방을 만들면 이전 방에서 빠진다', () => {
@@ -353,6 +358,14 @@ describe('방 설정', () => {
     const result = ctx.store.updateSettings('p1', { pickedChallenges: [2, 2, 5] })
     assert.equal(result.ok, true)
     if (result.ok) assert.deepEqual(result.value.settings.pickedChallenges, [2, 5])
+  })
+
+  it('해결사 카드도 고를 수 있다', () => {
+    const picked = ctx.store.updateSettings('p1', { mode: 'custom', pickedSpecialists: [3, 10] })
+    assert.equal(picked.ok, true)
+    if (picked.ok) assert.deepEqual(picked.value.settings.pickedSpecialists, [3, 10])
+
+    assert.equal(ctx.store.updateSettings('p1', { pickedSpecialists: [99 as never] }).ok, false)
   })
 
   it('직접 고르기로 옮기는 것 자체는 막지 않는다', () => {

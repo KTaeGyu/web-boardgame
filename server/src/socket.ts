@@ -244,11 +244,13 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
         })
       }
       // 고르는 중에는 설정을 저장할 수 있게 두고, 시작하는 순간에 막는다.
-      if (room.settings.mode === 'custom' && room.settings.pickedChallenges.length === 0) {
+      const pickedNothing =
+        room.settings.pickedChallenges.length === 0 && room.settings.pickedSpecialists.length === 0
+      if (room.settings.mode === 'custom' && pickedNothing) {
         return ack({
           ok: false,
           code: 'INVALID_SETTINGS',
-          message: '직접 고르기에서는 도전자 카드를 하나 이상 골라 주세요.',
+          message: '직접 고르기에서는 카드를 하나 이상 골라 주세요.',
         })
       }
       if (room.players.some((player) => !player.connected)) {
@@ -263,7 +265,11 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
       const game = new Game(
         code,
         room.players.map((p) => ({ ...p })),
-        { mode: room.settings.mode, pickedChallenges: room.settings.pickedChallenges },
+        {
+          mode: room.settings.mode,
+          pickedChallenges: room.settings.pickedChallenges,
+          pickedSpecialists: room.settings.pickedSpecialists,
+        },
       )
       games.set(code, game)
       announce(store.setPhase(code, 'playing'))

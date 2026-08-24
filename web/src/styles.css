@@ -418,26 +418,75 @@ select {
   gap: 8px;
 }
 
-/* 설명이 딸린 선택지는 세로로 쌓아야 읽힌다. */
-.choice-col {
-  display: grid;
+/*
+ * 카드 고르기.
+ *
+ * 스무 장을 설명과 함께 늘어놓으면 화면이 한없이 길어진다. 이름만 흘려 두고
+ * 설명은 짚을 때만 보여준다 — 마우스는 올리면, 손가락은 길게 누르면.
+ */
+.pick-hint {
+  display: block;
+  margin: -4px 0 8px;
+  font-size: 12px;
+  color: var(--ink-dim);
+  word-break: keep-all;
+}
+
+.pick-chips {
+  display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
-.choice--wide {
-  align-items: flex-start;
-  width: 100%;
-  text-align: left;
+.pick-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 13px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink);
+  font-size: 14px;
+  white-space: nowrap;
+  user-select: none;
+  touch-action: manipulation;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
 }
 
-.choice__hint {
-  display: block;
-  margin-top: 3px;
-  font-size: 12px;
-  font-style: normal;
-  color: var(--ink-dim);
-  line-height: 1.45;
-  word-break: keep-all;
+.pick-chip:hover:not(:disabled) {
+  border-color: var(--gold-dim);
+}
+
+.pick-chip:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pick-chip--on {
+  border-color: var(--gold);
+  background: rgba(212, 175, 55, 0.16);
+  color: var(--gold);
+  font-weight: 700;
+}
+
+/* 체크박스·라디오를 대신하는 표시. 고른 것만 채워진다. */
+.pick-chip__mark {
+  width: 13px;
+  height: 13px;
+  flex: none;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  opacity: 0.55;
+}
+
+.pick-chip__mark--single {
+  border-radius: 50%;
+}
+
+.pick-chip--on .pick-chip__mark {
+  background: currentColor;
+  opacity: 1;
 }
 
 .choice {
@@ -542,6 +591,42 @@ select {
     min-height: 52px;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
   }
+}
+
+/* 마우스를 올렸을 때 커서 옆에 뜨는 설명. 뒤집지 않고도 무슨 카드인지 알 수 있다. */
+.card-tip {
+  position: fixed;
+  z-index: 20;
+  width: 240px;
+  padding: 8px 11px;
+  border: 1px solid var(--gold-dim);
+  border-radius: 8px;
+  background: #0c1310;
+  color: var(--ink);
+  font-size: 12px;
+  line-height: 1.5;
+  word-break: keep-all;
+  pointer-events: none;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+}
+
+/* 해결사가 카드를 나눠주자마자 밝힌 것들. */
+.announcements {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.announcements li {
+  padding: 5px 12px;
+  border: 1px solid var(--gold-dim);
+  border-radius: 999px;
+  background: rgba(212, 175, 55, 0.08);
+  font-size: 13px;
+  color: var(--gold);
 }
 
 /* ── 모달 ─────────────────────────────── */

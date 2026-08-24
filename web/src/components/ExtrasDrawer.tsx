@@ -10,6 +10,7 @@ import {
   type GameView,
 } from '@the-gang/shared'
 
+import { tipPosition } from '../lib/tooltip.ts'
 import { PlayingCard } from './PlayingCard.tsx'
 
 /** 카드가 나에게만 알려준 것. 드로어의 그 카드 뒷면에 적힌다. */
@@ -277,21 +278,6 @@ function ExtraTile({ kind, card, status, note, onUse }: TileProps) {
       )}
     </>
   )
-}
-
-const TIP_WIDTH = 240
-const TIP_GAP = 14
-
-/**
- * 커서 옆에 붙이되 화면 밖으로 나가지 않게 한다.
- * 드로어가 오른쪽 끝에 있어서 그냥 오른쪽에 두면 거의 항상 잘린다.
- */
-function tipPosition(tip: { x: number; y: number }): { left: number; top: number } {
-  const spillsRight = tip.x + TIP_GAP + TIP_WIDTH > window.innerWidth
-  return {
-    left: spillsRight ? Math.max(8, tip.x - TIP_GAP - TIP_WIDTH) : tip.x + TIP_GAP,
-    top: Math.min(tip.y + TIP_GAP, window.innerHeight - 120),
-  }
 }
 
 /** 카드가 나에게만 알려준 것. 처음 도착했을 때 한 번 뜨고, 뒤에는 드로어에서 본다. */

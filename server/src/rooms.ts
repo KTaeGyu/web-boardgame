@@ -11,11 +11,13 @@ import {
   MAX_PLAYERS_LIMIT,
   MIN_PLAYERS,
   READY_CHALLENGES,
+  READY_SPECIALISTS,
   displayNames,
   nextHost as pickNextHost,
   type ErrorCode,
   type GameMode,
   type ChallengeId,
+  type SpecialistId,
   type Result,
   type RoomPhase,
   type RoomSettings,
@@ -91,7 +93,7 @@ export class RoomStore {
       code,
       hostId: playerId,
       players: [{ id: playerId, nickname, connected: true, disconnectedAt: null, joinedAt: now }],
-      settings: { ...DEFAULT_SETTINGS, pickedChallenges: [] },
+      settings: { ...DEFAULT_SETTINGS, pickedChallenges: [], pickedSpecialists: [] },
       phase: 'lobby',
       createdAt: now,
       lastActivityAt: now,
@@ -216,7 +218,14 @@ export class RoomStore {
     if (next.pickedChallenges.some((id) => !READY_CHALLENGES.includes(id as ChallengeId))) {
       return err('INVALID_SETTINGS', '고를 수 없는 도전자 카드입니다.')
     }
-    room.settings = { ...next, pickedChallenges: [...new Set(next.pickedChallenges)].sort((a, b) => a - b) }
+    if (next.pickedSpecialists.some((id) => !READY_SPECIALISTS.includes(id as SpecialistId))) {
+      return err('INVALID_SETTINGS', '고를 수 없는 해결사 카드입니다.')
+    }
+    room.settings = {
+      ...next,
+      pickedChallenges: [...new Set(next.pickedChallenges)].sort((a, b) => a - b),
+      pickedSpecialists: [...new Set(next.pickedSpecialists)].sort((a, b) => a - b),
+    }
     return ok(toView(room))
   }
 
@@ -289,7 +298,11 @@ function toView(room: Room): RoomView {
       isHost: p.id === room.hostId,
       connected: p.connected,
     })),
-    settings: { ...room.settings, pickedChallenges: [...room.settings.pickedChallenges] },
+    settings: {
+      ...room.settings,
+      pickedChallenges: [...room.settings.pickedChallenges],
+      pickedSpecialists: [...room.settings.pickedSpecialists],
+    },
     phase: room.phase,
   }
 }

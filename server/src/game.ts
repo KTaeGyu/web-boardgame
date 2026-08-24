@@ -74,6 +74,8 @@ export interface GameOptions {
   mode?: GameMode
   /** 「직접 고르기」에서 방장이 고른 도전자 카드. */
   pickedChallenges?: readonly ChallengeId[]
+  /** 「직접 고르기」에서 방장이 고른 해결사 카드. */
+  pickedSpecialists?: readonly SpecialistId[]
 }
 
 /** 카드가 특정 한 사람에게만 알려주는 것. 드로어의 그 카드에 적힌다. */
@@ -100,6 +102,7 @@ export class Game {
   private readonly mode: GameMode
   private readonly alarmsToLose: number
   private readonly picked: readonly ChallengeId[]
+  private readonly pickedSpecialists: readonly SpecialistId[]
   private dealer: ExtraDealer
 
   private seats: Seat[] = []
@@ -164,7 +167,8 @@ export class Game {
     this.mode = options.mode ?? 'basic'
     this.alarmsToLose = this.mode === 'masterThief' ? ALARMS_TO_LOSE_MASTER : ALARMS_TO_LOSE
     this.picked = options.pickedChallenges ?? []
-    this.dealer = new ExtraDealer(this.mode, this.rng, this.picked)
+    this.pickedSpecialists = options.pickedSpecialists ?? []
+    this.dealer = new ExtraDealer(this.mode, this.rng, this.picked, this.pickedSpecialists)
     this.seats = players.map((player) => ({
       id: player.id,
       nickname: player.nickname,
@@ -573,7 +577,7 @@ export class Game {
     this.alarms = 0
     this.lastSuccess = null
     this.rematchAgreed.clear()
-    this.dealer = new ExtraDealer(this.mode, this.rng, this.picked)
+    this.dealer = new ExtraDealer(this.mode, this.rng, this.picked, this.pickedSpecialists)
     this.startHeist()
   }
 

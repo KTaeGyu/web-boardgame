@@ -7,12 +7,16 @@ import {
   GAME_MODE_LABEL,
   MIN_PLAYERS,
   READY_CHALLENGES,
+  READY_SPECIALISTS,
+  SPECIALISTS,
   nextHost,
   type ChallengeId,
+  type SpecialistId,
   type GameMode,
   type RoomView,
 } from '@the-gang/shared'
 
+import { CardPicker } from '../components/CardPicker.tsx'
 import { ConfirmModal } from '../components/Modal.tsx'
 import { getNickname, getPlayerId } from '../lib/identity.ts'
 import { call, socket, useServerEvent } from '../lib/socket.ts'
@@ -47,6 +51,11 @@ export function RoomPage() {
   function toggleChallenge(id: ChallengeId, picked: ChallengeId[]) {
     const next = picked.includes(id) ? picked.filter((x) => x !== id) : [...picked, id]
     void change({ pickedChallenges: next })
+  }
+
+  function toggleSpecialist(id: SpecialistId, picked: SpecialistId[]) {
+    const next = picked.includes(id) ? picked.filter((x) => x !== id) : [...picked, id]
+    void change({ pickedSpecialists: next })
   }
 
   // 판이 열리면 방에 있는 모두가 함께 테이블로 옮겨간다.
@@ -137,7 +146,10 @@ export function RoomPage() {
   const enoughPlayers = room.players.length >= MIN_PLAYERS
   const everyoneHere = room.players.every((player) => player.connected)
   // 직접 고르기인데 아무것도 고르지 않았다. 설정은 그대로 두고 시작만 막는다.
-  const needsCards = room.settings.mode === 'custom' && room.settings.pickedChallenges.length === 0
+  const needsCards =
+    room.settings.mode === 'custom' &&
+    room.settings.pickedChallenges.length === 0 &&
+    room.settings.pickedSpecialists.length === 0
   // 내가 빠진 뒤의 인원으로 다음 방장을 미리 구한다. 서버가 실제로 쓰는 규칙과 같은 함수다.
   const successor = iAmHost ? nextHost(room.players.filter((player) => player.id !== playerId)) : null
 
@@ -187,59 +199,47 @@ export function RoomPage() {
         <section className="panel">
           <h2 className="section-title">게임 설정</h2>
 
-          <div className="setting">
-            <span className="setting__label">진행 방식</span>
-            <div className="choice-col">
-              {GAME_MODES.map((mode) => (
-                <label
-                  key={mode}
-                  className={`choice choice--wide ${room.settings.mode === mode ? 'choice--on' : ''} ${
-                    iAmHost ? '' : 'choice--locked'
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="mode"
-                    checked={room.settings.mode === mode}
-                    disabled={!iAmHost}
-                    onChange={() => void change({ mode: mode as GameMode })}
-                  />
-                  <span>
-                    <b>{GAME_MODE_LABEL[mode]}</b>
-                    <em className="choice__hint">{GAME_MODE_HINT[mode]}</em>
-                  </span>
-                </label>
-              ))}
-            </div>
-          </div>
+          <CardPicker
+            label="진행 방식"
+            single
+            options={GAME_MODES.map((mode) => ({
+              id: mode,
+              name: GAME_MODE_LABEL[mode],
+              text: GAME_MODE_HINT[mode],
+            }))}
+            picked={[room.settings.mode]}
+            disabled={!iAmHost}
+            onToggle={(id) => void change({ mode: id as GameMode })}
+          />
 
           {room.settings.mode === 'custom' && (
-            <div className="setting">
-              <span className="setting__label">
-                걸어 둘 도전자 카드 ({room.settings.pickedChallenges.length}장)
-              </span>
-              <div className="choice-col">
-                {READY_CHALLENGES.map((id) => (
-                  <label
-                    key={id}
-                    className={`choice choice--wide ${
-                      room.settings.pickedChallenges.includes(id) ? 'choice--on' : ''
-                    } ${iAmHost ? '' : 'choice--locked'}`}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={room.settings.pickedChallenges.includes(id)}
-                      disabled={!iAmHost}
-                      onChange={() => toggleChallenge(id, room.settings.pickedChallenges)}
-                    />
-                    <span>
-                      <b>{CHALLENGES[id].name}</b>
-                      <em className="choice__hint">{CHALLENGES[id].text}</em>
-                    </span>
-                  </label>
-                ))}
-              </div>
-            </div>
+            <>
+              <CardPicker
+                label={`도전자 카드 (${room.settings.pickedChallenges.length}장)`}
+                hint="고른 것이 모든 판에 함께 걸립니다."
+                options={READY_CHALLENGES.map((id) => ({
+                  id,
+                  name: CHALLENGES[id].name,
+                  text: CHALLENGES[id].text,
+                }))}
+                picked={room.settings.pickedChallenges}
+                disabled={!iAmHost}
+                onToggle={(id) => toggleChallenge(id as ChallengeId, room.settings.pickedChallenges)}
+              />
+
+              <CardPicker
+                label={`해결사 카드 (${room.settings.pickedSpecialists.length}장)`}
+                hint="한 판에 하나뿐이라 고른 것들이 판마다 차례로 나옵니다."
+                options={READY_SPECIALISTS.map((id) => ({
+                  id,
+                  name: SPECIALISTS[id].name,
+                  text: SPECIALISTS[id].text,
+                }))}
+                picked={room.settings.pickedSpecialists}
+                disabled={!iAmHost}
+                onToggle={(id) => toggleSpecialist(id as SpecialistId, room.settings.pickedSpecialists)}
+              />
+            </>
           )}
 
           <div className="setting">
@@ -261,7 +261,7 @@ export function RoomPage() {
 
       {needsCards && (
         <p className="notice notice--warn">
-          직접 고르기를 골랐습니다. 걸어 둘 도전자 카드를 하나 이상 골라야 시작할 수 있습니다.
+          직접 고르기를 골랐습니다. 도전자든 해결사든 카드를 하나 이상 골라야 시작할 수 있습니다.
         </p>
       )}
       {iAmHost && !enoughPlayers && (

@@ -321,42 +321,6 @@
   font-size: 14px;
 }
 
-/* 마우스를 올렸을 때 커서 옆에 뜨는 설명. 뒤집지 않고도 무슨 카드인지 알 수 있다. */
-.card-tip {
-  position: fixed;
-  z-index: 20;
-  width: 240px;
-  padding: 8px 11px;
-  border: 1px solid var(--gold-dim);
-  border-radius: 8px;
-  background: #0c1310;
-  color: var(--ink);
-  font-size: 12px;
-  line-height: 1.5;
-  word-break: keep-all;
-  pointer-events: none;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
-}
-
-/* 해결사가 카드를 나눠주자마자 밝힌 것들. */
-.announcements {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.announcements li {
-  padding: 5px 12px;
-  border: 1px solid var(--gold-dim);
-  border-radius: 999px;
-  background: rgba(212, 175, 55, 0.08);
-  font-size: 13px;
-  color: var(--gold);
-}
-
 /* ── 상대 자리 ────────────────────────── */
 .seats {
   display: grid;

@@ -61,13 +61,21 @@ export class ExtraDealer {
   private permanent: ChallengeId | null = null
   /** 마스터 시프 모드에서 늘 두 장이 걸려 있다. */
   private standing: ChallengeId[] = []
-  /** 「직접 고르기」에서 방장이 고른 카드. 모든 판에 그대로 걸린다. */
+  /** 「직접 고르기」에서 방장이 고른 도전자. 모든 판에 그대로 걸린다. */
   private readonly picked: ChallengeId[]
+  /** 고른 해결사. 한 판에 하나뿐이라 판마다 차례로 돌아간다. */
+  private readonly pickedSpecialists: Stack<SpecialistId>
 
-  constructor(mode: GameMode, rng: () => number, picked: readonly ChallengeId[] = []) {
+  constructor(
+    mode: GameMode,
+    rng: () => number,
+    picked: readonly ChallengeId[] = [],
+    pickedSpecialists: readonly SpecialistId[] = [],
+  ) {
     this.mode = mode
     this.rng = rng
     this.picked = [...picked]
+    this.pickedSpecialists = new Stack(pickedSpecialists)
 
     // 프로·마스터 시프에서는 「빠른 접근」을 쓰지 않는다. 라운드를 통째로 건너뛰어
     // 다른 카드와 겹칠 때 규칙이 서로 부딪히기 때문이다.
@@ -94,8 +102,11 @@ export class ExtraDealer {
   next(lastSuccess: boolean | null): ExtraSelection {
     if (this.mode === 'basic') return { challenges: [], specialist: null }
 
-    // 직접 고르기는 뽑기가 없다. 고른 것이 처음부터 끝까지 그대로 걸린다.
-    if (this.mode === 'custom') return { challenges: [...this.picked], specialist: null }
+    // 직접 고르기는 뽑기가 없다. 도전자는 고른 것이 처음부터 끝까지 그대로 걸리고,
+    // 해결사는 한 판에 하나뿐이라 고른 것들이 판마다 차례로 나온다.
+    if (this.mode === 'custom') {
+      return { challenges: [...this.picked], specialist: this.pickedSpecialists.draw() }
+    }
 
     if (this.mode === 'masterThief') {
       // 매 판 가장 오래된 한 장을 버리고 새 한 장을 받는다. 늘 두 장이다.
