@@ -215,6 +215,19 @@ select {
   flex: 1;
 }
 
+/* ── 방 목록 ──────────────────────────── */
+.rooms-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.rooms-head .section-title {
+  margin: 0;
+}
+
 /* ── 카드/목록 ────────────────────────── */
 .panel {
   border: 1px solid var(--line);
@@ -445,6 +458,34 @@ select {
   flex-wrap: wrap;
 }
 
+/*
+ * 좁은 화면에서는 버튼을 화면 아래에 붙인다. 참여자 목록이 길어져도
+ * 「게임 시작」이 스크롤 밖으로 밀려나지 않는다.
+ */
+@media (max-width: 640px) {
+  .room-page {
+    padding-bottom: 100px;
+  }
+
+  .room-footer {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 4;
+    margin: 0;
+    flex-wrap: nowrap;
+    padding: 12px 16px max(12px, env(safe-area-inset-bottom));
+    background: linear-gradient(180deg, rgba(15, 21, 18, 0), var(--bg) 35%);
+    backdrop-filter: blur(8px);
+  }
+
+  .room-footer .btn {
+    flex: 1;
+    min-height: 52px;
+  }
+}
+
 .notice {
   margin-top: 14px;
   padding: 10px 12px;
@@ -452,6 +493,26 @@ select {
   background: rgba(212, 175, 55, 0.06);
   font-size: 13px;
   color: var(--ink-dim);
+}
+
+/*
+ * 좁은 화면에서는 방 만들기가 화면 아래에 붙는다. 손이 닿는 자리에 두고,
+ * 목록을 훑는 동안에도 사라지지 않는다.
+ */
+@media (max-width: 640px) {
+  .rooms-page {
+    padding-bottom: 96px;
+  }
+
+  .rooms-head__create {
+    position: fixed;
+    left: 16px;
+    right: 16px;
+    bottom: max(16px, env(safe-area-inset-bottom));
+    z-index: 4;
+    min-height: 52px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  }
 }
 
 /* ── 모달 ─────────────────────────────── */

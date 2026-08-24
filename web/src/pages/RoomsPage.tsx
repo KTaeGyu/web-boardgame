@@ -4,6 +4,7 @@ import type { RoomSummary, RoomView } from '@the-gang/shared'
 
 import { ConfirmModal } from '../components/Modal.tsx'
 import { getNickname, getPlayerId } from '../lib/identity.ts'
+import { createRoom } from '../lib/rooms.ts'
 import { call, socket, useServerEvent } from '../lib/socket.ts'
 
 export function RoomsPage() {
@@ -13,6 +14,7 @@ export function RoomsPage() {
   const [asking, setAsking] = useState<RoomSummary | null>(null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [making, setMaking] = useState(false)
 
   // 닉네임 없이 들어온 경우는 주소를 직접 친 것이다. 처음으로 돌려보낸다.
   useEffect(() => {
@@ -38,6 +40,18 @@ export function RoomsPage() {
 
   useServerEvent('rooms:changed', useCallback((next: RoomSummary[]) => setRooms(next), []))
 
+  /** 여기까지 왔다는 것은 닉네임이 이미 있다는 뜻이라, 바로 방을 열 수 있다. */
+  async function makeRoom() {
+    setMaking(true)
+    const result = await createRoom(nickname)
+    setMaking(false)
+    if (!result.ok) {
+      setError(result.message)
+      return
+    }
+    navigate(`/rooms/${result.value.code}`)
+  }
+
   async function enter(room: RoomSummary) {
     setBusy(true)
     const result = await call<RoomView>('room:join', {
@@ -56,11 +70,22 @@ export function RoomsPage() {
   }
 
   return (
-    <main className="page">
+    <main className="page page--column rooms-page">
       <Link className="link-back" to="/">
         ← 처음으로
       </Link>
-      <h1 className="section-title">열려 있는 방</h1>
+
+      <div className="rooms-head">
+        <h1 className="section-title">열려 있는 방</h1>
+        <button
+          type="button"
+          className="btn btn--primary rooms-head__create"
+          onClick={() => void makeRoom()}
+          disabled={making}
+        >
+          {making ? '만드는 중…' : '방 만들기'}
+        </button>
+      </div>
 
       {rooms === null && <p className="empty">불러오는 중…</p>}
 
@@ -68,7 +93,7 @@ export function RoomsPage() {
         <p className="empty">
           아직 열린 방이 없습니다.
           <br />
-          직접 방을 만들어 친구를 불러 보세요.
+          방을 만들어 친구를 불러 보세요.
         </p>
       )}
 

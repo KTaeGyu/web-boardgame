@@ -6,9 +6,11 @@ import {
   MIN_PLAYERS,
   PENALTIES,
   PENALTY_LABEL,
+  nextHost,
   type RoomView,
 } from '@the-gang/shared'
 
+import { ConfirmModal } from '../components/Modal.tsx'
 import { getNickname, getPlayerId } from '../lib/identity.ts'
 import { call, socket, useServerEvent } from '../lib/socket.ts'
 
@@ -24,6 +26,7 @@ export function RoomPage() {
   const [room, setRoom] = useState<RoomView | null>(null)
   const [error, setError] = useState('')
   const [starting, setStarting] = useState(false)
+  const [confirmLeave, setConfirmLeave] = useState(false)
 
   // 판이 열리면 방에 있는 모두가 함께 테이블로 옮겨간다.
   useEffect(() => {
@@ -103,6 +106,8 @@ export function RoomPage() {
   const iAmHost = room.hostId === playerId
   const enoughPlayers = room.players.length >= MIN_PLAYERS
   const everyoneHere = room.players.every((player) => player.connected)
+  // 내가 빠진 뒤의 인원으로 다음 방장을 미리 구한다. 서버가 실제로 쓰는 규칙과 같은 함수다.
+  const successor = iAmHost ? nextHost(room.players.filter((player) => player.id !== playerId)) : null
 
   async function startGame() {
     setStarting(true)
@@ -112,7 +117,7 @@ export function RoomPage() {
   }
 
   return (
-    <main className="page">
+    <main className="page room-page">
       <div className="room-header">
         <h1 className="room-header__host">{host?.displayName ?? '?'}님의 방</h1>
         <span className="room-header__code">{room.code}</span>
@@ -209,6 +214,14 @@ export function RoomPage() {
         </section>
       </div>
 
+      {iAmHost && !enoughPlayers && (
+        <p className="notice">최소 {MIN_PLAYERS}명이 모여야 시작할 수 있습니다.</p>
+      )}
+      {iAmHost && enoughPlayers && !everyoneHere && (
+        <p className="notice">자리를 비운 사람이 있습니다. 돌아오기를 기다려 주세요.</p>
+      )}
+
+      {/* 안내문구를 밖으로 뺐다. 아래에 고정되는 것은 버튼뿐이어야 자리가 흔들리지 않는다. */}
       <div className="room-footer">
         {iAmHost && (
           <button
@@ -220,16 +233,32 @@ export function RoomPage() {
             {starting ? '차리는 중…' : '게임 시작'}
           </button>
         )}
-        <button type="button" className="btn btn--danger" onClick={() => void leave()}>
+        <button
+          type="button"
+          className="btn btn--danger"
+          onClick={() => (iAmHost ? setConfirmLeave(true) : void leave())}
+        >
           방 나가기
         </button>
-        {iAmHost && !enoughPlayers && (
-          <p className="notice">최소 {MIN_PLAYERS}명이 모여야 시작할 수 있습니다.</p>
-        )}
-        {iAmHost && enoughPlayers && !everyoneHere && (
-          <p className="notice">자리를 비운 사람이 있습니다. 돌아오기를 기다려 주세요.</p>
-        )}
       </div>
+
+      {confirmLeave && (
+        <ConfirmModal
+          title="방을 나가시겠습니까?"
+          confirmLabel="나가기"
+          cancelLabel="취소"
+          onConfirm={() => void leave()}
+          onCancel={() => setConfirmLeave(false)}
+        >
+          {successor ? (
+            <>
+              방장이 <strong>{successor.displayName}</strong>님에게 넘어갑니다.
+            </>
+          ) : (
+            '마지막 사람이라, 나가면 이 방은 사라집니다.'
+          )}
+        </ConfirmModal>
+      )}
     </main>
   )
 }

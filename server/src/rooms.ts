@@ -12,6 +12,7 @@ import {
   MIN_PLAYERS,
   PENALTIES,
   displayNames,
+  nextHost as pickNextHost,
   type ErrorCode,
   type GameMode,
   type Penalty,
@@ -236,10 +237,12 @@ function defaultCodeFactory(): string {
   throw new Error('RoomStore 에 makeCode 를 넘겨야 한다')
 }
 
-/** 접속 중인 사람 중 가장 먼저 들어온 사람. 아무도 접속 중이 아니면 남은 사람 중 가장 먼저 들어온 사람. */
+/** 규칙은 공용에 있다. 화면이 「누구에게 넘어갑니다」를 말할 때 같은 규칙을 쓴다. */
 function nextHost(room: Room): string {
   const byJoin = [...room.players].sort((a, b) => a.joinedAt - b.joinedAt)
-  return (byJoin.find((p) => p.connected) ?? byJoin[0]).id
+  const next = pickNextHost(byJoin)
+  if (!next) throw new Error('남은 사람이 없는데 방장을 찾고 있다')
+  return next.id
 }
 
 function toView(room: Room): RoomView {

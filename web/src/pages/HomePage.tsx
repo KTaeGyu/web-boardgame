@@ -1,9 +1,9 @@
 import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { NICKNAME_MAX, type RoomView, normalizeNickname } from '@the-gang/shared'
+import { NICKNAME_MAX, normalizeNickname } from '@the-gang/shared'
 
-import { getNickname, getPlayerId, setNickname as saveNickname } from '../lib/identity.ts'
-import { call } from '../lib/socket.ts'
+import { getNickname, setNickname as saveNickname } from '../lib/identity.ts'
+import { createRoom } from '../lib/rooms.ts'
 
 export function HomePage() {
   const navigate = useNavigate()
@@ -24,13 +24,13 @@ export function HomePage() {
     return clean
   }
 
-  async function createRoom(event: FormEvent) {
+  async function makeRoom(event: FormEvent) {
     event.preventDefault()
     const name = requireNickname()
     if (!name) return
 
     setBusy(true)
-    const result = await call<RoomView>('room:create', { playerId: getPlayerId(), nickname: name })
+    const result = await createRoom(name)
     setBusy(false)
 
     if (!result.ok) {
@@ -52,7 +52,7 @@ export function HomePage() {
         <p className="brand__sub">말하지 않고 맞추는 협력 포커</p>
       </header>
 
-      <form className="home-form" onSubmit={createRoom}>
+      <form className="home-form" onSubmit={makeRoom}>
         <label className="field">
           <span className="field__label">닉네임</span>
           <input

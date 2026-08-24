@@ -137,6 +137,19 @@ export interface ServerToClientEvents {
 export const NICKNAME_MAX = 12
 
 /**
+ * 방장이 빠졌을 때 다음 방장.
+ *
+ * 접속 중인 사람 중 가장 먼저 들어온 사람. 아무도 접속 중이 아니면 남은 사람 중
+ * 가장 먼저 들어온 사람. 넘기는 배열은 방장이 빠진 뒤의 인원이며 입장 순서여야 한다.
+ *
+ * 서버가 실제로 넘기는 규칙이자, 화면이 「누구에게 넘어갑니다」를 미리 말할 때 쓰는
+ * 규칙이다. 두 곳이 갈라지면 안내와 결과가 어긋나므로 한 곳에 둔다.
+ */
+export function nextHost<T extends { connected: boolean }>(remaining: readonly T[]): T | null {
+  return remaining.find((player) => player.connected) ?? remaining[0] ?? null
+}
+
+/**
  * 화면에 부를 이름을 정한다.
  *
  * 같은 닉네임이 둘 이상이면 들어온 순서대로 [1], [2] 를 붙인다. 혼자뿐이면
