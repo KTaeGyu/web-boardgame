@@ -123,6 +123,43 @@ describe('방 입장', () => {
   })
 })
 
+describe('겹치는 닉네임', () => {
+  it('같은 이름끼리 들어온 순서대로 번호가 붙는다', () => {
+    const { store } = makeStore()
+    const code = seed(store, ['p1'])
+    store.joinRoom('p2', '태규', code)
+    store.joinRoom('p3', '태규', code)
+
+    assert.deepEqual(store.view(code)?.players.map((p) => p.displayName), ['태규 [1]', '태규 [2]', '태규 [3]'])
+  })
+
+  it('먼저 들어온 사람이 나가면 남은 사람들이 다시 매겨진다', () => {
+    const { store } = makeStore()
+    const code = seed(store, ['p1'])
+    store.joinRoom('p2', '태규', code)
+    store.joinRoom('p3', '태규', code)
+    store.leaveRoom('p1')
+
+    assert.deepEqual(store.view(code)?.players.map((p) => p.displayName), ['태규 [1]', '태규 [2]'])
+  })
+
+  it('겹치지 않게 되면 꼬리표가 사라진다', () => {
+    const { store } = makeStore()
+    const code = seed(store, ['p1'])
+    store.joinRoom('p2', '태규', code)
+    store.leaveRoom('p2')
+
+    assert.deepEqual(store.view(code)?.players.map((p) => p.displayName), ['태규'])
+  })
+
+  it('방 목록의 방장 이름에도 같은 규칙이 적용된다', () => {
+    const { store } = makeStore()
+    const code = seed(store, ['p1'])
+    store.joinRoom('p2', '태규', code)
+    assert.equal(store.list()[0].hostNickname, '태규 [1]')
+  })
+})
+
 describe('방 나가기와 방장 인계', () => {
   it('나가면 자리가 즉시 빈다', () => {
     const { store } = makeStore()

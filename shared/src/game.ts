@@ -48,6 +48,8 @@ export type GamePhase = 'picking' | 'showdown' | 'gameOver'
 export interface GamePlayerView {
   id: string
   nickname: string
+  /** 화면에 부를 이름. 같은 닉네임이 여럿이면 꼬리표가 붙는다. */
+  displayName: string
   connected: boolean
   /** 이번 라운드에 쥐고 있는 토큰. 아직 안 집었으면 null. */
   currentToken: number | null

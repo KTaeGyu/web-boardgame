@@ -312,7 +312,7 @@ export function attachGameServer(io: GameServer): { store: RoomStore; stop: () =
     if (!game) return
     const seat = game.view().players.find((player) => player.id === playerId)
     if (!seat) return
-    abortGame(code, `${seat.nickname}님이 나가서 판을 이어갈 수 없습니다.`)
+    abortGame(code, `${seat.displayName}님이 나가서 판을 이어갈 수 없습니다.`)
   }
 
   function bind(socket: GameSocket, playerId: string, code: string) {
@@ -339,7 +339,7 @@ export function attachGameServer(io: GameServer): { store: RoomStore; stop: () =
       const game = games.get(room.code)
       if (game) {
         const missing = game.view().players.find((seat) => !room.players.some((p) => p.id === seat.id))
-        if (missing) abortGame(room.code, `${missing.nickname}님이 돌아오지 않아 판을 접습니다.`)
+        if (missing) abortGame(room.code, `${missing.displayName}님이 돌아오지 않아 판을 접습니다.`)
       }
     }
     for (const code of closedCodes) {

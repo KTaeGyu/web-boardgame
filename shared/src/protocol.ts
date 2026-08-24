@@ -49,6 +49,8 @@ export type RoomPhase = 'lobby' | 'playing' | 'result'
 export interface PlayerView {
   id: string
   nickname: string
+  /** 화면에 부를 이름. 같은 닉네임이 여럿이면 꼬리표가 붙는다. */
+  displayName: string
   isHost: boolean
   /** 끊긴 사람도 유예 시간 동안은 자리를 지킨다. 화면에는 흐리게 표시한다. */
   connected: boolean
@@ -133,6 +135,26 @@ export interface ServerToClientEvents {
 }
 
 export const NICKNAME_MAX = 12
+
+/**
+ * 화면에 부를 이름을 정한다.
+ *
+ * 같은 닉네임이 둘 이상이면 들어온 순서대로 [1], [2] 를 붙인다. 혼자뿐이면
+ * 그대로 둔다 — 겹치지도 않는데 꼬리표가 붙으면 거슬린다.
+ * 순서가 곧 번호이므로 넘기는 배열은 입장 순서여야 한다.
+ */
+export function displayNames(nicknames: readonly string[]): string[] {
+  const total = new Map<string, number>()
+  for (const nickname of nicknames) total.set(nickname, (total.get(nickname) ?? 0) + 1)
+
+  const seen = new Map<string, number>()
+  return nicknames.map((nickname) => {
+    if ((total.get(nickname) ?? 0) < 2) return nickname
+    const index = (seen.get(nickname) ?? 0) + 1
+    seen.set(nickname, index)
+    return `${nickname} [${index}]`
+  })
+}
 
 export function normalizeNickname(raw: string): string | null {
   const trimmed = raw.trim().replace(/\s+/g, ' ')

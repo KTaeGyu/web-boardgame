@@ -14,6 +14,7 @@ import {
   ROUNDS,
   TOKEN_LOCK_MS,
   VAULTS_TO_WIN,
+  displayNames,
   freshDeck,
   judgeShowdown,
   shuffle,
@@ -295,6 +296,7 @@ export class Game {
   view(): GameView {
     const now = this.now()
     const revealed = this.phase !== 'picking'
+    const names = displayNames(this.seats.map((seat) => seat.nickname))
 
     return {
       roomCode: this.roomCode,
@@ -304,9 +306,10 @@ export class Game {
       round: this.round,
       phase: this.phase,
       community: [...this.community],
-      players: this.seats.map((seat) => ({
+      players: this.seats.map((seat, index) => ({
         id: seat.id,
         nickname: seat.nickname,
+        displayName: names[index],
         connected: seat.connected,
         currentToken: this.tokenOf(seat.id),
         history: ROUNDS.map((round) => seat.history[round - 1] ?? null),

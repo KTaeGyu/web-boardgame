@@ -114,7 +114,7 @@ export function RoomPage() {
   return (
     <main className="page">
       <div className="room-header">
-        <h1 className="room-header__host">{host?.nickname ?? '?'}님의 방</h1>
+        <h1 className="room-header__host">{host?.displayName ?? '?'}님의 방</h1>
         <span className="room-header__code">{room.code}</span>
       </div>
 
@@ -137,7 +137,7 @@ export function RoomPage() {
               >
                 <span className="player__seat">{index + 1}</span>
                 <span className="player__name">
-                  {player.nickname}
+                  {player.displayName}
                   {player.id === playerId && ' (나)'}
                 </span>
                 {player.isHost && <span className="player__tag">방장</span>}

@@ -228,7 +228,7 @@ export function GamePage() {
 
       {waitingFor.length > 0 && (
         <p className="game-waiting">
-          {waitingFor.map((player) => player.nickname).join(', ')}님의 재접속을 기다리는 중입니다.
+          {waitingFor.map((player) => player.displayName).join(', ')}님의 재접속을 기다리는 중입니다.
         </p>
       )}
 
@@ -296,7 +296,7 @@ export function GamePage() {
           </div>
           <div className="my-seat__info">
             <span className="my-seat__name">
-              {me.nickname} (나)
+              {me.displayName} (나)
               {myHolding && (
                 <button
                   type="button"
@@ -384,7 +384,7 @@ function PlayerSeat(props: SeatProps) {
           />
         ))}
       </div>
-      <span className="seat__name">{player.nickname}</span>
+      <span className="seat__name">{player.displayName}</span>
       <TokenTrack {...props} />
       {!player.connected && <span className="seat__away">자리 비움</span>}
     </div>
@@ -467,7 +467,9 @@ function Showdown({ game, revealed, flash, finished, playerId }: ShowdownProps) 
             return (
               <li key={reveal.playerId} className={`reveal ${shown ? 'reveal--shown' : ''} ${shown && !reveal.ok ? 'reveal--bad' : ''}`}>
                 <span className="reveal__token">{reveal.token}</span>
-                <span className="reveal__name">{game.players.find((p) => p.id === reveal.playerId)?.nickname}</span>
+                <span className="reveal__name">
+                  {game.players.find((p) => p.id === reveal.playerId)?.displayName}
+                </span>
                 <span className="reveal__cards">
                   {reveal.hole.map((card) => (
                     <PlayingCard key={card} card={card} size="sm" faceDown={!shown} />

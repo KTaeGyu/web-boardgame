@@ -11,6 +11,7 @@ import {
   MAX_PLAYERS_LIMIT,
   MIN_PLAYERS,
   PENALTIES,
+  displayNames,
   type ErrorCode,
   type GameMode,
   type Penalty,
@@ -192,9 +193,10 @@ export class RoomStore {
     for (const room of this.rooms.values()) {
       const connected = room.players.filter((p) => p.connected)
       if (connected.length === 0) continue
+      const host = toView(room).players.find((p) => p.isHost)
       summaries.push({
         code: room.code,
-        hostNickname: room.players.find((p) => p.id === room.hostId)?.nickname ?? '(알 수 없음)',
+        hostNickname: host?.displayName ?? '(알 수 없음)',
         playerCount: connected.length,
         maxPlayers: room.settings.maxPlayers,
         phase: room.phase,
@@ -241,12 +243,14 @@ function nextHost(room: Room): string {
 }
 
 function toView(room: Room): RoomView {
+  const names = displayNames(room.players.map((p) => p.nickname))
   return {
     code: room.code,
     hostId: room.hostId,
-    players: room.players.map((p) => ({
+    players: room.players.map((p, index) => ({
       id: p.id,
       nickname: p.nickname,
+      displayName: names[index],
       isHost: p.id === room.hostId,
       connected: p.connected,
     })),
