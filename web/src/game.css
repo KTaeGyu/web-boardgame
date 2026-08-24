@@ -462,6 +462,13 @@ button.token:hover:not(:disabled) {
   animation: verdict-in 1.2s cubic-bezier(0.2, 0.9, 0.3, 1) forwards;
 }
 
+/* 판 전체의 결과. 글이 길어 조금 작게, 대신 오래 머문다. */
+.verdict--final {
+  font-size: clamp(30px, 6.5vw, 62px);
+  letter-spacing: 0.04em;
+  animation-duration: 2.4s;
+}
+
 .verdict--ok {
   color: var(--gold);
   text-shadow: 0 0 40px rgba(212, 175, 55, 0.6), 0 6px 24px rgba(0, 0, 0, 0.8);

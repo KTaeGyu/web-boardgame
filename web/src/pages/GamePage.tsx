@@ -23,6 +23,9 @@ import { useTokenFlight } from '../lib/useTokenFlight.ts'
 const REVEAL_STEP_MS = 1900
 /** 그 사람이 사슬을 이었는지 아닌지를 크게 띄워 두는 시간. */
 const VERDICT_MS = 1200
+/** 마지막 사람까지 보고 나서 판 전체의 결과를 띄우기까지의 뜸. */
+const FINAL_GAP_MS = 350
+const FINAL_MS = 2400
 
 export function GamePage() {
   const { code = '' } = useParams()
@@ -35,8 +38,17 @@ export function GamePage() {
   const [notice, setNotice] = useState('')
   const [rejected, setRejected] = useState<number | null>(null)
   const [revealed, setRevealed] = useState(0)
-  /** 방금 공개한 사람이 앞사람보다 셌는지. 두 번째 사람부터 의미가 생긴다. */
-  const [verdict, setVerdict] = useState<{ index: number; ok: boolean } | null>(null)
+  /**
+   * 화면 앞에 크게 띄우는 글자.
+   *
+   * 사람마다의 판정(성공/실패)과 판 전체의 결과가 같은 자리에 차례로 온다.
+   * 마지막 사람이 성공이어도 판은 실패일 수 있어서, 결과를 따로 못박아야 한다.
+   */
+  const [flash, setFlash] = useState<{ key: string; text: string; tone: 'ok' | 'bad'; final?: boolean } | null>(
+    null,
+  )
+  /** 마지막 결과까지 다 보여줬는가. 이때가 되어야 다음으로 넘어가는 버튼이 열린다. */
+  const [finished, setFinished] = useState(false)
 
   const tokenRef = useTokenFlight(TOKEN_LOCK_MS)
 
@@ -119,28 +131,44 @@ export function GamePage() {
    */
   const revealsRef = useRef(game?.showdown?.reveals ?? [])
   revealsRef.current = game?.showdown?.reveals ?? []
+  const successRef = useRef(false)
+  successRef.current = game?.showdown?.success ?? false
 
   useEffect(() => {
     for (const timer of timers.current) clearTimeout(timer)
     timers.current = []
     setRevealed(0)
-    setVerdict(null)
+    setFlash(null)
+    setFinished(false)
     if (phase === 'picking' || revealCount === 0) return
 
+    const at = (ms: number, run: () => void) => timers.current.push(setTimeout(run, ms))
+
     for (let index = 1; index <= revealCount; index++) {
-      timers.current.push(
-        setTimeout(() => {
-          setRevealed(index)
-          // 첫 사람은 비교할 상대가 없다. 두 번째부터 사슬이 이어졌는지 판정이 선다.
-          if (index < 2) return
-          const ok = revealsRef.current[index - 1]?.ok ?? true
-          setVerdict({ index, ok })
-          timers.current.push(
-            setTimeout(() => setVerdict((v) => (v?.index === index ? null : v)), VERDICT_MS),
-          )
-        }, REVEAL_STEP_MS * index),
-      )
+      at(REVEAL_STEP_MS * index, () => {
+        setRevealed(index)
+        // 첫 사람은 비교할 상대가 없다. 두 번째부터 사슬이 이어졌는지 판정이 선다.
+        if (index < 2) return
+        const ok = revealsRef.current[index - 1]?.ok ?? true
+        const key = `p${index}`
+        setFlash({ key, text: ok ? '성공' : '실패', tone: ok ? 'ok' : 'bad' })
+        at(VERDICT_MS, () => setFlash((current) => (current?.key === key ? null : current)))
+      })
     }
+
+    // 마지막 사람의 판정이 사라진 뒤에 판 전체의 결과를 못박는다.
+    at(REVEAL_STEP_MS * revealCount + VERDICT_MS + FINAL_GAP_MS, () => {
+      const success = successRef.current
+      setFinished(true)
+      setFlash({
+        key: 'final',
+        text: success ? '금고가 열렸습니다' : '경보가 울렸습니다',
+        tone: success ? 'ok' : 'bad',
+        final: true,
+      })
+      at(FINAL_MS, () => setFlash((current) => (current?.key === 'final' ? null : current)))
+    })
+
     return () => {
       for (const timer of timers.current) clearTimeout(timer)
       timers.current = []
@@ -318,7 +346,7 @@ export function GamePage() {
       </footer>
 
       {game.showdown && (
-        <Showdown game={game} revealed={revealed} verdict={verdict} playerId={playerId} />
+        <Showdown game={game} revealed={revealed} flash={flash} finished={finished} playerId={playerId} />
       )}
     </main>
   )
@@ -400,14 +428,15 @@ function TokenTrack({ player, round, phase, lockedTokens, rejected, tokenRef, on
 interface ShowdownProps {
   game: GameView
   revealed: number
-  verdict: { index: number; ok: boolean } | null
+  flash: { key: string; text: string; tone: 'ok' | 'bad'; final?: boolean } | null
+  finished: boolean
   playerId: string
 }
 
-function Showdown({ game, revealed, verdict, playerId }: ShowdownProps) {
+function Showdown({ game, revealed, flash, finished, playerId }: ShowdownProps) {
   const navigate = useNavigate()
   const reveals = game.showdown?.reveals ?? []
-  const done = revealed >= reveals.length
+  const done = finished
   const over = game.phase === 'gameOver'
   const iAgreed = game.rematch.agreed.includes(playerId)
   // 서버가 구버전이면 이 값이 없다. 없다고 화면이 깨지지는 않게 한다.
@@ -419,9 +448,12 @@ function Showdown({ game, revealed, verdict, playerId }: ShowdownProps) {
 
   return (
     <div className="showdown">
-      {verdict && (
-        <div className={`verdict verdict--${verdict.ok ? 'ok' : 'bad'}`} key={verdict.index}>
-          {verdict.ok ? '성공' : '실패'}
+      {flash && (
+        <div
+          key={flash.key}
+          className={`verdict verdict--${flash.tone} ${flash.final ? 'verdict--final' : ''}`}
+        >
+          {flash.text}
         </div>
       )}
       <div className="showdown__panel">
