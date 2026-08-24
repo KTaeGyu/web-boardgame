@@ -200,6 +200,27 @@
   background: linear-gradient(180deg, rgba(212, 175, 55, 0.06), transparent);
 }
 
+/*
+ * 내가 확정했다는 표시. 확정 버튼은 화면 맨 아래라 눈이 가 있지 않다.
+ * 남의 자리가 바뀌는 것처럼 내 자리도 바뀌어야 눌린 것이 확인된다.
+ */
+.my-seat--ready {
+  border-color: var(--gold);
+  background: linear-gradient(180deg, rgba(212, 175, 55, 0.16), rgba(212, 175, 55, 0.03));
+  box-shadow: 0 0 0 1px rgba(212, 175, 55, 0.35), 0 0 22px rgba(212, 175, 55, 0.12);
+}
+
+.my-seat__ready {
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: var(--gold);
+  color: #1b1405;
+  font-size: 12px;
+  font-weight: 800;
+  font-style: normal;
+  letter-spacing: 0.06em;
+}
+
 .my-seat__info {
   display: flex;
   flex-direction: column;

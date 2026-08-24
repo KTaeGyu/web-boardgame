@@ -299,7 +299,7 @@ export function GamePage() {
       </section>
 
       {me && (
-        <section className="my-seat">
+        <section className={`my-seat ${me.ready ? 'my-seat--ready' : ''}`}>
           <div className="my-seat__cards">
             {hand.length > 0 ? (
               hand.map((card, index) => (
@@ -315,6 +315,7 @@ export function GamePage() {
           <div className="my-seat__info">
             <span className="my-seat__name">
               {me.displayName} (나)
+              {me.ready && <em className="my-seat__ready">확정</em>}
               {myHolding && (
                 <button
                   type="button"
