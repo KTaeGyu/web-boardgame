@@ -19,7 +19,7 @@ import {
   normalizeNickname,
 } from '@the-gang/shared'
 
-import { SWEEP_INTERVAL_MS } from './config.ts'
+import { IDLE_ROOM_MS, MAX_CONNECTIONS, MAX_ROOMS, SWEEP_INTERVAL_MS } from './config.ts'
 import { Game } from './game.ts'
 import { uniqueRoomCode } from './ids.ts'
 import { RoomStore } from './rooms.ts'
@@ -46,8 +46,19 @@ function readIdentity(payload: Identity): Result<{ playerId: string; nickname: s
   return { ok: true, value: { playerId: payload.playerId, nickname } }
 }
 
-export function attachGameServer(io: GameServer): { store: RoomStore; stop: () => void } {
-  const store = new RoomStore({ makeCode: uniqueRoomCode })
+export interface ServerLimits {
+  maxConnections?: number
+  maxRooms?: number
+  idleMs?: number
+}
+
+export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { store: RoomStore; stop: () => void } {
+  const maxConnections = limits.maxConnections ?? MAX_CONNECTIONS
+  const store = new RoomStore({
+    makeCode: uniqueRoomCode,
+    maxRooms: limits.maxRooms ?? MAX_ROOMS,
+    idleMs: limits.idleMs ?? IDLE_ROOM_MS,
+  })
   /** 방 코드 → 진행 중인 판. 방 하나에 판 하나다. */
   const games = new Map<string, Game>()
   /** 소켓 하나가 사람 하나를 대변한다. 양방향으로 들고 있어야 개인 정보를 골라 보낼 수 있다. */
@@ -106,16 +117,31 @@ export function attachGameServer(io: GameServer): { store: RoomStore; stop: () =
     unlockTimers.set(code, timer)
   }
 
-  /** 사람이 빠지면 판을 이어갈 수 없다. 판을 접고 방은 대기실로 되돌린다. */
-  function abortGame(code: string, message: string): void {
-    if (!games.delete(code)) return
+  /** 방이 사라졌다. 딸려 있던 판과 타이머도 함께 정리한다. */
+  function forgetRoom(code: string): void {
+    games.delete(code)
     clearTimeout(unlockTimers.get(code))
     unlockTimers.delete(code)
+  }
+
+  /** 사람이 빠지면 판을 이어갈 수 없다. 판을 접고 방은 대기실로 되돌린다. */
+  function abortGame(code: string, message: string): void {
+    if (!games.has(code)) return
+    forgetRoom(code)
     io.to(code).emit('game:aborted', { reason: 'playerLeft', message })
     announce(store.setPhase(code, 'lobby'))
   }
 
   io.on('connection', (socket: GameSocket) => {
+    // 한도를 넘겼으면 방에 들어가기 전에 돌려보낸다. 이미 놀고 있는 사람을 밀어내지는 않는다.
+    if (io.engine.clientsCount > maxConnections) {
+      socket.emit('server:full', {
+        message: '지금은 접속이 많습니다. 잠시 뒤에 다시 시도해 주세요.',
+      })
+      socket.disconnect(true)
+      return
+    }
+
     socket.on('room:create', (payload, ack) => {
       const identity = readIdentity(payload)
       if (!identity.ok) return ack(identity)
@@ -145,6 +171,7 @@ export function attachGameServer(io: GameServer): { store: RoomStore; stop: () =
 
       const code = result.value.code
       if (previous && previous !== code) leftRoom(previous, playerId)
+      store.touch(code)
       bind(socket, playerId, code)
       ack(result)
       announce(result.value)
@@ -188,6 +215,7 @@ export function attachGameServer(io: GameServer): { store: RoomStore; stop: () =
       const playerId = playerOfSocket.get(socket.id)
       if (!playerId) return ack({ ok: false, code: 'NOT_IN_ROOM', message: '방에 들어와 있지 않습니다.' })
 
+      store.touch(store.codeOf(playerId))
       const result = store.updateSettings(playerId, patch ?? {})
       ack(result)
       if (result.ok) announce(result.value)
@@ -223,6 +251,7 @@ export function attachGameServer(io: GameServer): { store: RoomStore; stop: () =
         })
       }
 
+      store.touch(code)
       const game = new Game(code, room.players.map((p) => ({ ...p })))
       games.set(code, game)
       announce(store.setPhase(code, 'playing'))
@@ -302,6 +331,7 @@ export function attachGameServer(io: GameServer): { store: RoomStore; stop: () =
       if (!playerId || !code || !game) {
         return ack({ ok: false, code: 'GAME_NOT_RUNNING', message: '진행 중인 판이 없습니다.' })
       }
+      store.touch(code)
       run(game, code, playerId)
     }
   })
@@ -332,7 +362,7 @@ export function attachGameServer(io: GameServer): { store: RoomStore; stop: () =
   }
 
   const sweeper = setInterval(() => {
-    const { changed, closedCodes } = store.sweep()
+    const { changed, closedCodes, idleCodes } = store.sweep()
     for (const room of changed) {
       sendRoom(room)
       // 유예를 넘겨 자리가 비었다. 판이 돌고 있었다면 여기서 접는다.
@@ -343,12 +373,14 @@ export function attachGameServer(io: GameServer): { store: RoomStore; stop: () =
       }
     }
     for (const code of closedCodes) {
-      games.delete(code)
-      clearTimeout(unlockTimers.get(code))
-      unlockTimers.delete(code)
+      forgetRoom(code)
       io.to(code).emit('room:closed', { reason: 'empty' })
     }
-    if (changed.length > 0 || closedCodes.length > 0) sendRoomList()
+    for (const code of idleCodes) {
+      forgetRoom(code)
+      io.to(code).emit('room:closed', { reason: 'idle' })
+    }
+    if (changed.length > 0 || closedCodes.length > 0 || idleCodes.length > 0) sendRoomList()
   }, SWEEP_INTERVAL_MS)
   sweeper.unref()
 

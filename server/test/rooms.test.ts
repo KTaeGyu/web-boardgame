@@ -215,7 +215,7 @@ describe('끊김과 재접속 유예', () => {
     const code = seed(store, ['p1', 'p2'])
     store.markDisconnected('p2')
     advance(29_999)
-    assert.deepEqual(store.sweep(), { changed: [], closedCodes: [] })
+    assert.deepEqual(store.sweep(), { changed: [], closedCodes: [], idleCodes: [] })
     assert.equal(store.view(code)?.players.length, 2)
   })
 
@@ -240,7 +240,7 @@ describe('끊김과 재접속 유예', () => {
     store.joinRoom('p2', '민수', code)
     advance(20_000) // 끊긴 시점부터는 40초가 지났지만 이미 돌아왔다
 
-    assert.deepEqual(store.sweep(), { changed: [], closedCodes: [] })
+    assert.deepEqual(store.sweep(), { changed: [], closedCodes: [], idleCodes: [] })
     assert.equal(store.view(code)?.players.length, 2)
   })
 

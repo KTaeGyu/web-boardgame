@@ -14,6 +14,14 @@ import { ConfirmModal } from '../components/Modal.tsx'
 import { getNickname, getPlayerId } from '../lib/identity.ts'
 import { call, socket, useServerEvent } from '../lib/socket.ts'
 
+/** 방이 닫힌 사유를 사람 말로. 아무 설명 없이 튕겨나가면 고장으로 느껴진다. */
+const CLOSED_MESSAGE: Record<string, string> = {
+  empty: '방에 아무도 남지 않아 닫혔습니다.',
+  idle: '10분 동안 아무 움직임이 없어 방이 닫혔습니다.',
+  rematchDeclined: '재경기를 원하지 않는 사람이 있어 방이 닫혔습니다.',
+  hostClosed: '방장이 방을 닫았습니다.',
+}
+
 /** 설정은 게임 규칙이 붙은 뒤에 열 것이다. 지금은 자리만 잡아두고 잠가 둔다. */
 const SETTINGS_LOCKED = true
 
@@ -75,7 +83,11 @@ export function RoomPage() {
 
   useServerEvent(
     'room:closed',
-    useCallback(() => navigate('/rooms', { replace: true }), [navigate]),
+    useCallback(
+      (payload: { reason: string }) =>
+        navigate('/rooms', { replace: true, state: { notice: CLOSED_MESSAGE[payload.reason] } }),
+      [navigate],
+    ),
   )
 
   async function leave() {

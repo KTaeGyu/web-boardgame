@@ -13,11 +13,20 @@ import {
   type Round,
 } from '@the-gang/shared'
 
+import { ConfirmModal } from '../components/Modal.tsx'
 import { CardSlot, PlayingCard } from '../components/PlayingCard.tsx'
 import { Token, TokenBlank } from '../components/Token.tsx'
 import { getNickname, getPlayerId } from '../lib/identity.ts'
 import { call, socket, useServerEvent } from '../lib/socket.ts'
 import { useTokenFlight } from '../lib/useTokenFlight.ts'
+
+/** 방이 닫힌 사유를 사람 말로. 아무 설명 없이 튕겨나가면 고장으로 느껴진다. */
+const CLOSED_MESSAGE: Record<string, string> = {
+  empty: '방에 아무도 남지 않아 닫혔습니다.',
+  idle: '10분 동안 아무 움직임이 없어 방이 닫혔습니다.',
+  rematchDeclined: '재경기를 원하지 않는 사람이 있어 방이 닫혔습니다.',
+  hostClosed: '방장이 방을 닫았습니다.',
+}
 
 /** 쇼다운은 한 사람씩 차례로 뒤집어야 순서가 맞았는지 눈에 들어온다. */
 const REVEAL_STEP_MS = 1900
@@ -49,6 +58,7 @@ export function GamePage() {
   )
   /** 마지막 결과까지 다 보여줬는가. 이때가 되어야 다음으로 넘어가는 버튼이 열린다. */
   const [finished, setFinished] = useState(false)
+  const [confirmLeave, setConfirmLeave] = useState(false)
 
   const tokenRef = useTokenFlight(TOKEN_LOCK_MS)
 
@@ -117,7 +127,11 @@ export function GamePage() {
 
   useServerEvent(
     'room:closed',
-    useCallback(() => navigate('/rooms', { replace: true }), [navigate]),
+    useCallback(
+      (payload: { reason: string }) =>
+        navigate('/rooms', { replace: true, state: { notice: CLOSED_MESSAGE[payload.reason] } }),
+      [navigate],
+    ),
   )
 
   /** 쇼다운에 들어서면 한 명씩 뒤집는다. 다음 판이 시작되면 처음으로 되돌린다. */
@@ -209,19 +223,23 @@ export function GamePage() {
     <main className="game">
       <header className="game-bar">
         <span className="game-bar__heist">{game.heist}번째 금고</span>
+        {/* 금고와 경보를 두 줄로 나눈다. 좁은 화면에서 한 줄로 늘어놓으면 나가기가 밀려난다. */}
         <span className="game-bar__marks" title={`금고 ${game.vaults} / 경보 ${game.alarms}`}>
-          {Array.from({ length: VAULTS_TO_WIN }, (_, i) => (
-            <i key={`v${i}`} className={`mark mark--vault ${i < game.vaults ? 'mark--on' : ''}`} />
-          ))}
-          <em className="game-bar__divider" />
-          {Array.from({ length: ALARMS_TO_LOSE }, (_, i) => (
-            <i key={`a${i}`} className={`mark mark--alarm ${i < game.alarms ? 'mark--on' : ''}`} />
-          ))}
+          <span className="mark-row">
+            {Array.from({ length: VAULTS_TO_WIN }, (_, i) => (
+              <i key={`v${i}`} className={`mark mark--vault ${i < game.vaults ? 'mark--on' : ''}`} />
+            ))}
+          </span>
+          <span className="mark-row">
+            {Array.from({ length: ALARMS_TO_LOSE }, (_, i) => (
+              <i key={`a${i}`} className={`mark mark--alarm ${i < game.alarms ? 'mark--on' : ''}`} />
+            ))}
+          </span>
         </span>
         <span className="game-bar__round">
           {picking ? `${game.round}라운드 · ${ROUND_LABEL[game.round]}` : '쇼다운'}
         </span>
-        <button type="button" className="game-bar__leave" onClick={() => void leave(navigate)}>
+        <button type="button" className="game-bar__leave" onClick={() => setConfirmLeave(true)}>
           나가기
         </button>
       </header>
@@ -347,6 +365,18 @@ export function GamePage() {
 
       {game.showdown && (
         <Showdown game={game} revealed={revealed} flash={flash} finished={finished} playerId={playerId} />
+      )}
+
+      {confirmLeave && (
+        <ConfirmModal
+          title="게임에서 나가시겠습니까?"
+          confirmLabel="나가기"
+          cancelLabel="계속하기"
+          onConfirm={() => void leave(navigate)}
+          onCancel={() => setConfirmLeave(false)}
+        >
+          지금 나가면 <strong>이 판이 취소되고</strong> 남은 사람들도 모두 대기실로 돌아갑니다.
+        </ConfirmModal>
       )}
     </main>
   )

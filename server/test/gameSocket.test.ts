@@ -19,7 +19,8 @@ let url = ''
 const open: Socket[] = []
 
 before(async () => {
-  app = createApp()
+  // 소켓을 계속 열어두는 테스트라 운영 한도(40)에 걸린다. 여기서는 한도를 풀어둔다.
+  app = createApp({ maxConnections: 1000, maxRooms: 1000 })
   await new Promise<void>((resolve) => app.http.listen(0, resolve))
   url = `http://localhost:${(app.http.address() as AddressInfo).port}`
 })

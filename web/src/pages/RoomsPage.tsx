@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import type { RoomSummary, RoomView } from '@the-gang/shared'
 
 import { ConfirmModal } from '../components/Modal.tsx'
@@ -9,6 +9,8 @@ import { call, socket, useServerEvent } from '../lib/socket.ts'
 
 export function RoomsPage() {
   const navigate = useNavigate()
+  // 방이 닫혀서 밀려온 경우, 왜 닫혔는지 여기서 알려준다.
+  const arrivedWith = (useLocation().state as { notice?: string } | null)?.notice ?? ''
   const nickname = getNickname()
   const [rooms, setRooms] = useState<RoomSummary[] | null>(null)
   const [asking, setAsking] = useState<RoomSummary | null>(null)
@@ -86,6 +88,8 @@ export function RoomsPage() {
           {making ? '만드는 중…' : '방 만들기'}
         </button>
       </div>
+
+      {arrivedWith && <p className="notice">{arrivedWith}</p>}
 
       {rooms === null && <p className="empty">불러오는 중…</p>}
 

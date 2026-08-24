@@ -42,6 +42,8 @@ interface Room {
   settings: RoomSettings
   phase: RoomPhase
   createdAt: number
+  /** 마지막으로 누군가 무언가를 한 시각. 아무 일도 없는 방을 골라내는 기준이다. */
+  lastActivityAt: number
 }
 
 function err<T>(code: ErrorCode, message: string): Result<T> {
@@ -56,6 +58,8 @@ export interface RoomStoreOptions {
   now?: () => number
   makeCode?: (taken: (code: string) => boolean) => string
   graceMs?: number
+  maxRooms?: number
+  idleMs?: number
 }
 
 export class RoomStore {
@@ -65,14 +69,21 @@ export class RoomStore {
   private readonly now: () => number
   private readonly makeCode: (taken: (code: string) => boolean) => string
   private readonly graceMs: number
+  private readonly maxRooms: number
+  private readonly idleMs: number
 
   constructor(options: RoomStoreOptions = {}) {
     this.now = options.now ?? Date.now
     this.makeCode = options.makeCode ?? defaultCodeFactory
     this.graceMs = options.graceMs ?? DISCONNECT_GRACE_MS
+    this.maxRooms = options.maxRooms ?? Number.POSITIVE_INFINITY
+    this.idleMs = options.idleMs ?? Number.POSITIVE_INFINITY
   }
 
   createRoom(playerId: string, nickname: string): Result<RoomView> {
+    if (this.rooms.size >= this.maxRooms) {
+      return err('ROOM_LIMIT', '지금은 열려 있는 방이 많습니다. 잠시 뒤에 다시 시도해 주세요.')
+    }
     this.leaveRoom(playerId) // 다른 방에 남아 있었다면 정리하고 시작한다
     const code = this.makeCode((candidate) => this.rooms.has(candidate))
     const now = this.now()
@@ -83,6 +94,7 @@ export class RoomStore {
       settings: { ...DEFAULT_SETTINGS, penalties: [] },
       phase: 'lobby',
       createdAt: now,
+      lastActivityAt: now,
     }
     this.rooms.set(code, room)
     this.whereIs.set(playerId, code)
@@ -130,6 +142,17 @@ export class RoomStore {
     return { room: toView(room), closedCode: null }
   }
 
+  /**
+   * 누군가 무언가를 했다. 방이 살아 있다는 표시다.
+   *
+   * 끊김 유예와 달리 이쪽은 「사람이 실제로 하고 있는가」를 본다.
+   * 접속만 걸어두고 떠나면 아무리 연결이 멀쩡해도 방이 정리된다.
+   */
+  touch(code: string | null): void {
+    const room = code ? this.rooms.get(code.toUpperCase()) : undefined
+    if (room) room.lastActivityAt = this.now()
+  }
+
   /** 소켓이 끊겼을 뿐이다. 자리는 유예 시간 동안 남겨둔다. */
   markDisconnected(playerId: string): RoomView | null {
     const room = this.roomOf(playerId)
@@ -140,11 +163,21 @@ export class RoomStore {
     return toView(room)
   }
 
-  /** 유예를 넘긴 자리를 실제로 비운다. 소켓 계층이 주기적으로 부른다. */
-  sweep(): { changed: RoomView[]; closedCodes: string[] } {
-    const deadline = this.now() - this.graceMs
+  /** 유예를 넘긴 자리와, 아무 일도 없는 방을 실제로 치운다. 소켓 계층이 주기적으로 부른다. */
+  sweep(): { changed: RoomView[]; closedCodes: string[]; idleCodes: string[] } {
+    const now = this.now()
+    const deadline = now - this.graceMs
     const changed: RoomView[] = []
     const closedCodes: string[] = []
+    const idleCodes: string[] = []
+
+    // 아무도 아무것도 하지 않은 방부터 접는다. 남은 사람이 있어도 접는다.
+    for (const room of [...this.rooms.values()]) {
+      if (now - room.lastActivityAt < this.idleMs) continue
+      for (const player of room.players) this.whereIs.delete(player.id)
+      this.rooms.delete(room.code)
+      idleCodes.push(room.code)
+    }
 
     for (const room of [...this.rooms.values()]) {
       const expired = room.players.filter(
@@ -164,7 +197,7 @@ export class RoomStore {
       if (expiredIds.has(room.hostId)) room.hostId = nextHost(room)
       changed.push(toView(room))
     }
-    return { changed, closedCodes }
+    return { changed, closedCodes, idleCodes }
   }
 
   updateSettings(playerId: string, patch: Partial<RoomSettings>): Result<RoomView> {

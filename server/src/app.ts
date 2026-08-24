@@ -2,7 +2,7 @@ import { createServer, type Server as HttpServer } from 'node:http'
 import { Server } from 'socket.io'
 
 import { isAllowedOrigin } from './config.ts'
-import { attachGameServer, type GameServer } from './socket.ts'
+import { attachGameServer, type GameServer, type ServerLimits } from './socket.ts'
 import type { RoomStore } from './rooms.ts'
 
 export interface GameApp {
@@ -13,7 +13,7 @@ export interface GameApp {
 }
 
 /** 부팅을 listen 과 분리해 두면 테스트가 임의 포트로 띄웠다 닫을 수 있다. */
-export function createApp(): GameApp {
+export function createApp(limits: ServerLimits = {}): GameApp {
   const http = createServer((req, res) => {
     // Render 의 상태 확인용. 무료 요금제에서 잠든 인스턴스를 깨우는 데도 쓴다.
     if (req.url === '/healthz') {
@@ -35,7 +35,7 @@ export function createApp(): GameApp {
     },
   })
 
-  const game = attachGameServer(io)
+  const game = attachGameServer(io, limits)
   const store = game.store
 
   const close = () =>

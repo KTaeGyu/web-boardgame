@@ -24,8 +24,7 @@ export function HomePage() {
     return clean
   }
 
-  async function makeRoom(event: FormEvent) {
-    event.preventDefault()
+  async function makeRoom() {
     const name = requireNickname()
     if (!name) return
 
@@ -40,7 +39,9 @@ export function HomePage() {
     navigate(`/rooms/${result.value.code}`)
   }
 
-  function findRoom() {
+  /** 엔터가 닿는 자리. 대부분은 만들기보다 남의 방에 들어가려고 온다. */
+  function findRoom(event: FormEvent) {
+    event.preventDefault()
     if (requireNickname()) navigate('/rooms')
   }
 
@@ -52,7 +53,7 @@ export function HomePage() {
         <p className="brand__sub">말하지 않고 맞추는 협력 포커</p>
       </header>
 
-      <form className="home-form" onSubmit={makeRoom}>
+      <form className="home-form" onSubmit={findRoom}>
         <label className="field">
           <span className="field__label">닉네임</span>
           <input
@@ -69,10 +70,10 @@ export function HomePage() {
         {error && <p className="error">{error}</p>}
 
         <div className="btn-row home-form__actions">
-          <button type="submit" className="btn btn--primary" disabled={busy}>
+          <button type="button" className="btn" onClick={() => void makeRoom()} disabled={busy}>
             {busy ? '만드는 중…' : '방 만들기'}
           </button>
-          <button type="button" className="btn" onClick={findRoom} disabled={busy}>
+          <button type="submit" className="btn btn--primary" disabled={busy}>
             방 찾기
           </button>
         </div>

@@ -85,6 +85,8 @@ export type ErrorCode =
   | 'INVALID_SETTINGS'
   | 'NOT_ENOUGH_PLAYERS'
   | 'PLAYER_AWAY'
+  | 'ROOM_LIMIT'
+  | 'SERVER_FULL'
   | 'GAME_NOT_RUNNING'
   | 'ALREADY_STARTED'
   | 'WRONG_PHASE'
@@ -123,7 +125,9 @@ export interface ClientToServerEvents {
 /** 서버 → 클라이언트. */
 export interface ServerToClientEvents {
   'room:updated': (room: RoomView) => void
-  'room:closed': (payload: { reason: 'empty' | 'hostClosed' | 'rematchDeclined' }) => void
+  'room:closed': (payload: { reason: 'empty' | 'hostClosed' | 'rematchDeclined' | 'idle' }) => void
+  /** 서버가 감당할 수 있는 인원을 넘겼다. 곧 연결이 끊긴다. */
+  'server:full': (payload: { message: string }) => void
   'rooms:changed': (rooms: RoomSummary[]) => void
 
   /** 모두가 보는 상태. 누구의 홀카드도 들어 있지 않다. */
