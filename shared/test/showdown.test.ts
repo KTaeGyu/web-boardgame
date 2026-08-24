@@ -90,6 +90,82 @@ describe('쇼다운 판정', () => {
   })
 })
 
+describe('완전히 같은 손끼리는 순서가 자유롭다', () => {
+  // 보드: 2♠ 3♥ 4♦ A♣ 9♠
+  // 갑·을: 투 페어(3, 2) + A 키커 — 무늬만 다를 뿐 세기가 완전히 같다
+  // 병: 2-3-4-5-6 스트레이트 — 둘보다 세다
+  const board = cards('2s 3h 4d Ac 9s')
+  const 갑 = '2h 3d'
+  const 을 = '2d 3c'
+  const 병 = '5d 6c'
+
+  it('전제 확인 — 갑과 을은 정말 같고, 병이 더 세다', () => {
+    const result = judgeShowdown(
+      [entry('갑', 1, 갑), entry('을', 2, 을), entry('병', 3, 병)],
+      board,
+    )
+    const [a, b, c] = result.reveals
+    assert.equal(a.description, '투 페어(3, 2)')
+    assert.equal(b.description, '투 페어(3, 2)')
+    assert.equal(c.description, '스트레이트(6)')
+    assert.deepEqual(a.value.score, b.value.score, '키커까지 같아야 진짜 동률이다')
+  })
+
+  it('동률인 둘은 2등 3등이든 3등 2등이든 성공한다', () => {
+    const 갑먼저 = judgeShowdown(
+      [entry('갑', 1, 갑), entry('을', 2, 을), entry('병', 3, 병)],
+      board,
+    )
+    const 을먼저 = judgeShowdown(
+      [entry('을', 1, 을), entry('갑', 2, 갑), entry('병', 3, 병)],
+      board,
+    )
+    assert.equal(갑먼저.success, true)
+    assert.equal(을먼저.success, true)
+  })
+
+  it('이름이 같아도 키커가 다르면 동률이 아니다', () => {
+    // 보드 2♠ 2♥ 5♦ 9♣ 7♠ — 둘 다 「원 페어(2)」지만 키커가 갈린다.
+    const 높은키커 = 'Ad Kh' // 키커 A K 9
+    const 낮은키커 = 'Qd Jh' // 키커 Q J 9
+
+    const 본다 = judgeShowdown(
+      [entry('낮음', 1, 낮은키커), entry('높음', 2, 높은키커)],
+      cards('2s 2h 5d 9c 7s'),
+    )
+    const [약, 강] = 본다.reveals
+    assert.equal(약.description, '원 페어(2)')
+    assert.equal(강.description, '원 페어(2)', '이름은 똑같이 나온다')
+    assert.notDeepEqual(약.value.score, 강.value.score, '그래도 세기는 다르다')
+    assert.equal(약.value.score[2], 12, '키커 Q')
+    assert.equal(강.value.score[2], 14, '키커 A')
+    assert.equal(본다.success, true, '약한 쪽이 앞이면 성공')
+  })
+
+  it('키커가 낮은 사람이 뒤에 서면 실패한다', () => {
+    const 뒤집힘 = judgeShowdown(
+      [entry('높음', 1, 'Ad Kh'), entry('낮음', 2, 'Qd Jh')],
+      cards('2s 2h 5d 9c 7s'),
+    )
+    assert.equal(뒤집힘.success, false, '2 2 3 3 A 가 2 2 3 3 6 보다 세다는 것이 순서에 반영돼야 한다')
+    assert.deepEqual(뒤집힘.reveals.map((r) => r.ok), [true, false])
+  })
+
+  it('그래도 센 쪽과의 순서는 지켜야 한다', () => {
+    const 병이먼저 = judgeShowdown(
+      [entry('병', 1, 병), entry('갑', 2, 갑), entry('을', 3, 을)],
+      board,
+    )
+    assert.equal(병이먼저.success, false)
+
+    const 병이가운데 = judgeShowdown(
+      [entry('갑', 1, 갑), entry('병', 2, 병), entry('을', 3, 을)],
+      board,
+    )
+    assert.equal(병이가운데.success, false, '동률인 둘 사이에 센 사람이 끼면 안 된다')
+  })
+})
+
 describe('쇼다운 입력 검증', () => {
   it('커뮤니티가 5장이 아니면 거부한다', () => {
     assert.throws(() => judgeShowdown([entry('a', 1, 'Kh Kd')], cards('Ks 9h 4d')), /5장/)
