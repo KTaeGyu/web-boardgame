@@ -140,13 +140,15 @@ export class Game {
   /** 한 장을 더 받아 지금 버릴 카드를 고르고 있는 사람. */
   private discardingId: string | null = null
 
-  /** 스캔이 열려 있는 동안의 상태. 답이 정해지면 쇼다운으로 넘어간다. */
+  /** 스캔이 열려 있는 동안의 상태. 모든 물음의 답이 정해지면 쇼다운으로 넘어간다. */
   private scan: {
-    kind: 'rank' | 'category'
     targetId: string
-    votes: Map<string, number>
-    decided: number | null
-    correct: boolean | null
+    questions: {
+      kind: 'rank' | 'category'
+      votes: Map<string, number>
+      decided: number | null
+      correct: boolean | null
+    }[]
   } | null = null
 
   constructor(roomCode: string, players: StartingPlayer[], options: GameOptions = {}) {
@@ -591,8 +593,11 @@ export class Game {
 
     if (finished === 4) {
       // 스캔이 걸려 있으면 마지막 사람이 공개하기 전에 답을 정해야 한다.
-      const scanning = this.has(4) ? 'rank' : this.has(9) ? 'category' : null
-      if (scanning) this.beginScan(scanning)
+      // 둘 다 걸려 있으면 둘 다 맞혀야 한다.
+      const kinds: ('rank' | 'category')[] = []
+      if (this.has(4)) kinds.push('rank')
+      if (this.has(9)) kinds.push('category')
+      if (kinds.length > 0) this.beginScan(kinds)
       else this.runShowdown()
       return
     }
@@ -647,11 +652,14 @@ export class Game {
    * 대상의 카드는 답이 정해질 때까지 어디로도 나가지 않는다. 미리 보낸 뒤에
    * 화면에서만 가리면, 통신을 들여다보는 것만으로 답을 알 수 있게 된다.
    */
-  private beginScan(kind: 'rank' | 'category'): void {
+  private beginScan(kinds: ('rank' | 'category')[]): void {
     const ordered = [...this.seats].sort((a, b) => (a.history[3] ?? 0) - (b.history[3] ?? 0))
     const target = ordered[ordered.length - 1]
 
-    this.scan = { kind, targetId: target.id, votes: new Map(), decided: null, correct: null }
+    this.scan = {
+      targetId: target.id,
+      questions: kinds.map((kind) => ({ kind, votes: new Map(), decided: null, correct: null })),
+    }
     this.phase = 'scanning'
     // 먼저 공개되는 사람들끼리의 순서는 이 시점에 이미 판정할 수 있다.
     this.showdown = judgeShowdown(
@@ -665,8 +673,8 @@ export class Game {
     )
   }
 
-  /** 스캔에 답한다. 대상을 뺀 접속자 전원이 같은 답을 고르면 확정된다. */
-  voteScan(playerId: string, value: number): Result<null> {
+  /** 스캔에 답한다. 대상을 뺀 접속자 전원이 같은 답을 고르면 그 물음이 확정된다. */
+  voteScan(playerId: string, kind: 'rank' | 'category', value: number): Result<null> {
     if (this.phase !== 'scanning' || !this.scan) return err('WRONG_PHASE', '지금은 답할 수 없습니다.')
     if (playerId === this.scan.targetId) {
       return err('WRONG_PHASE', '지목된 사람은 답할 수 없습니다.')
@@ -676,28 +684,34 @@ export class Game {
     }
     if (!Number.isInteger(value)) return err('INVALID_TOKEN', '답을 골라 주세요.')
 
-    this.scan.votes.set(playerId, value)
+    const question = this.scan.questions.find((q) => q.kind === kind)
+    if (!question) return err('INVALID_TOKEN', '없는 물음입니다.')
+    if (question.decided !== null) return err('WRONG_PHASE', '이미 정해진 물음입니다.')
+
+    question.votes.set(playerId, value)
 
     const voters = this.seats.filter((s) => s.connected && s.id !== this.scan!.targetId)
-    const answers = voters.map((s) => this.scan!.votes.get(s.id))
-    const allIn = answers.every((answer) => answer !== undefined)
-    const agreed = allIn && new Set(answers).size === 1
-    if (agreed) this.settleScan(answers[0]!)
+    const answers = voters.map((s) => question.votes.get(s.id))
+    const agreed = answers.every((answer) => answer !== undefined) && new Set(answers).size === 1
+    if (agreed) this.settleQuestion(question, answers[0]!)
     return OK
   }
 
-  private settleScan(value: number): void {
-    if (!this.scan) return
-    const target = this.seats.find((s) => s.id === this.scan!.targetId)
-    if (!target) return
+  private settleQuestion(
+    question: { kind: 'rank' | 'category'; decided: number | null; correct: boolean | null },
+    value: number,
+  ): void {
+    const target = this.seats.find((s) => s.id === this.scan?.targetId)
+    if (!target || !this.scan) return
 
-    this.scan.decided = value
-    this.scan.correct =
-      this.scan.kind === 'rank'
+    question.decided = value
+    question.correct =
+      question.kind === 'rank'
         ? target.hole.some((card) => rankValueOf(card) === value)
         : evaluateHoleAndCommunity(target.hole, this.community).category === value
 
-    this.runShowdown()
+    // 물음이 여럿이면 전부 정해져야 공개로 넘어간다.
+    if (this.scan.questions.every((q) => q.decided !== null)) this.runShowdown()
   }
 
   private runShowdown(): void {
@@ -708,8 +722,8 @@ export class Game {
     }))
 
     const judged = judgeShowdown(entries, this.community, { muscleId: this.muscleId })
-    // 스캔을 틀리면 순서가 맞았어도 그 판은 실패다.
-    const scanOk = this.scan === null || this.scan.correct === true
+    // 스캔을 틀리면 순서가 맞았어도 그 판은 실패다. 물음이 여럿이면 전부 맞혀야 한다.
+    const scanOk = this.scan === null || this.scan.questions.every((q) => q.correct === true)
     this.showdown = { ...judged, success: judged.success && scanOk }
     this.lastSuccess = this.showdown.success
     if (this.showdown.success) this.vaults += 1
@@ -769,11 +783,13 @@ export class Game {
   private scanView(): ScanState | null {
     if (!this.scan) return null
     return {
-      kind: this.scan.kind,
       targetId: this.scan.targetId,
-      votes: [...this.scan.votes].map(([playerId, value]) => ({ playerId, value })),
-      decided: this.scan.decided,
-      correct: this.scan.correct,
+      questions: this.scan.questions.map((question) => ({
+        kind: question.kind,
+        votes: [...question.votes].map(([playerId, value]) => ({ playerId, value })),
+        decided: question.decided,
+        correct: question.correct,
+      })),
     }
   }
 

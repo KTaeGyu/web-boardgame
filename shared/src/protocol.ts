@@ -128,7 +128,10 @@ export interface ClientToServerEvents {
   /** 한 장을 더 받은 뒤 버릴 카드를 고른다. */
   'game:discard': (payload: { cardIndex: number }, ack: (result: Result<null>) => void) => void
   /** 스캔에 답한다. 접속 중인 사람이 모두 같은 답을 고르면 확정된다. */
-  'game:scanVote': (payload: { value: number }, ack: (result: Result<null>) => void) => void
+  'game:scanVote': (
+    payload: { kind: 'rank' | 'category'; value: number },
+    ack: (result: Result<null>) => void,
+  ) => void
   /** 해결사 카드를 쓴다. 누른 사람이 쓰는 사람이고, 카드에 따라 대상·숫자·내 카드가 더 필요하다. */
   'game:useSpecialist': (
     payload: { targetId?: string; value?: number; cardIndex?: number },

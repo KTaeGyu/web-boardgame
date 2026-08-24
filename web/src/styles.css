@@ -569,6 +569,12 @@ select {
   max-width: 460px;
 }
 
+/* 물음이 둘이면 길어진다. 화면을 넘기지 않고 안에서 스크롤한다. */
+.modal--tall {
+  max-height: min(84vh, var(--app-height, 100dvh));
+  overflow-y: auto;
+}
+
 .modal__title {
   margin: 0 0 8px;
   font-size: 18px;

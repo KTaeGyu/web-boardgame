@@ -181,13 +181,15 @@ export function ExtrasDrawer({ game, playerId, hand, notes, onUse }: Props) {
 
 /** 도전자 카드가 지금 어떤 상태인지. 스캔처럼 결과가 남는 카드가 있다. */
 function challengeStatus(game: GameView, id: number): string {
-  if ((id === 4 || id === 9) && game.scan) {
-    if (game.scan.decided === null) return '답을 모으는 중입니다'
+  const kind = id === 4 ? 'rank' : id === 9 ? 'category' : null
+  const question = kind ? game.scan?.questions.find((q) => q.kind === kind) : null
+  if (question) {
+    if (question.decided === null) return '답을 모으는 중입니다'
     const answer =
-      game.scan.kind === 'rank'
-        ? rankLabel(game.scan.decided)
-        : (CATEGORY_LABEL[game.scan.decided as 0] ?? String(game.scan.decided))
-    return `「${answer}」로 답했고, ${game.scan.correct ? '맞혔습니다' : '틀렸습니다'}`
+      question.kind === 'rank'
+        ? rankLabel(question.decided)
+        : (CATEGORY_LABEL[question.decided as 0] ?? String(question.decided))
+    return `「${answer}」로 답했고, ${question.correct ? '맞혔습니다' : '틀렸습니다'}`
   }
   return '이번 판 내내 적용됩니다'
 }

@@ -64,18 +64,23 @@ export interface SetupState {
 /**
  * 스캔. 마지막 사람이 공개하기 전에 나머지가 답을 맞혀야 하는 상황.
  *
- * 「망막 스캔」은 숫자를, 「지문 스캔」은 족보를 묻는다. 지목당한 사람은 끼지 못하고,
- * 나머지가 모두 같은 답을 고르면 확정된다. 틀리면 순서가 맞았어도 그 판은 실패다.
+ * 「망막 스캔」은 숫자를, 「지문 스캔」은 족보를 묻는다. 둘 다 걸려 있으면 둘 다 맞혀야 한다 —
+ * 그래서 물음이 하나가 아니라 여럿일 수 있다.
+ * 지목당한 사람은 끼지 못하고, 나머지가 모두 같은 답을 고르면 그 물음이 확정된다.
  */
-export interface ScanState {
+export interface ScanQuestion {
   kind: 'rank' | 'category'
-  /** 답을 맞혀야 하는 대상. 이 사람은 투표하지 못한다. */
-  targetId: string
   /** 지금까지의 표. 서로 보이므로 말 없이도 답을 맞춰갈 수 있다. */
   votes: { playerId: string; value: number }[]
   /** 만장일치로 정해진 답. 아직이면 null. */
   decided: number | null
   correct: boolean | null
+}
+
+export interface ScanState {
+  /** 답을 맞혀야 하는 대상. 이 사람은 투표하지 못한다. */
+  targetId: string
+  questions: ScanQuestion[]
 }
 
 export interface GamePlayerView {

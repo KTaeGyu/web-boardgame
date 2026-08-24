@@ -494,7 +494,7 @@ export function GamePage() {
       <ScanVote
         game={game}
         playerId={playerId}
-        onVote={(value) => void call('game:scanVote', { value })}
+        onVote={(kind, value) => void call('game:scanVote', { kind, value })}
       />
 
       {game.showdown && game.phase !== 'scanning' && (

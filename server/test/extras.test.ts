@@ -359,30 +359,30 @@ describe('스캔 — 마지막 사람 차례에 답을 맞힌다', () => {
 
   it('지목된 사람은 답할 수 없다', () => {
     const { game } = openScan(4)
-    const result = game.voteScan('p3', 14)
+    const result = game.voteScan('p3', 'rank', 14)
     assert.equal(result.ok, false)
     if (!result.ok) assert.match(result.message, /지목된 사람/)
   })
 
   it('답이 갈리면 확정되지 않는다', () => {
     const { game } = openScan(4)
-    game.voteScan('p1', 14)
-    game.voteScan('p2', 13)
+    game.voteScan('p1', 'rank', 14)
+    game.voteScan('p2', 'rank', 13)
 
     const view = game.view()
-    assert.equal(view.scan?.decided, null)
+    assert.equal(view.scan?.questions[0].decided, null)
     assert.equal(view.phase, 'scanning')
-    assert.equal(view.scan?.votes.length, 2, '표는 서로 보인다')
+    assert.equal(view.scan?.questions[0].votes.length, 2, '표는 서로 보인다')
   })
 
   it('답을 바꿔 맞추면 그때 확정된다', () => {
     const { game } = openScan(4)
-    game.voteScan('p1', 14)
-    game.voteScan('p2', 13)
-    game.voteScan('p1', 13) // p1 이 p2 에게 맞춘다
+    game.voteScan('p1', 'rank', 14)
+    game.voteScan('p2', 'rank', 13)
+    game.voteScan('p1', 'rank', 13) // p1 이 p2 에게 맞춘다
 
     const view = game.view()
-    assert.equal(view.scan?.decided, 13)
+    assert.equal(view.scan?.questions[0].decided, 13)
     assert.notEqual(view.phase, 'scanning')
   })
 
@@ -393,9 +393,9 @@ describe('스캔 — 마지막 사람 차례에 답을 맞힌다', () => {
       ? { T: 10, J: 11, Q: 12, K: 13, A: 14 }[targetRank as 'T' | 'J' | 'Q' | 'K' | 'A']!
       : Number(targetRank)
 
-    ctx.game.voteScan('p1', value)
-    ctx.game.voteScan('p2', value)
-    assert.equal(ctx.game.view().scan?.correct, true)
+    ctx.game.voteScan('p1', 'rank', value)
+    ctx.game.voteScan('p2', 'rank', value)
+    assert.equal(ctx.game.view().scan?.questions[0].correct, true)
   })
 
   it('망막 스캔을 틀리면 순서가 맞아도 실패한다', () => {
@@ -406,11 +406,11 @@ describe('스캔 — 마지막 사람 차례에 답을 맞힌다', () => {
       (value) => !hole.some((card) => rankValue(card) === value),
     )!
 
-    ctx.game.voteScan('p1', wrong)
-    ctx.game.voteScan('p2', wrong)
+    ctx.game.voteScan('p1', 'rank', wrong)
+    ctx.game.voteScan('p2', 'rank', wrong)
 
     const view = ctx.game.view()
-    assert.equal(view.scan?.correct, false)
+    assert.equal(view.scan?.questions[0].correct, false)
     assert.equal(view.showdown?.success, false, '스캔을 틀리면 판이 실패한다')
     assert.deepEqual(
       view.showdown?.reveals.map((r) => r.ok),
@@ -422,26 +422,80 @@ describe('스캔 — 마지막 사람 차례에 답을 맞힌다', () => {
   it('지문 스캔 — 대상의 족보를 맞혀야 한다', () => {
     const ctx = openScan(9)
     const view = ctx.game.view()
-    assert.equal(view.scan?.kind, 'category')
+    assert.equal(view.scan?.questions[0].kind, 'category')
 
     const actual = bestHolding([...ctx.game.handOf('p3')!, ...view.community])!
     const category = HAND_ORDER.indexOf(actual.name)
-    ctx.game.voteScan('p1', category)
-    ctx.game.voteScan('p2', category)
-    assert.equal(ctx.game.view().scan?.correct, true)
+    ctx.game.voteScan('p1', 'category', category)
+    ctx.game.voteScan('p2', 'category', category)
+    assert.equal(ctx.game.view().scan?.questions[0].correct, true)
   })
 
   it('맞히면 순서대로 성공한다', () => {
     const ctx = openScan(9)
     const actual = bestHolding([...ctx.game.handOf('p3')!, ...ctx.game.view().community])!
     const category = HAND_ORDER.indexOf(actual.name)
-    ctx.game.voteScan('p1', category)
-    ctx.game.voteScan('p2', category)
+    ctx.game.voteScan('p1', 'category', category)
+    ctx.game.voteScan('p2', 'category', category)
 
     const view = ctx.game.view()
     assert.equal(view.players.find((p) => p.id === 'p3')?.hole?.length, 2, '이제 모두 공개된다')
     assert.equal(view.showdown?.reveals.length, 3)
     assert.equal(view.showdown?.success, true)
+  })
+
+  it('둘 다 걸리면 둘 다 물어야 한다', () => {
+    const ctx = gameWith([4, 9])
+    for (let round = 0; round < 4; round++) passRound(ctx)
+
+    const view = ctx.game.view()
+    assert.deepEqual(view.scan?.questions.map((q) => q.kind), ['rank', 'category'])
+
+    // 숫자만 맞혀서는 넘어가지 않는다
+    const hole = ctx.game.handOf('p3')!
+    const rank = rankValue(hole[0])
+    ctx.game.voteScan('p1', 'rank', rank)
+    ctx.game.voteScan('p2', 'rank', rank)
+    assert.equal(ctx.game.view().phase, 'scanning', '남은 물음이 있으면 그대로다')
+    assert.equal(ctx.game.view().scan?.questions[0].correct, true)
+
+    const actual = bestHolding([...hole, ...view.community])!
+    const category = HAND_ORDER.indexOf(actual.name)
+    ctx.game.voteScan('p1', 'category', category)
+    ctx.game.voteScan('p2', 'category', category)
+
+    const after = ctx.game.view()
+    assert.notEqual(after.phase, 'scanning')
+    assert.equal(after.showdown?.success, true, '둘 다 맞혔으니 순서대로면 성공이다')
+  })
+
+  it('하나만 틀려도 판은 실패한다', () => {
+    const ctx = gameWith([4, 9])
+    for (let round = 0; round < 4; round++) passRound(ctx)
+
+    const hole = ctx.game.handOf('p3')!
+    const wrongRank = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14].find(
+      (value) => !hole.some((card) => rankValue(card) === value),
+    )!
+    ctx.game.voteScan('p1', 'rank', wrongRank)
+    ctx.game.voteScan('p2', 'rank', wrongRank)
+
+    const actual = bestHolding([...hole, ...ctx.game.view().community])!
+    const category = HAND_ORDER.indexOf(actual.name)
+    ctx.game.voteScan('p1', 'category', category)
+    ctx.game.voteScan('p2', 'category', category)
+
+    const after = ctx.game.view()
+    assert.deepEqual(after.scan?.questions.map((q) => q.correct), [false, true])
+    assert.equal(after.showdown?.success, false)
+  })
+
+  it('이미 정해진 물음에는 다시 답할 수 없다', () => {
+    const ctx = gameWith([4])
+    for (let round = 0; round < 4; round++) passRound(ctx)
+    ctx.game.voteScan('p1', 'rank', 5)
+    ctx.game.voteScan('p2', 'rank', 5)
+    assert.equal(ctx.game.voteScan('p1', 'rank', 6).ok, false)
   })
 
   it('스캔이 없으면 바로 쇼다운이다', () => {

@@ -357,9 +357,9 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
       })
     })
 
-    socket.on('game:scanVote', ({ value }, ack) => {
+    socket.on('game:scanVote', ({ kind, value }, ack) => {
       withGame(ack, (game, code, playerId) => {
-        const result = game.voteScan(playerId, Number(value))
+        const result = game.voteScan(playerId, kind, Number(value))
         ack(result)
         if (result.ok) sendGame(code)
       })

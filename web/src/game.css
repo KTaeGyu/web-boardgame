@@ -835,6 +835,38 @@ button.token:hover:not(:disabled) {
  * 스캔 투표. 표가 서로 보이는 것이 핵심이다 — 말을 주고받을 수 없으니
  * 남이 무엇을 골랐는지 보면서 옮겨가야 만장일치에 닿는다.
  */
+/* 물음 하나. 둘이면 위아래로 쌓인다. */
+.scan-block + .scan-block {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.scan-block__title {
+  margin: 0 0 10px;
+  font-size: 14px;
+  color: var(--gold);
+  letter-spacing: 0.02em;
+}
+
+.scan-block__done {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.scan-block__done--ok {
+  background: rgba(212, 175, 55, 0.14);
+  color: var(--gold);
+}
+
+.scan-block__done--bad {
+  background: rgba(181, 69, 58, 0.14);
+  color: #e2a29a;
+}
+
 .scan-votes {
   display: grid;
   gap: 6px;
