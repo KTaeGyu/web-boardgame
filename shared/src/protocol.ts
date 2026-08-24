@@ -114,12 +114,14 @@ export interface ClientToServerEvents {
   'game:ready': (payload: { ready: boolean }, ack: (result: Result<null>) => void) => void
   /** 쇼다운을 보고 다음 판으로 넘어간다. 모두가 눌러야 넘어간다. */
   'game:continue': (ack: (result: Result<null>) => void) => void
+  /** 게임이 끝난 뒤 재경기. 한 명이라도 거절하면 방이 닫힌다. */
+  'game:rematch': (payload: { agree: boolean }, ack: (result: Result<null>) => void) => void
 }
 
 /** 서버 → 클라이언트. */
 export interface ServerToClientEvents {
   'room:updated': (room: RoomView) => void
-  'room:closed': (payload: { reason: 'empty' | 'hostClosed' }) => void
+  'room:closed': (payload: { reason: 'empty' | 'hostClosed' | 'rematchDeclined' }) => void
   'rooms:changed': (rooms: RoomSummary[]) => void
 
   /** 모두가 보는 상태. 누구의 홀카드도 들어 있지 않다. */

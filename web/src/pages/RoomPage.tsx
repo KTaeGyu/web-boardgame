@@ -23,6 +23,12 @@ export function RoomPage() {
 
   const [room, setRoom] = useState<RoomView | null>(null)
   const [error, setError] = useState('')
+  const [starting, setStarting] = useState(false)
+
+  // 판이 열리면 방에 있는 모두가 함께 테이블로 옮겨간다.
+  useEffect(() => {
+    if (room?.phase === 'playing') navigate(`/rooms/${code}/game`, { replace: true })
+  }, [room?.phase, code, navigate])
 
   /**
    * 들어오기. 처음 입장이든, 새로고침이든, 잠깐 끊겼다 돌아온 것이든 같은 요청이다.
@@ -96,6 +102,14 @@ export function RoomPage() {
   const host = room.players.find((player) => player.id === room.hostId)
   const iAmHost = room.hostId === playerId
   const enoughPlayers = room.players.length >= MIN_PLAYERS
+  const everyoneHere = room.players.every((player) => player.connected)
+
+  async function startGame() {
+    setStarting(true)
+    const result = await call<unknown>('game:start')
+    setStarting(false)
+    if (!result.ok) setError(result.message)
+  }
 
   return (
     <main className="page">
@@ -197,8 +211,13 @@ export function RoomPage() {
 
       <div className="room-footer">
         {iAmHost && (
-          <button type="button" className="btn btn--primary" disabled title="아직 준비 중입니다">
-            게임 시작
+          <button
+            type="button"
+            className="btn btn--primary"
+            disabled={!enoughPlayers || !everyoneHere || starting}
+            onClick={() => void startGame()}
+          >
+            {starting ? '차리는 중…' : '게임 시작'}
           </button>
         )}
         <button type="button" className="btn btn--danger" onClick={() => void leave()}>
@@ -206,6 +225,9 @@ export function RoomPage() {
         </button>
         {iAmHost && !enoughPlayers && (
           <p className="notice">최소 {MIN_PLAYERS}명이 모여야 시작할 수 있습니다.</p>
+        )}
+        {iAmHost && enoughPlayers && !everyoneHere && (
+          <p className="notice">자리를 비운 사람이 있습니다. 돌아오기를 기다려 주세요.</p>
         )}
       </div>
     </main>

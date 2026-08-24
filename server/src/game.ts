@@ -75,6 +75,8 @@ export class Game {
   private lockedUntil = new Map<number, number>()
   private showdown: ShowdownResult | null = null
   private continued = new Set<string>()
+  /** 재경기에 동의한 사람들. 아무도 손을 들지 않았으면 비어 있다. */
+  private rematchAgreed = new Set<string>()
 
   constructor(roomCode: string, players: StartingPlayer[], options: GameOptions = {}) {
     this.roomCode = roomCode
@@ -186,6 +188,34 @@ export class Game {
     return OK
   }
 
+  /**
+   * 재경기 합의. 처음 동의한 사람이 제안자가 되고, 나머지에게 물음이 뜬다.
+   * 한 명이라도 거절하면 방을 닫는다 — 그 판단은 소켓 계층이 실행한다.
+   */
+  proposeRematch(playerId: string, agree: boolean): Result<'pending' | 'restart' | 'declined'> {
+    if (this.phase !== 'gameOver') return err('WRONG_PHASE', '아직 게임이 끝나지 않았습니다.')
+    if (!this.seats.some((s) => s.id === playerId)) {
+      return err('NOT_IN_ROOM', '이 게임에 참여하고 있지 않습니다.')
+    }
+    if (!agree) return { ok: true, value: 'declined' }
+
+    this.rematchAgreed.add(playerId)
+    const waiting = this.seats.filter((s) => s.connected && !this.rematchAgreed.has(s.id))
+    if (waiting.length > 0) return { ok: true, value: 'pending' }
+
+    this.restart()
+    return { ok: true, value: 'restart' }
+  }
+
+  /** 같은 사람들로 처음부터. 금고와 경보를 지우고 첫 판을 다시 연다. */
+  private restart(): void {
+    this.heist = 0
+    this.vaults = 0
+    this.alarms = 0
+    this.rematchAgreed.clear()
+    this.startHeist()
+  }
+
   /** 끊긴 사람이 있으면 라운드가 넘어가지 않는다. 그 사실이 화면에 보여야 한다. */
   setConnected(playerId: string, connected: boolean): void {
     const seat = this.seats.find((s) => s.id === playerId)
@@ -288,6 +318,7 @@ export class Game {
       canConfirm: this.phase === 'picking' && this.everyoneHasToken(),
       showdown: this.showdown,
       outcome: this.outcome,
+      rematch: { proposed: this.rematchAgreed.size > 0, agreed: [...this.rematchAgreed] },
     }
   }
 }

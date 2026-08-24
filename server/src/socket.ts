@@ -258,6 +258,25 @@ export function attachGameServer(io: GameServer): { store: RoomStore; stop: () =
       })
     })
 
+    socket.on('game:rematch', ({ agree }, ack) => {
+      withGame(ack, (game, code, playerId) => {
+        const result = game.proposeRematch(playerId, Boolean(agree))
+        if (!result.ok) return ack(result)
+        ack({ ok: true, value: null })
+
+        if (result.value === 'declined') {
+          // 한 명이라도 거절하면 방을 접는다. 남은 사람끼리 어색하게 기다리지 않도록.
+          games.delete(code)
+          clearTimeout(unlockTimers.get(code))
+          unlockTimers.delete(code)
+          io.to(code).emit('room:closed', { reason: 'rematchDeclined' })
+          return
+        }
+        if (result.value === 'restart') announce(store.setPhase(code, 'playing'))
+        sendGame(code, { hands: result.value === 'restart' })
+      })
+    })
+
     socket.on('disconnect', () => {
       const playerId = playerOfSocket.get(socket.id)
       unbind(socket.id, playerId)

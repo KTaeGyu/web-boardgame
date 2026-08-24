@@ -76,6 +76,8 @@ export interface GameView {
   canConfirm: boolean
   showdown: ShowdownResult | null
   outcome: 'win' | 'lose' | null
+  /** 게임이 끝난 뒤의 재경기 합의. 아무도 제안하지 않았으면 proposed 가 false 다. */
+  rematch: { proposed: boolean; agreed: string[] }
 }
 
 /** 판이 끝나고 다음 판으로 넘어가기 전에 다들 결과를 볼 시간이 필요하다. */
