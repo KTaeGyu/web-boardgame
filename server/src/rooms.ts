@@ -216,10 +216,6 @@ export class RoomStore {
     if (next.pickedChallenges.some((id) => !READY_CHALLENGES.includes(id as ChallengeId))) {
       return err('INVALID_SETTINGS', '고를 수 없는 도전자 카드입니다.')
     }
-    if (next.mode === 'custom' && next.pickedChallenges.length === 0) {
-      return err('INVALID_SETTINGS', '직접 고르기에서는 도전자 카드를 하나 이상 골라야 합니다.')
-    }
-
     room.settings = { ...next, pickedChallenges: [...new Set(next.pickedChallenges)].sort((a, b) => a - b) }
     return ok(toView(room))
   }

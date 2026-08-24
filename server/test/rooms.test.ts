@@ -355,12 +355,13 @@ describe('방 설정', () => {
     if (result.ok) assert.deepEqual(result.value.settings.pickedChallenges, [2, 5])
   })
 
-  it('직접 고르기인데 아무것도 고르지 않으면 거절한다', () => {
+  it('직접 고르기로 옮기는 것 자체는 막지 않는다', () => {
+    // 고르는 도중에는 비어 있는 것이 자연스럽다. 막는 것은 시작하는 순간이다.
     const empty = ctx.store.updateSettings('p1', { mode: 'custom', pickedChallenges: [] })
-    assert.equal(empty.ok, false)
-    if (!empty.ok) assert.match(empty.message, /하나 이상/)
+    assert.equal(empty.ok, true)
+    if (empty.ok) assert.deepEqual(empty.value.settings.pickedChallenges, [])
 
-    assert.equal(ctx.store.updateSettings('p1', { mode: 'custom', pickedChallenges: [8] }).ok, true)
+    assert.equal(ctx.store.updateSettings('p1', { pickedChallenges: [8] }).ok, true)
   })
 
   it('돌려주는 설정은 복사본이라 밖에서 고쳐도 방이 오염되지 않는다', () => {

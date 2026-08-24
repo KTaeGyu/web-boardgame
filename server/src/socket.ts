@@ -243,6 +243,14 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
           message: `${MIN_PLAYERS}명부터 시작할 수 있습니다.`,
         })
       }
+      // 고르는 중에는 설정을 저장할 수 있게 두고, 시작하는 순간에 막는다.
+      if (room.settings.mode === 'custom' && room.settings.pickedChallenges.length === 0) {
+        return ack({
+          ok: false,
+          code: 'INVALID_SETTINGS',
+          message: '직접 고르기에서는 도전자 카드를 하나 이상 골라 주세요.',
+        })
+      }
       if (room.players.some((player) => !player.connected)) {
         return ack({
           ok: false,

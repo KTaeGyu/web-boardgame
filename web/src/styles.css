@@ -517,6 +517,13 @@ select {
   color: var(--ink-dim);
 }
 
+/* 설정이 아직 덜 됐다는 경고. 안내와 달리 붉은 쪽이다. */
+.notice--warn {
+  border-left-color: var(--danger);
+  background: rgba(181, 69, 58, 0.1);
+  color: #e2a29a;
+}
+
 /*
  * 좁은 화면에서는 방 만들기가 화면 아래에 붙는다. 손이 닿는 자리에 두고,
  * 목록을 훑는 동안에도 사라지지 않는다.

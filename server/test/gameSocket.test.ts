@@ -158,6 +158,29 @@ describe('판 시작', () => {
   })
 })
 
+describe('직접 고르기', () => {
+  it('카드를 고르지 않으면 시작 자체를 막는다', async () => {
+    const { host } = await seatThree()
+
+    // 고르는 도중에는 비어 있는 것이 자연스럽다. 설정을 옮기는 것 자체는 허용된다.
+    const moved = await call<unknown>(host.socket, 'room:settings', {
+      mode: 'custom',
+      pickedChallenges: [],
+    })
+    assert.equal(moved.ok, true)
+
+    const blocked = await call<GameView>(host.socket, 'game:start')
+    assert.equal(blocked.ok, false)
+    if (!blocked.ok) assert.match(blocked.message, /하나 이상 골라/)
+
+    // 한 장이라도 고르면 열린다.
+    unwrap(await call<unknown>(host.socket, 'room:settings', { pickedChallenges: [8] }))
+    const started = await call<GameView>(host.socket, 'game:start')
+    assert.equal(started.ok, true)
+    if (started.ok) assert.deepEqual(started.value.challenges, [8])
+  })
+})
+
 describe('은닉 정보', () => {
   it('손패는 주인에게만 간다', async () => {
     const { people, host } = await seatThree()

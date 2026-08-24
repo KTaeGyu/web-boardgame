@@ -136,6 +136,8 @@ export function RoomPage() {
   const iAmHost = room.hostId === playerId
   const enoughPlayers = room.players.length >= MIN_PLAYERS
   const everyoneHere = room.players.every((player) => player.connected)
+  // 직접 고르기인데 아무것도 고르지 않았다. 설정은 그대로 두고 시작만 막는다.
+  const needsCards = room.settings.mode === 'custom' && room.settings.pickedChallenges.length === 0
   // 내가 빠진 뒤의 인원으로 다음 방장을 미리 구한다. 서버가 실제로 쓰는 규칙과 같은 함수다.
   const successor = iAmHost ? nextHost(room.players.filter((player) => player.id !== playerId)) : null
 
@@ -200,16 +202,7 @@ export function RoomPage() {
                     name="mode"
                     checked={room.settings.mode === mode}
                     disabled={!iAmHost}
-                    onChange={() =>
-                      void change({
-                        mode: mode as GameMode,
-                        // 직접 고르기로 옮기면서 아무것도 고르지 않으면 서버가 거절한다.
-                        pickedChallenges:
-                          mode === 'custom' && room.settings.pickedChallenges.length === 0
-                            ? [READY_CHALLENGES[0]]
-                            : room.settings.pickedChallenges,
-                      })
-                    }
+                    onChange={() => void change({ mode: mode as GameMode })}
                   />
                   <span>
                     <b>{GAME_MODE_LABEL[mode]}</b>
@@ -266,6 +259,11 @@ export function RoomPage() {
         </section>
       </div>
 
+      {needsCards && (
+        <p className="notice notice--warn">
+          직접 고르기를 골랐습니다. 걸어 둘 도전자 카드를 하나 이상 골라야 시작할 수 있습니다.
+        </p>
+      )}
       {iAmHost && !enoughPlayers && (
         <p className="notice">최소 {MIN_PLAYERS}명이 모여야 시작할 수 있습니다.</p>
       )}
@@ -279,7 +277,7 @@ export function RoomPage() {
           <button
             type="button"
             className="btn btn--primary"
-            disabled={!enoughPlayers || !everyoneHere || starting}
+            disabled={!enoughPlayers || !everyoneHere || needsCards || starting}
             onClick={() => void startGame()}
           >
             {starting ? '차리는 중…' : '게임 시작'}
