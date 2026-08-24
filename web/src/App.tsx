@@ -5,9 +5,11 @@ import { RoomPage } from './pages/RoomPage.tsx'
 import { RoomsPage } from './pages/RoomsPage.tsx'
 import { GamePage } from './pages/GamePage.tsx'
 import { useConnected } from './lib/socket.ts'
+import { useViewportHeight } from './lib/useViewportHeight.ts'
 
 export function App() {
   const connected = useConnected()
+  useViewportHeight()
 
   return (
     <BrowserRouter>

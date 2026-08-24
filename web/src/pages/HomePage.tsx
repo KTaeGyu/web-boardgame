@@ -45,14 +45,14 @@ export function HomePage() {
   }
 
   return (
-    <main className="page page--narrow">
+    <main className="page page--narrow page--column">
       <header className="brand">
         <h1 className="brand__title">THE GANG</h1>
         <div className="brand__rule" />
         <p className="brand__sub">말하지 않고 맞추는 협력 포커</p>
       </header>
 
-      <form onSubmit={createRoom}>
+      <form className="home-form" onSubmit={createRoom}>
         <label className="field">
           <span className="field__label">닉네임</span>
           <input
@@ -66,7 +66,9 @@ export function HomePage() {
           <span className="field__hint">최대 {NICKNAME_MAX}자. 같은 이름이 있어도 괜찮습니다.</span>
         </label>
 
-        <div className="btn-row">
+        {error && <p className="error">{error}</p>}
+
+        <div className="btn-row home-form__actions">
           <button type="submit" className="btn btn--primary" disabled={busy}>
             {busy ? '만드는 중…' : '방 만들기'}
           </button>
@@ -75,8 +77,6 @@ export function HomePage() {
           </button>
         </div>
       </form>
-
-      {error && <p className="error">{error}</p>}
     </main>
   )
 }

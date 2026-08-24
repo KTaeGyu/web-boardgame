@@ -48,6 +48,28 @@ select {
   max-width: 420px;
 }
 
+/*
+ * 세로로 흐르는 화면. 내용이 적어도 바닥까지 채우고, 맨 아래 것은 바닥에 붙는다.
+ * 높이는 --app-height 를 쓴다 — 모바일에서 키보드가 올라오면 그만큼 줄어들어
+ * 아래 붙은 버튼이 키보드 위로 따라 올라온다. 값이 없으면 dvh 로 돌아간다.
+ */
+.page--column {
+  display: flex;
+  flex-direction: column;
+  min-height: var(--app-height, 100dvh);
+  padding-bottom: max(20px, env(safe-area-inset-bottom));
+}
+
+.home-form {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.home-form__actions {
+  margin-top: auto;
+}
+
 /* ── 표제 ─────────────────────────────── */
 .brand {
   text-align: center;
@@ -74,6 +96,25 @@ select {
   margin: 0;
   color: var(--ink-dim);
   font-size: 14px;
+}
+
+/*
+ * 좁은 화면에서는 표제가 자리를 양보한다. 키보드가 올라오면 더 줄어서
+ * 입력칸과 버튼이 함께 보이도록 한다.
+ */
+@media (max-width: 640px) {
+  .brand {
+    margin: clamp(12px, 6vh, 40px) 0 clamp(16px, 4vh, 32px);
+  }
+
+  .brand__title {
+    font-size: clamp(30px, 9vw, 44px);
+  }
+
+  /* 손가락으로 누르는 크기. 아래에 붙어 있으므로 넉넉해도 방해되지 않는다. */
+  .home-form__actions .btn {
+    min-height: 52px;
+  }
 }
 
 .section-title {
