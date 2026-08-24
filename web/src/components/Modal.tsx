@@ -20,13 +20,22 @@ export function ConfirmModal({
   onCancel,
   busy = false,
 }: Props) {
+  // 손이 마우스로 가지 않아도 끝낼 수 있게. Esc 는 물러나기, Enter 는 밀고 나가기.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onCancel()
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        onCancel()
+        return
+      }
+      if (event.key === 'Enter' && !busy) {
+        event.preventDefault()
+        onConfirm()
+      }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [onCancel])
+  }, [onCancel, onConfirm, busy])
 
   return (
     <div className="modal-backdrop" onClick={onCancel} role="presentation">

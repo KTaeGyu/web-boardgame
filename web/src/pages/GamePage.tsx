@@ -18,6 +18,7 @@ import { CardSlot, PlayingCard } from '../components/PlayingCard.tsx'
 import { Token, TokenBlank } from '../components/Token.tsx'
 import { getNickname, getPlayerId } from '../lib/identity.ts'
 import { call, socket, useServerEvent } from '../lib/socket.ts'
+import { useEscape } from '../lib/useEscape.ts'
 import { useTokenFlight } from '../lib/useTokenFlight.ts'
 
 /** 방이 닫힌 사유를 사람 말로. 아무 설명 없이 튕겨나가면 고장으로 느껴진다. */
@@ -97,6 +98,11 @@ export function GamePage() {
       socket.off('connect', enter)
     }
   }, [code, nickname, playerId, navigate])
+
+  useEscape(
+    !confirmLeave,
+    useCallback(() => setConfirmLeave(true), []),
+  )
 
   useServerEvent(
     'game:state',

@@ -13,6 +13,7 @@ import {
 import { ConfirmModal } from '../components/Modal.tsx'
 import { getNickname, getPlayerId } from '../lib/identity.ts'
 import { call, socket, useServerEvent } from '../lib/socket.ts'
+import { useEscape } from '../lib/useEscape.ts'
 
 /** 방이 닫힌 사유를 사람 말로. 아무 설명 없이 튕겨나가면 고장으로 느껴진다. */
 const CLOSED_MESSAGE: Record<string, string> = {
@@ -79,6 +80,11 @@ export function RoomPage() {
       },
       [code],
     ),
+  )
+
+  useEscape(
+    !confirmLeave,
+    useCallback(() => setConfirmLeave(true), []),
   )
 
   useServerEvent(
@@ -245,11 +251,7 @@ export function RoomPage() {
             {starting ? '차리는 중…' : '게임 시작'}
           </button>
         )}
-        <button
-          type="button"
-          className="btn btn--danger"
-          onClick={() => (iAmHost ? setConfirmLeave(true) : void leave())}
-        >
+        <button type="button" className="btn btn--danger" onClick={() => setConfirmLeave(true)}>
           방 나가기
         </button>
       </div>
@@ -262,15 +264,20 @@ export function RoomPage() {
           onConfirm={() => void leave()}
           onCancel={() => setConfirmLeave(false)}
         >
-          {successor ? (
-            <>
-              방장이 <strong>{successor.displayName}</strong>님에게 넘어갑니다.
-            </>
-          ) : (
-            '마지막 사람이라, 나가면 이 방은 사라집니다.'
-          )}
+          <LeaveMessage isHost={iAmHost} successorName={successor?.displayName} />
         </ConfirmModal>
       )}
     </main>
+  )
+}
+
+/** 나갈 때 무엇이 달라지는지. 방장인가에 따라 결과가 다르다. */
+function LeaveMessage({ isHost, successorName }: { isHost: boolean; successorName?: string }) {
+  if (!isHost) return <>대기실에서 나갑니다. 방 목록에서 다시 들어올 수 있습니다.</>
+  if (!successorName) return <>마지막 사람이라, 나가면 이 방은 사라집니다.</>
+  return (
+    <>
+      방장이 <strong>{successorName}</strong>님에게 넘어갑니다.
+    </>
   )
 }

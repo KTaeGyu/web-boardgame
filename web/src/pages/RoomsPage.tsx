@@ -6,6 +6,7 @@ import { ConfirmModal } from '../components/Modal.tsx'
 import { getNickname, getPlayerId } from '../lib/identity.ts'
 import { createRoom } from '../lib/rooms.ts'
 import { call, socket, useServerEvent } from '../lib/socket.ts'
+import { useEscape } from '../lib/useEscape.ts'
 
 export function RoomsPage() {
   const navigate = useNavigate()
@@ -41,6 +42,9 @@ export function RoomsPage() {
   }, [])
 
   useServerEvent('rooms:changed', useCallback((next: RoomSummary[]) => setRooms(next), []))
+
+  // 입장 확인창이 떠 있으면 Esc 는 그쪽 몫이다.
+  useEscape(asking === null, useCallback(() => navigate('/'), [navigate]))
 
   /** 여기까지 왔다는 것은 닉네임이 이미 있다는 뜻이라, 바로 방을 열 수 있다. */
   async function makeRoom() {
