@@ -212,6 +212,11 @@ export function GamePage() {
   revealsRef.current = game?.showdown?.reveals ?? []
   const successRef = useRef(false)
   successRef.current = game?.showdown?.success ?? false
+  /** 스캔을 틀렸는지. 순서가 맞았는데도 실패했다면 이유가 여기에 있다. */
+  const missedScanRef = useRef<('rank' | 'category')[]>([])
+  missedScanRef.current = (game?.scan?.questions ?? [])
+    .filter((question) => question.correct === false)
+    .map((question) => question.kind)
 
   useEffect(() => {
     for (const timer of timers.current) clearTimeout(timer)
@@ -241,7 +246,8 @@ export function GamePage() {
       setFinished(true)
       setFlash({
         key: 'final',
-        text: success ? '금고가 열렸습니다' : '경보가 울렸습니다',
+        // 스캔에 걸린 것이면 순서는 맞았을 수 있다. 무엇에 걸렸는지 짚어 준다.
+        text: success ? '금고가 열렸습니다' : failureText(missedScanRef.current),
         tone: success ? 'ok' : 'bad',
         final: true,
       })
@@ -550,6 +556,14 @@ export function GamePage() {
   )
 }
 
+const SCAN_NAME: Record<'rank' | 'category', string> = { rank: '망막', category: '지문' }
+
+/** 판이 실패한 이유. 스캔에 걸렸으면 순서가 맞았어도 실패이므로 그 사실을 알린다. */
+function failureText(missed: ('rank' | 'category')[]): string {
+  if (missed.length === 0) return '경보가 울렸습니다'
+  return `${missed.map((kind) => SCAN_NAME[kind]).join('·')} 스캔에 걸렸습니다!`
+}
+
 async function leave(navigate: ReturnType<typeof useNavigate>) {
   await call<null>('room:leave')
   navigate('/rooms')
@@ -658,7 +672,15 @@ function Showdown({ game, revealed, finished, playerId }: ShowdownProps) {
     <div className="showdown">
       <div className="showdown__panel">
         <h2 className="showdown__title">
-          {done ? (game.showdown?.success ? '금고가 열렸습니다' : '경보가 울렸습니다') : '공개 중…'}
+          {!done
+            ? '공개 중…'
+            : game.showdown?.success
+              ? '금고가 열렸습니다'
+              : failureText(
+                  (game.scan?.questions ?? [])
+                    .filter((question) => question.correct === false)
+                    .map((question) => question.kind),
+                )}
         </h2>
 
         <ol className="reveal-list">
