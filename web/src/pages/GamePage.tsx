@@ -208,8 +208,6 @@ export function GamePage() {
    * 공개 순서는 ref 로 읽는다. 의존성에 넣으면 누가 「다음 금고로」를 누를 때마다
    * 새 상태가 도착해 공개가 처음부터 다시 시작된다.
    */
-  /** 감지기 알림은 판마다 한 번만 띄운다. 상태가 다시 올 때마다 뜨면 곤란하다. */
-  const shownSensor = useRef('')
   const revealsRef = useRef(game?.showdown?.reveals ?? [])
   revealsRef.current = game?.showdown?.reveals ?? []
   const successRef = useRef(false)
@@ -256,22 +254,33 @@ export function GamePage() {
     }
   }, [showdownKey, revealCount, phase])
 
+  /**
+   * 감지기가 터지면 한 번 크게 알린다.
+   *
+   * 의존성은 키 하나뿐이다. sensor 객체는 상태가 올 때마다 새로 만들어지므로
+   * 그것에 매달면 매번 정리 함수가 돌아 타이머가 취소되고 글자가 남는다.
+   */
   const sensor = game?.sensor ?? null
   const sensorKey = sensor ? `${game?.heist}:${sensor.challenge}` : ''
+  const sensorRef = useRef(sensor)
+  sensorRef.current = sensor
 
   useEffect(() => {
-    if (!sensor || shownSensor.current === sensorKey) return
-    shownSensor.current = sensorKey
+    const fired = sensorRef.current
+    if (!fired) return
 
     setFlash({
       key: sensorKey,
-      text: `${CHALLENGES[sensor.challenge].name} 작동!`,
+      text: `${CHALLENGES[fired.challenge].name} 작동!`,
       tone: 'bad',
       final: true,
     })
-    const timer = setTimeout(() => setFlash((current) => (current?.key === sensorKey ? null : current)), FINAL_MS)
+    const timer = setTimeout(
+      () => setFlash((current) => (current?.key === sensorKey ? null : current)),
+      FINAL_MS,
+    )
     return () => clearTimeout(timer)
-  }, [sensor, sensorKey])
+  }, [sensorKey])
 
   async function take(token: number) {
     const result = await call<null>('game:take', { token })
@@ -498,7 +507,17 @@ export function GamePage() {
       />
 
       {game.showdown && game.phase !== 'scanning' && (
-        <Showdown game={game} revealed={revealed} flash={flash} finished={finished} playerId={playerId} />
+        <Showdown game={game} revealed={revealed} finished={finished} playerId={playerId} />
+      )}
+
+      {/* 쇼다운 밖에서도 뜬다. 감지기는 라운드 도중에 터진다. */}
+      {flash && (
+        <div
+          key={flash.key}
+          className={`verdict verdict--${flash.tone} ${flash.final ? 'verdict--final' : ''}`}
+        >
+          {flash.text}
+        </div>
       )}
 
       {confirmLeave && iAmHost && (
@@ -618,12 +637,11 @@ function TokenTrack({
 interface ShowdownProps {
   game: GameView
   revealed: number
-  flash: { key: string; text: string; tone: 'ok' | 'bad'; final?: boolean } | null
   finished: boolean
   playerId: string
 }
 
-function Showdown({ game, revealed, flash, finished, playerId }: ShowdownProps) {
+function Showdown({ game, revealed, finished, playerId }: ShowdownProps) {
   const navigate = useNavigate()
   const reveals = game.showdown?.reveals ?? []
   const done = finished
@@ -638,14 +656,6 @@ function Showdown({ game, revealed, flash, finished, playerId }: ShowdownProps) 
 
   return (
     <div className="showdown">
-      {flash && (
-        <div
-          key={flash.key}
-          className={`verdict verdict--${flash.tone} ${flash.final ? 'verdict--final' : ''}`}
-        >
-          {flash.text}
-        </div>
-      )}
       <div className="showdown__panel">
         <h2 className="showdown__title">
           {done ? (game.showdown?.success ? '금고가 열렸습니다' : '경보가 울렸습니다') : '공개 중…'}
