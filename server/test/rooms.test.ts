@@ -55,7 +55,7 @@ describe('방 만들기', () => {
     const result = store.createRoom('p1', '태규')
     assert.equal(result.ok, true)
     if (!result.ok) return
-    assert.deepEqual(result.value.settings, { penalties: [], mode: 'basic', maxPlayers: 6 })
+    assert.deepEqual(result.value.settings, { mode: 'basic', pickedChallenges: [], maxPlayers: 6 })
   })
 
   it('다른 방에 있던 사람이 방을 만들면 이전 방에서 빠진다', () => {
@@ -346,20 +346,28 @@ describe('방 설정', () => {
 
   it('모르는 모드나 패널티는 거절한다', () => {
     assert.equal(ctx.store.updateSettings('p1', { mode: 'ultra' as never }).ok, false)
-    assert.equal(ctx.store.updateSettings('p1', { penalties: ['없는패널티' as never] }).ok, false)
+    assert.equal(ctx.store.updateSettings('p1', { pickedChallenges: [99 as never] }).ok, false)
   })
 
-  it('같은 패널티를 여러 번 넣어도 한 번만 남는다', () => {
-    const result = ctx.store.updateSettings('p1', { penalties: ['retinaScan', 'retinaScan'] })
+  it('같은 도전자 카드를 여러 번 넣어도 한 번만 남는다', () => {
+    const result = ctx.store.updateSettings('p1', { pickedChallenges: [2, 2, 5] })
     assert.equal(result.ok, true)
-    if (result.ok) assert.deepEqual(result.value.settings.penalties, ['retinaScan'])
+    if (result.ok) assert.deepEqual(result.value.settings.pickedChallenges, [2, 5])
+  })
+
+  it('직접 고르기인데 아무것도 고르지 않으면 거절한다', () => {
+    const empty = ctx.store.updateSettings('p1', { mode: 'custom', pickedChallenges: [] })
+    assert.equal(empty.ok, false)
+    if (!empty.ok) assert.match(empty.message, /하나 이상/)
+
+    assert.equal(ctx.store.updateSettings('p1', { mode: 'custom', pickedChallenges: [8] }).ok, true)
   })
 
   it('돌려주는 설정은 복사본이라 밖에서 고쳐도 방이 오염되지 않는다', () => {
-    const result = ctx.store.updateSettings('p1', { penalties: ['retinaScan'] })
+    const result = ctx.store.updateSettings('p1', { pickedChallenges: [2] })
     assert.equal(result.ok, true)
     if (!result.ok) return
-    result.value.settings.penalties.push('quickAccess')
-    assert.deepEqual(ctx.store.view(code)?.settings.penalties, ['retinaScan'])
+    result.value.settings.pickedChallenges.push(5)
+    assert.deepEqual(ctx.store.view(code)?.settings.pickedChallenges, [2])
   })
 })

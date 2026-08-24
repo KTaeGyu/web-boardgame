@@ -6,10 +6,11 @@
  */
 
 import type { Card } from './cards.ts'
+import type { ChallengeId } from './extraCards.ts'
 import type { GameOverReason, GameView } from './game.ts'
 
 /** 방 설정. 지금은 기본값 고정으로 시작하고, UI 는 자리만 잡아둔다. */
-export const GAME_MODES = ['basic', 'advanced', 'professional', 'masterThief'] as const
+export const GAME_MODES = ['basic', 'advanced', 'professional', 'masterThief', 'custom'] as const
 export type GameMode = (typeof GAME_MODES)[number]
 
 export const GAME_MODE_LABEL: Record<GameMode, string> = {
@@ -17,30 +18,30 @@ export const GAME_MODE_LABEL: Record<GameMode, string> = {
   advanced: '고급 모드',
   professional: '프로 모드',
   masterThief: '마스터 시프 모드',
+  custom: '직접 고르기',
 }
 
-/** 원작의 챌린지 카드에 해당한다. 아직 게임 로직에 연결되지 않았다. */
-export const PENALTIES = ['quickAccess', 'retinaScan', 'fingerprintScan'] as const
-export type Penalty = (typeof PENALTIES)[number]
-
-export const PENALTY_LABEL: Record<Penalty, string> = {
-  quickAccess: '빠른 접근',
-  retinaScan: '망막 스캔',
-  fingerprintScan: '지문 스캔',
+export const GAME_MODE_HINT: Record<GameMode, string> = {
+  basic: '도전자·해결사 카드 없이 순수한 규칙으로.',
+  advanced: '성공하면 도전자 카드, 실패하면 해결사 카드가 붙습니다.',
+  professional: '도전자 한 장이 게임 내내 붙어 있고, 그 위에 고급 모드가 얹힙니다.',
+  masterThief: '도전자 두 장이 언제나 걸립니다. 해결사는 없고 경보 두 번이면 끝납니다.',
+  custom: '원하는 도전자 카드를 골라 모든 판에 걸어 둡니다.',
 }
 
 export const MIN_PLAYERS = 3
 export const MAX_PLAYERS_LIMIT = 10
 
 export interface RoomSettings {
-  penalties: Penalty[]
   mode: GameMode
+  /** 「직접 고르기」에서 고른 도전자 카드. 다른 모드에서는 쓰이지 않는다. */
+  pickedChallenges: ChallengeId[]
   maxPlayers: number
 }
 
 export const DEFAULT_SETTINGS: RoomSettings = {
-  penalties: [],
   mode: 'basic',
+  pickedChallenges: [],
   maxPlayers: 6,
 }
 

@@ -7,11 +7,15 @@
  */
 
 import type { Card } from './cards.ts'
+import type { ChallengeId, SpecialistId } from './extraCards.ts'
+import type { GameMode } from './protocol.ts'
 import type { ShowdownResult } from './showdown.ts'
 
 /** 금고 3개면 승리, 경보 3개면 패배. 그래서 한 게임은 최대 5판이다. */
 export const VAULTS_TO_WIN = 3
 export const ALARMS_TO_LOSE = 3
+/** 마스터 시프 모드는 경보 카드 하나를 빼고 시작한다. 두 번이면 끝이다. */
+export const ALARMS_TO_LOSE_MASTER = 2
 
 /** 라운드는 넷. 프리플롭 → 플롭 → 턴 → 리버. */
 export const ROUNDS = [1, 2, 3, 4] as const
@@ -60,8 +64,25 @@ export interface GamePlayerView {
   hole: Card[] | null
 }
 
+/** 해결사 카드가 카드를 나눠주자마자 알려주는 정보. */
+export interface Announcement {
+  playerId: string
+  text: string
+}
+
 export interface GameView {
   roomCode: string
+  mode: GameMode
+  /** 모드에 따라 다르다. 마스터 시프는 2다. */
+  alarmsToLose: number
+  /** 이번 판에 걸려 있는 도전자 카드. 프로 모드는 판 내내 유지되는 것이 하나 더 있다. */
+  challenges: ChallengeId[]
+  /** 이번 판에 쓸 수 있는 해결사 카드. */
+  specialist: SpecialistId | null
+  /** 해결사가 공개한 정보. 판이 바뀌면 사라진다. */
+  announcements: Announcement[]
+  /** 한 사람이 받은 카드 수. 「보안 카메라」가 걸리면 3장이다. */
+  holeCount: number
   /** 몇 번째 판인가. 1부터 센다. */
   heist: number
   vaults: number

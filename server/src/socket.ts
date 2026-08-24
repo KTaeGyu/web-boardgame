@@ -252,7 +252,11 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
       }
 
       store.touch(code)
-      const game = new Game(code, room.players.map((p) => ({ ...p })))
+      const game = new Game(
+        code,
+        room.players.map((p) => ({ ...p })),
+        { mode: room.settings.mode, pickedChallenges: room.settings.pickedChallenges },
+      )
       games.set(code, game)
       announce(store.setPhase(code, 'playing'))
       ack({ ok: true, value: game.view() })

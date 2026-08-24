@@ -10,12 +10,12 @@ import {
   GAME_MODES,
   MAX_PLAYERS_LIMIT,
   MIN_PLAYERS,
-  PENALTIES,
+  READY_CHALLENGES,
   displayNames,
   nextHost as pickNextHost,
   type ErrorCode,
   type GameMode,
-  type Penalty,
+  type ChallengeId,
   type Result,
   type RoomPhase,
   type RoomSettings,
@@ -91,7 +91,7 @@ export class RoomStore {
       code,
       hostId: playerId,
       players: [{ id: playerId, nickname, connected: true, disconnectedAt: null, joinedAt: now }],
-      settings: { ...DEFAULT_SETTINGS, penalties: [] },
+      settings: { ...DEFAULT_SETTINGS, pickedChallenges: [] },
       phase: 'lobby',
       createdAt: now,
       lastActivityAt: now,
@@ -213,11 +213,14 @@ export class RoomStore {
     if (next.maxPlayers < room.players.length) {
       return err('INVALID_SETTINGS', '이미 들어와 있는 인원보다 적게 줄일 수 없습니다.')
     }
-    if (next.penalties.some((p) => !PENALTIES.includes(p as Penalty))) {
-      return err('INVALID_SETTINGS', '알 수 없는 패널티입니다.')
+    if (next.pickedChallenges.some((id) => !READY_CHALLENGES.includes(id as ChallengeId))) {
+      return err('INVALID_SETTINGS', '고를 수 없는 도전자 카드입니다.')
+    }
+    if (next.mode === 'custom' && next.pickedChallenges.length === 0) {
+      return err('INVALID_SETTINGS', '직접 고르기에서는 도전자 카드를 하나 이상 골라야 합니다.')
     }
 
-    room.settings = { ...next, penalties: [...new Set(next.penalties)] }
+    room.settings = { ...next, pickedChallenges: [...new Set(next.pickedChallenges)].sort((a, b) => a - b) }
     return ok(toView(room))
   }
 
@@ -290,7 +293,7 @@ function toView(room: Room): RoomView {
       isHost: p.id === room.hostId,
       connected: p.connected,
     })),
-    settings: { ...room.settings, penalties: [...room.settings.penalties] },
+    settings: { ...room.settings, pickedChallenges: [...room.settings.pickedChallenges] },
     phase: room.phase,
   }
 }

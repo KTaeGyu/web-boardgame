@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
+  CHALLENGES,
   GAME_MODES,
+  GAME_MODE_HINT,
   GAME_MODE_LABEL,
   MIN_PLAYERS,
-  PENALTIES,
-  PENALTY_LABEL,
+  READY_CHALLENGES,
   nextHost,
+  type ChallengeId,
+  type GameMode,
   type RoomView,
 } from '@the-gang/shared'
 
@@ -23,9 +26,6 @@ const CLOSED_MESSAGE: Record<string, string> = {
   hostClosed: '방장이 방을 닫았습니다.',
 }
 
-/** 설정은 게임 규칙이 붙은 뒤에 열 것이다. 지금은 자리만 잡아두고 잠가 둔다. */
-const SETTINGS_LOCKED = true
-
 export function RoomPage() {
   const { code = '' } = useParams()
   const navigate = useNavigate()
@@ -36,6 +36,18 @@ export function RoomPage() {
   const [error, setError] = useState('')
   const [starting, setStarting] = useState(false)
   const [confirmLeave, setConfirmLeave] = useState(false)
+
+  /** 설정 바꾸기는 방장만 할 수 있다. 거절 사유는 그대로 보여준다. */
+  async function change(patch: Partial<RoomView['settings']>) {
+    const result = await call<RoomView>('room:settings', patch)
+    if (!result.ok) setError(result.message)
+    else setError('')
+  }
+
+  function toggleChallenge(id: ChallengeId, picked: ChallengeId[]) {
+    const next = picked.includes(id) ? picked.filter((x) => x !== id) : [...picked, id]
+    void change({ pickedChallenges: next })
+  }
 
   // 판이 열리면 방에 있는 모두가 함께 테이블로 옮겨간다.
   useEffect(() => {
@@ -174,61 +186,83 @@ export function RoomPage() {
           <h2 className="section-title">게임 설정</h2>
 
           <div className="setting">
-            <span className="setting__label">패널티</span>
-            <div className="choice-row">
-              {PENALTIES.map((penalty) => (
-                <label key={penalty} className={`choice ${SETTINGS_LOCKED ? 'choice--locked' : ''}`}>
-                  <input
-                    type="checkbox"
-                    checked={room.settings.penalties.includes(penalty)}
-                    disabled={SETTINGS_LOCKED || !iAmHost}
-                    readOnly
-                  />
-                  {PENALTY_LABEL[penalty]}
-                </label>
-              ))}
-            </div>
-          </div>
-
-          <div className="setting">
             <span className="setting__label">진행 방식</span>
-            <div className="choice-row">
+            <div className="choice-col">
               {GAME_MODES.map((mode) => (
                 <label
                   key={mode}
-                  className={`choice ${room.settings.mode === mode ? 'choice--on' : ''} ${
-                    SETTINGS_LOCKED ? 'choice--locked' : ''
+                  className={`choice choice--wide ${room.settings.mode === mode ? 'choice--on' : ''} ${
+                    iAmHost ? '' : 'choice--locked'
                   }`}
                 >
                   <input
                     type="radio"
                     name="mode"
                     checked={room.settings.mode === mode}
-                    disabled={SETTINGS_LOCKED || !iAmHost}
-                    readOnly
+                    disabled={!iAmHost}
+                    onChange={() =>
+                      void change({
+                        mode: mode as GameMode,
+                        // 직접 고르기로 옮기면서 아무것도 고르지 않으면 서버가 거절한다.
+                        pickedChallenges:
+                          mode === 'custom' && room.settings.pickedChallenges.length === 0
+                            ? [READY_CHALLENGES[0]]
+                            : room.settings.pickedChallenges,
+                      })
+                    }
                   />
-                  {GAME_MODE_LABEL[mode]}
+                  <span>
+                    <b>{GAME_MODE_LABEL[mode]}</b>
+                    <em className="choice__hint">{GAME_MODE_HINT[mode]}</em>
+                  </span>
                 </label>
               ))}
             </div>
           </div>
+
+          {room.settings.mode === 'custom' && (
+            <div className="setting">
+              <span className="setting__label">
+                걸어 둘 도전자 카드 ({room.settings.pickedChallenges.length}장)
+              </span>
+              <div className="choice-col">
+                {READY_CHALLENGES.map((id) => (
+                  <label
+                    key={id}
+                    className={`choice choice--wide ${
+                      room.settings.pickedChallenges.includes(id) ? 'choice--on' : ''
+                    } ${iAmHost ? '' : 'choice--locked'}`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={room.settings.pickedChallenges.includes(id)}
+                      disabled={!iAmHost}
+                      onChange={() => toggleChallenge(id, room.settings.pickedChallenges)}
+                    />
+                    <span>
+                      <b>{CHALLENGES[id].name}</b>
+                      <em className="choice__hint">{CHALLENGES[id].text}</em>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="setting">
             <span className="setting__label">최대 인원</span>
             <input
               className="number-input"
               type="number"
+              min={MIN_PLAYERS}
+              max={10}
               value={room.settings.maxPlayers}
-              disabled={SETTINGS_LOCKED || !iAmHost}
-              readOnly
+              disabled={!iAmHost}
+              onChange={(event) => void change({ maxPlayers: Number(event.target.value) })}
             />
           </div>
 
-          <p className="notice">
-            {iAmHost
-              ? '지금은 기본 설정으로 고정되어 있습니다. 게임 규칙이 붙으면 방장이 바꿀 수 있습니다.'
-              : '설정은 방장만 바꿀 수 있습니다.'}
-          </p>
+          {!iAmHost && <p className="notice">설정은 방장만 바꿀 수 있습니다.</p>}
         </section>
       </div>
 

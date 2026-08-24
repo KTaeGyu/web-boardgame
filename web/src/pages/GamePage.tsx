@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
-  ALARMS_TO_LOSE,
+  CHALLENGES,
   ROUNDS,
   ROUND_LABEL,
   TOKEN_LOCK_MS,
+  SPECIALISTS,
   VAULTS_TO_WIN,
   bestHolding,
   type Card,
@@ -248,7 +249,7 @@ export function GamePage() {
             ))}
           </span>
           <span className="mark-row">
-            {Array.from({ length: ALARMS_TO_LOSE }, (_, i) => (
+            {Array.from({ length: game.alarmsToLose }, (_, i) => (
               <i key={`a${i}`} className={`mark mark--alarm ${i < game.alarms ? 'mark--on' : ''}`} />
             ))}
           </span>
@@ -260,6 +261,33 @@ export function GamePage() {
           나가기
         </button>
       </header>
+
+      {(game.challenges.length > 0 || game.specialist !== null) && (
+        <section className="extras">
+          {game.challenges.map((id) => (
+            <article key={`c${id}`} className="extra extra--challenge">
+              <span className="extra__kind">도전자</span>
+              <b className="extra__name">{CHALLENGES[id].name}</b>
+              <span className="extra__text">{CHALLENGES[id].text}</span>
+            </article>
+          ))}
+          {game.specialist !== null && (
+            <article className="extra extra--specialist">
+              <span className="extra__kind">해결사</span>
+              <b className="extra__name">{SPECIALISTS[game.specialist].name}</b>
+              <span className="extra__text">{SPECIALISTS[game.specialist].text}</span>
+            </article>
+          )}
+        </section>
+      )}
+
+      {game.announcements.length > 0 && (
+        <ul className="announcements">
+          {game.announcements.map((item) => (
+            <li key={item.playerId}>{item.text}</li>
+          ))}
+        </ul>
+      )}
 
       {waitingFor.length > 0 && (
         <p className="game-waiting">

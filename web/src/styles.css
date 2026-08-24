@@ -418,6 +418,28 @@ select {
   gap: 8px;
 }
 
+/* 설명이 딸린 선택지는 세로로 쌓아야 읽힌다. */
+.choice-col {
+  display: grid;
+  gap: 8px;
+}
+
+.choice--wide {
+  align-items: flex-start;
+  width: 100%;
+  text-align: left;
+}
+
+.choice__hint {
+  display: block;
+  margin-top: 3px;
+  font-size: 12px;
+  font-style: normal;
+  color: var(--ink-dim);
+  line-height: 1.45;
+  word-break: keep-all;
+}
+
 .choice {
   display: inline-flex;
   align-items: center;

@@ -107,6 +107,86 @@
   font-size: 14px;
 }
 
+/*
+ * 이번 판에 걸린 카드. 무엇이 달라졌는지 판 내내 보여야 한다 —
+ * 한 번 읽고 사라지면 규칙을 기억에 맡기게 된다.
+ */
+.extras {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 10px;
+}
+
+.extra {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 10px;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-left-width: 3px;
+  border-radius: 8px;
+  background: var(--card);
+}
+
+.extra--challenge {
+  border-left-color: var(--danger);
+}
+
+.extra--specialist {
+  border-left-color: var(--gold);
+}
+
+.extra__kind {
+  align-self: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
+.extra--challenge .extra__kind {
+  background: rgba(181, 69, 58, 0.2);
+  color: #e2a29a;
+}
+
+.extra--specialist .extra__kind {
+  background: rgba(212, 175, 55, 0.18);
+  color: var(--gold);
+}
+
+.extra__name {
+  align-self: center;
+  font-size: 15px;
+}
+
+.extra__text {
+  grid-column: 1 / -1;
+  font-size: 13px;
+  color: var(--ink-dim);
+  line-height: 1.45;
+  word-break: keep-all;
+}
+
+/* 해결사가 카드를 나눠주자마자 밝힌 것들. */
+.announcements {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.announcements li {
+  padding: 5px 12px;
+  border: 1px solid var(--gold-dim);
+  border-radius: 999px;
+  background: rgba(212, 175, 55, 0.08);
+  font-size: 13px;
+  color: var(--gold);
+}
+
 /* ── 상대 자리 ────────────────────────── */
 .seats {
   display: grid;
