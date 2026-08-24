@@ -7,8 +7,6 @@ import {
   GAME_MODE_LABEL,
   MIN_PLAYERS,
   READY_CHALLENGES,
-  READY_SPECIALISTS,
-  SPECIALISTS,
   nextHost,
   type ChallengeId,
   type SpecialistId,
@@ -17,6 +15,7 @@ import {
 } from '@the-gang/shared'
 
 import { CardPicker } from '../components/CardPicker.tsx'
+import { SpecialistGrid } from '../components/SpecialistGrid.tsx'
 import { ConfirmModal } from '../components/Modal.tsx'
 import { getNickname, getPlayerId } from '../lib/identity.ts'
 import { call, socket, useServerEvent } from '../lib/socket.ts'
@@ -53,10 +52,7 @@ export function RoomPage() {
     void change({ pickedChallenges: next })
   }
 
-  function toggleSpecialist(id: SpecialistId, picked: SpecialistId[]) {
-    const next = picked.includes(id) ? picked.filter((x) => x !== id) : [...picked, id]
-    void change({ pickedSpecialists: next })
-  }
+
 
   // 판이 열리면 방에 있는 모두가 함께 테이블로 옮겨간다.
   useEffect(() => {
@@ -149,7 +145,7 @@ export function RoomPage() {
   const needsCards =
     room.settings.mode === 'custom' &&
     room.settings.pickedChallenges.length === 0 &&
-    room.settings.pickedSpecialists.length === 0
+    room.settings.specialistRounds.every((id) => id === null)
   // 내가 빠진 뒤의 인원으로 다음 방장을 미리 구한다. 서버가 실제로 쓰는 규칙과 같은 함수다.
   const successor = iAmHost ? nextHost(room.players.filter((player) => player.id !== playerId)) : null
 
@@ -228,17 +224,10 @@ export function RoomPage() {
                 onToggle={(id) => toggleChallenge(id as ChallengeId, room.settings.pickedChallenges)}
               />
 
-              <CardPicker
-                label={`해결사 카드 (${room.settings.pickedSpecialists.length}장)`}
-                hint="한 판에 하나뿐이라 고른 것들이 판마다 차례로 나옵니다."
-                options={READY_SPECIALISTS.map((id) => ({
-                  id,
-                  name: SPECIALISTS[id].name,
-                  text: SPECIALISTS[id].text,
-                }))}
-                picked={room.settings.pickedSpecialists}
+              <SpecialistGrid
+                rounds={room.settings.specialistRounds}
                 disabled={!iAmHost}
-                onToggle={(id) => toggleSpecialist(id as SpecialistId, room.settings.pickedSpecialists)}
+                onChange={(specialistRounds) => void change({ specialistRounds })}
               />
             </>
           )}

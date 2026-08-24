@@ -17,6 +17,14 @@ export const ALARMS_TO_LOSE = 3
 /** 마스터 시프 모드는 경보 카드 하나를 빼고 시작한다. 두 번이면 끝이다. */
 export const ALARMS_TO_LOSE_MASTER = 2
 
+/**
+ * 「직접 고르기」에서 해결사를 앉힐 수 있는 자리의 수 = 한 게임의 최대 판수.
+ *
+ * 금고 2개와 경보 2번까지는 게임이 이어지고, 다섯째 판에서 어느 쪽이든 결판난다.
+ * 그래서 여섯째 자리는 있어도 쓰이지 않는다.
+ */
+export const SPECIALIST_ROUNDS = VAULTS_TO_WIN + ALARMS_TO_LOSE - 1
+
 /** 라운드는 넷. 프리플롭 → 플롭 → 턴 → 리버. */
 export const ROUNDS = [1, 2, 3, 4] as const
 export type Round = (typeof ROUNDS)[number]

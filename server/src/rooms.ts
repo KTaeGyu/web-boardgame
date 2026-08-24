@@ -12,7 +12,9 @@ import {
   MIN_PLAYERS,
   READY_CHALLENGES,
   READY_SPECIALISTS,
+  SPECIALIST_ROUNDS,
   displayNames,
+  emptyRounds,
   nextHost as pickNextHost,
   type ErrorCode,
   type GameMode,
@@ -93,7 +95,7 @@ export class RoomStore {
       code,
       hostId: playerId,
       players: [{ id: playerId, nickname, connected: true, disconnectedAt: null, joinedAt: now }],
-      settings: { ...DEFAULT_SETTINGS, pickedChallenges: [], pickedSpecialists: [] },
+      settings: { ...DEFAULT_SETTINGS, pickedChallenges: [], specialistRounds: emptyRounds() },
       phase: 'lobby',
       createdAt: now,
       lastActivityAt: now,
@@ -218,13 +220,23 @@ export class RoomStore {
     if (next.pickedChallenges.some((id) => !READY_CHALLENGES.includes(id as ChallengeId))) {
       return err('INVALID_SETTINGS', '고를 수 없는 도전자 카드입니다.')
     }
-    if (next.pickedSpecialists.some((id) => !READY_SPECIALISTS.includes(id as SpecialistId))) {
+    // 자리 하나가 판 하나다. 길이가 어긋나면 몇 번째 판인지가 통째로 밀린다.
+    if (next.specialistRounds.length !== SPECIALIST_ROUNDS) {
+      return err('INVALID_SETTINGS', '해결사 자리는 판마다 하나씩입니다.')
+    }
+    const placed = next.specialistRounds.filter((id): id is SpecialistId => id !== null)
+    if (placed.some((id) => !READY_SPECIALISTS.includes(id))) {
       return err('INVALID_SETTINGS', '고를 수 없는 해결사 카드입니다.')
+    }
+    // 한 장은 한 판에만. 같은 카드가 두 판에 앉으면 「썼는가」가 판을 넘나든다.
+    if (new Set(placed).size !== placed.length) {
+      return err('INVALID_SETTINGS', '같은 해결사 카드를 두 판에 놓을 수 없습니다.')
     }
     room.settings = {
       ...next,
       pickedChallenges: [...new Set(next.pickedChallenges)].sort((a, b) => a - b),
-      pickedSpecialists: [...new Set(next.pickedSpecialists)].sort((a, b) => a - b),
+      // 정렬하지 않는다 — 여기서는 자리가 곧 뜻이다.
+      specialistRounds: [...next.specialistRounds],
     }
     return ok(toView(room))
   }
@@ -301,7 +313,7 @@ function toView(room: Room): RoomView {
     settings: {
       ...room.settings,
       pickedChallenges: [...room.settings.pickedChallenges],
-      pickedSpecialists: [...room.settings.pickedSpecialists],
+      specialistRounds: [...room.settings.specialistRounds],
     },
     phase: room.phase,
   }

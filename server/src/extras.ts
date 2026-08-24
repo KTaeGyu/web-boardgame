@@ -63,19 +63,24 @@ export class ExtraDealer {
   private standing: ChallengeId[] = []
   /** 「직접 고르기」에서 방장이 고른 도전자. 모든 판에 그대로 걸린다. */
   private readonly picked: ChallengeId[]
-  /** 고른 해결사. 한 판에 하나뿐이라 판마다 차례로 돌아간다. */
-  private readonly pickedSpecialists: Stack<SpecialistId>
+  /**
+   * 「직접 고르기」에서 방장이 짠 배치. 자리 하나가 판 하나다.
+   * 비어 있는 판은 해결사 없이 지나간다 — 빈칸도 뜻이 있다.
+   */
+  private readonly specialistRounds: readonly (SpecialistId | null)[]
+  /** 지금 몇 번째 판인가. 배치표에서 자리를 짚는 데만 쓴다. */
+  private heist = 0
 
   constructor(
     mode: GameMode,
     rng: () => number,
     picked: readonly ChallengeId[] = [],
-    pickedSpecialists: readonly SpecialistId[] = [],
+    specialistRounds: readonly (SpecialistId | null)[] = [],
   ) {
     this.mode = mode
     this.rng = rng
     this.picked = [...picked]
-    this.pickedSpecialists = new Stack(pickedSpecialists)
+    this.specialistRounds = [...specialistRounds]
 
     // 프로·마스터 시프에서는 「빠른 접근」을 쓰지 않는다. 라운드를 통째로 건너뛰어
     // 다른 카드와 겹칠 때 규칙이 서로 부딪히기 때문이다.
@@ -100,12 +105,16 @@ export class ExtraDealer {
    * @param lastSuccess 직전 판의 결과. 첫 판이면 null 이고 아무것도 걸리지 않는다.
    */
   next(lastSuccess: boolean | null): ExtraSelection {
+    this.heist += 1
     if (this.mode === 'basic') return { challenges: [], specialist: null }
 
     // 직접 고르기는 뽑기가 없다. 도전자는 고른 것이 처음부터 끝까지 그대로 걸리고,
-    // 해결사는 한 판에 하나뿐이라 고른 것들이 판마다 차례로 나온다.
+    // 해결사는 방장이 짠 배치표에서 이번 판 자리를 그대로 읽는다.
     if (this.mode === 'custom') {
-      return { challenges: [...this.picked], specialist: this.pickedSpecialists.draw() }
+      return {
+        challenges: [...this.picked],
+        specialist: this.specialistRounds[this.heist - 1] ?? null,
+      }
     }
 
     if (this.mode === 'masterThief') {

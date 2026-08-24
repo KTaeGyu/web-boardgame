@@ -7,6 +7,7 @@
 
 import type { Card } from './cards.ts'
 import type { ChallengeId, SpecialistId } from './extraCards.ts'
+import { SPECIALIST_ROUNDS } from './game.ts'
 import type { GameOverReason, GameView } from './game.ts'
 
 /** 방 설정. 지금은 기본값 고정으로 시작하고, UI 는 자리만 잡아둔다. */
@@ -26,7 +27,7 @@ export const GAME_MODE_HINT: Record<GameMode, string> = {
   advanced: '성공하면 도전자 카드, 실패하면 해결사 카드가 붙습니다.',
   professional: '도전자 한 장이 게임 내내 붙어 있고, 그 위에 고급 모드가 얹힙니다.',
   masterThief: '도전자 두 장이 언제나 걸립니다. 해결사는 없고 경보 두 번이면 끝납니다.',
-  custom: '원하는 카드를 직접 고릅니다. 도전자는 모든 판에 걸리고, 해결사는 판마다 차례로 나옵니다.',
+  custom: '원하는 카드를 직접 고릅니다. 도전자는 모든 판에 걸리고, 해결사는 판을 지정해 둡니다.',
 }
 
 export const MIN_PLAYERS = 3
@@ -37,17 +38,25 @@ export interface RoomSettings {
   /** 「직접 고르기」에서 고른 도전자 카드. 다른 모드에서는 쓰이지 않는다. */
   pickedChallenges: ChallengeId[]
   /**
-   * 「직접 고르기」에서 고른 해결사 카드.
-   * 한 판에 걸리는 해결사는 하나뿐이므로, 고른 것들이 판마다 차례로 나온다.
+   * 「직접 고르기」에서 판마다 걸릴 해결사. **자리 하나가 판 하나다** —
+   * `[null, null, 10, null, null]` 이면 셋째 판에만 「근육」이 나오고 나머지 판은 비어 있다.
+   *
+   * 한 판에 걸리는 해결사는 하나뿐이라 자리마다 한 장이고, 한 장이 여러 판에
+   * 나뉠 수도 없어 같은 카드가 두 자리에 앉지 않는다. 길이는 늘 SPECIALIST_ROUNDS 다.
    */
-  pickedSpecialists: SpecialistId[]
+  specialistRounds: (SpecialistId | null)[]
   maxPlayers: number
+}
+
+/** 빈 자리 다섯. 설정을 새로 만들 때마다 새 배열이어야 방끼리 섞이지 않는다. */
+export function emptyRounds(): (SpecialistId | null)[] {
+  return Array.from({ length: SPECIALIST_ROUNDS }, () => null)
 }
 
 export const DEFAULT_SETTINGS: RoomSettings = {
   mode: 'basic',
   pickedChallenges: [],
-  pickedSpecialists: [],
+  specialistRounds: emptyRounds(),
   maxPlayers: 6,
 }
 

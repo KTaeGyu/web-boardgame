@@ -198,18 +198,33 @@ describe('직접 고르기', () => {
     assert.equal(view.holeCount, 3, '보안 카메라')
   })
 
-  it('고른 해결사가 판마다 차례로 나온다', () => {
-    const dealer = new ExtraDealer('custom', mulberry32(1), [2], [3, 10])
+  it('해결사는 방장이 앉힌 판에 그대로 나온다', () => {
+    const dealer = new ExtraDealer('custom', mulberry32(1), [2], [3, null, 10, null, null])
     assert.equal(dealer.next(null).specialist, 3, '첫 판')
-    assert.equal(dealer.next(true).specialist, 10, '둘째 판')
-    assert.equal(dealer.next(false).specialist, 3, '한 바퀴 돌면 처음으로')
+    assert.equal(dealer.next(true).specialist, null, '둘째 판은 비워 두었다')
+    assert.equal(dealer.next(false).specialist, 10, '셋째 판')
+  })
+
+  it('빈칸만 있는 판은 해결사 없이 지나간다', () => {
+    // 마지막 판에만 하나 앉히는 것이 「직접 고르기」를 만든 이유다.
+    const dealer = new ExtraDealer('custom', mulberry32(1), [], [null, null, null, null, 10])
+    for (let heist = 1; heist <= 4; heist += 1) {
+      assert.equal(dealer.next(heist === 1 ? null : true).specialist, null, `${heist}판`)
+    }
+    assert.equal(dealer.next(true).specialist, 10, '다섯째 판')
+  })
+
+  it('배치표를 넘어선 판은 해결사가 없다', () => {
+    const dealer = new ExtraDealer('custom', mulberry32(1), [], [10])
+    assert.equal(dealer.next(null).specialist, 10)
+    assert.equal(dealer.next(true).specialist, null)
   })
 
   it('해결사만 골라도 된다', () => {
     const game = new Game('TEST', players, {
       mode: 'custom',
       pickedChallenges: [],
-      pickedSpecialists: [10],
+      specialistRounds: [10],
       rng: mulberry32(5),
     })
     const view = game.view()

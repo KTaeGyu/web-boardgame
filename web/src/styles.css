@@ -730,6 +730,108 @@ select {
 }
 
 /*
+ * 해결사 배치표. 가로 한 줄이 카드 하나, 세로 한 칸이 판 하나다.
+ *
+ * 줄과 머리글이 같은 칸 나눔을 써야 눈이 세로로 미끄러진다.
+ * 판의 수는 서버가 정하므로 칸 수를 --rounds 로 받는다.
+ */
+.slot-grid {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.slot-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) repeat(var(--rounds, 5), 38px);
+  align-items: center;
+}
+
+/* 줄무늬. 열 칸을 세로로 훑을 때 줄을 놓치지 않게 한다. */
+.slot-row:nth-of-type(even) {
+  background: rgba(var(--ink-rgb), 0.035);
+}
+
+.slot-row--head {
+  background: rgba(var(--gold-rgb), 0.07);
+  border-bottom: 1px solid var(--line);
+}
+
+.slot-row__round {
+  text-align: center;
+  padding: 7px 0;
+  font-size: 11px;
+  color: var(--gold);
+  letter-spacing: 0.02em;
+}
+
+.slot-row__name {
+  padding: 0 12px;
+  font-size: 13px;
+  color: var(--ink-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  user-select: none;
+  touch-action: manipulation;
+  transition: color 0.15s;
+}
+
+/* 어느 판이든 자리를 잡은 카드는 이름부터 살아난다. */
+.slot-row--on .slot-row__name {
+  color: var(--gold);
+  font-weight: 700;
+}
+
+.slot-cell {
+  display: grid;
+  place-items: center;
+  height: 34px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  /* 칸을 가르는 선. 마지막 칸의 오른쪽은 바깥 테두리가 맡는다. */
+  box-shadow: inset 1px 0 0 var(--line);
+}
+
+.slot-cell:disabled {
+  cursor: not-allowed;
+}
+
+.slot-cell__mark {
+  width: 15px;
+  height: 15px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  transition: border-color 0.15s, background 0.15s, transform 0.12s;
+}
+
+.slot-cell:hover:not(:disabled) .slot-cell__mark {
+  border-color: var(--gold-dim);
+  transform: scale(1.12);
+}
+
+.slot-cell:focus-visible {
+  outline: none;
+}
+
+.slot-cell:focus-visible .slot-cell__mark {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px rgba(var(--gold-rgb), 0.2);
+}
+
+.slot-cell--on .slot-cell__mark {
+  border-color: var(--gold);
+  background: var(--gold);
+  /* 찍힌 칸은 빈 칸과 크기까지 달라야 훑을 때 걸린다. */
+  transform: scale(1.1);
+}
+
+.slot-cell--on {
+  background: rgba(var(--gold-rgb), 0.1);
+}
+
+/*
  * 밝은 쪽·어두운 쪽 바꾸기. 어느 화면에서든 오른쪽 위 같은 자리다.
  *
  * z-index 는 4 — 드로어(6)와 모달(10) 아래다. 덮개가 깔린 동안에는
@@ -891,4 +993,16 @@ select {
   background: var(--card);
   font-size: 13px;
   color: var(--ink-dim);
+}
+
+/* 좁은 화면에서는 칸을 조여 카드 이름이 설 자리를 남긴다. */
+@media (max-width: 640px) {
+  .slot-row {
+    grid-template-columns: minmax(0, 1fr) repeat(var(--rounds, 5), 32px);
+  }
+
+  .slot-row__name {
+    padding: 0 8px;
+    font-size: 12px;
+  }
 }

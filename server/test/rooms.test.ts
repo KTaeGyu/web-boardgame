@@ -58,7 +58,7 @@ describe('방 만들기', () => {
     assert.deepEqual(result.value.settings, {
       mode: 'basic',
       pickedChallenges: [],
-      pickedSpecialists: [],
+      specialistRounds: [null, null, null, null, null],
       maxPlayers: 6,
     })
   })
@@ -360,12 +360,21 @@ describe('방 설정', () => {
     if (result.ok) assert.deepEqual(result.value.settings.pickedChallenges, [2, 5])
   })
 
-  it('해결사 카드도 고를 수 있다', () => {
-    const picked = ctx.store.updateSettings('p1', { mode: 'custom', pickedSpecialists: [3, 10] })
+  it('해결사는 판마다 자리를 잡는다 — 빈칸도 그대로 남는다', () => {
+    const rounds = [null, 3, null, null, 10] as const
+    const picked = ctx.store.updateSettings('p1', { mode: 'custom', specialistRounds: [...rounds] })
     assert.equal(picked.ok, true)
-    if (picked.ok) assert.deepEqual(picked.value.settings.pickedSpecialists, [3, 10])
+    // id 순으로 정렬하면 몇 번째 판인지가 사라진다. 자리는 넣은 그대로여야 한다.
+    if (picked.ok) assert.deepEqual(picked.value.settings.specialistRounds, [...rounds])
+  })
 
-    assert.equal(ctx.store.updateSettings('p1', { pickedSpecialists: [99 as never] }).ok, false)
+  it('자리 수가 판 수와 다르거나, 없는 카드거나, 같은 카드가 둘이면 막는다', () => {
+    const bad = (rounds: unknown) =>
+      ctx.store.updateSettings('p1', { specialistRounds: rounds as never }).ok
+
+    assert.equal(bad([3, null, null]), false, '자리가 모자람')
+    assert.equal(bad([99, null, null, null, null]), false, '없는 카드')
+    assert.equal(bad([3, null, 3, null, null]), false, '한 장이 두 판에')
   })
 
   it('직접 고르기로 옮기는 것 자체는 막지 않는다', () => {

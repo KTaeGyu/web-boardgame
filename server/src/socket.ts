@@ -245,7 +245,8 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
       }
       // 고르는 중에는 설정을 저장할 수 있게 두고, 시작하는 순간에 막는다.
       const pickedNothing =
-        room.settings.pickedChallenges.length === 0 && room.settings.pickedSpecialists.length === 0
+        room.settings.pickedChallenges.length === 0 &&
+        room.settings.specialistRounds.every((id) => id === null)
       if (room.settings.mode === 'custom' && pickedNothing) {
         return ack({
           ok: false,
@@ -268,7 +269,7 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
         {
           mode: room.settings.mode,
           pickedChallenges: room.settings.pickedChallenges,
-          pickedSpecialists: room.settings.pickedSpecialists,
+          specialistRounds: room.settings.specialistRounds,
         },
       )
       games.set(code, game)
