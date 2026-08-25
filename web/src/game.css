@@ -138,6 +138,12 @@
   display: flex;
   align-items: center;
   gap: 6px;
+  /*
+   * 본체가 DOM 에서 뒤에 있어 나중에 그려지고, 그 그림자가 왼쪽으로 퍼져 탭을 덮는다.
+   * 탭을 한 층 올려 그림자 위에 둔다.
+   */
+  position: relative;
+  z-index: 1;
   padding: 10px 8px;
   border: 1px solid var(--line);
   border-right: none;
@@ -149,9 +155,14 @@
   box-shadow: -4px 0 16px rgba(var(--shadow-rgb), 0.4);
 }
 
+/*
+ * 펼치면 탭과 본체가 한 덩어리다. 각자 그림자를 지면 탭의 그림자가 본체 위로 올라가
+ * 이음매에 어두운 띠가 생긴다. 바깥으로 지는 그림자는 본체 것 하나면 된다.
+ */
 .drawer--open .drawer__tab {
   color: var(--gold);
   border-color: var(--gold-dim);
+  box-shadow: none;
 }
 
 .drawer__tab-count {
@@ -178,7 +189,11 @@
   overflow-y: auto;
   border: 1px solid var(--line);
   border-right: none;
-  border-radius: 10px 0 0 10px;
+  /*
+   * 왼쪽 위는 탭과 맞닿는 자리다. 탭의 오른쪽이 각져 있으므로 여기도 각져야 이어진다.
+   * 아래는 아무것도 닿지 않으니 그대로 둥글린다.
+   */
+  border-radius: 0 0 0 10px;
   background: var(--card);
   box-shadow: -8px 0 28px rgba(var(--shadow-rgb), 0.55);
 }
@@ -326,12 +341,20 @@
 }
 
 /* ── 상대 자리 ────────────────────────── */
+/* 판을 위아래 가운데로 모으는 위쪽 절반. 아래쪽 절반은 화면 크기마다 다르다. */
+.seats-area {
+  margin-top: auto;
+}
+
 .seats {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 12px;
-  /* 판을 위아래 가운데로 모으는 위쪽 절반. 아래쪽 절반은 화면 크기마다 다르다. */
-  margin-top: auto;
+}
+
+/* 보기 전환은 좁은 화면에서만 뜻이 있다. 넓은 화면은 이미 전부 보인다. */
+.seats-view {
+  display: none;
 }
 
 .seat {
@@ -374,6 +397,62 @@
 .seat__away {
   font-size: 12px;
   color: var(--ink-dim);
+}
+
+/* ── 잠깐 뜨는 알림 ────────────────────── */
+
+/*
+ * 화면 위쪽 가운데. 상태 줄 바로 아래에 겹쳐 띄운다.
+ *
+ * 흐름 안에 두면 알림이 뜰 때마다 판이 아래로 밀려 카드 위치가 흔들린다.
+ * 오른쪽 끝은 드로어 탭이 쓰고 있으므로 폭을 그만큼 남겨 둔다.
+ */
+.toasts {
+  position: fixed;
+  top: 74px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 7;
+  display: grid;
+  gap: 6px;
+  justify-items: center;
+  width: max-content;
+  max-width: min(76vw, 420px);
+  pointer-events: none;
+}
+
+.toast {
+  pointer-events: auto;
+  max-width: 100%;
+  padding: 9px 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--ink);
+  font-size: 13px;
+  text-align: center;
+  box-shadow: 0 8px 24px rgba(var(--shadow-rgb), 0.5);
+  animation: toast-in 0.22s ease-out backwards;
+}
+
+/* 내 것이 남의 손에 넘어갔거나 되돌릴 수 없게 된 일. 지나쳐서는 안 된다. */
+.toast--warn {
+  border-color: var(--danger-line);
+  background: rgba(var(--danger-rgb), 0.16);
+  color: var(--danger-ink);
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toast {
+    animation: none;
+  }
 }
 
 /* ── 테이블 ───────────────────────────── */
@@ -675,10 +754,14 @@ button.token:hover:not(:disabled) {
   animation: token-pulse 0.5s ease-in-out infinite alternate;
 }
 
-/* 붙박이가 주인을 만나 잠긴 것은 깜빡일 이유가 없다. 그 상태가 끝이다. */
+/*
+ * 붙박이가 주인을 만나 잠긴 것은 깜빡일 이유가 없다. 그 상태가 끝이다.
+ * 다만 눌리기는 하므로(눌러야 왜 안 되는지 답이 온다) 손 모양은 그대로 둔다.
+ */
 .token--stuck.token--locked {
   opacity: 0.85;
   animation: none;
+  cursor: pointer;
 }
 
 @keyframes token-pulse {
@@ -920,6 +1003,16 @@ button.token:hover:not(:disabled) {
   color: var(--gold);
 }
 
+/* 결과 모달 맨 위의 다섯 장. 아래 사람별 공개와 선으로 갈라 둔다. */
+.showdown__community {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  margin: 0 0 18px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--line);
+}
+
 .reveal-list {
   list-style: none;
   margin: 0 0 20px;
@@ -1146,5 +1239,62 @@ button.token:hover:not(:disabled) {
   .game-actions .btn {
     width: 100%;
     min-height: 52px;
+  }
+
+  /*
+   * 「칩만 모아 보기」. 옆으로 미는 대신 두 줄로 세워 전원의 판단을 한 화면에 놓는다.
+   * 카드는 접는다 — 쇼다운 전까지 어차피 뒷면이라, 자리를 먹을 뿐 알려주는 것이 없다.
+   *
+   * `.seats` 의 가로 흐름과 자릿수가 같으므로 반드시 그 뒤에 온다.
+   */
+  .seats-view {
+    display: block;
+    margin: 0 0 6px auto;
+    padding: 5px 11px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: var(--card);
+    color: var(--ink-dim);
+    font-size: 12px;
+  }
+
+  .seats--chips {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    overflow-x: visible;
+  }
+
+  .seats--chips .seat {
+    width: auto;
+    gap: 5px;
+    padding: 8px 6px;
+  }
+
+  .seats--chips .seat__cards {
+    display: none;
+  }
+
+  .seats--chips .track {
+    gap: 3px;
+  }
+
+  /*
+   * 다섯 칸이 한 줄에 들어가야 이력으로 읽힌다. 화면 폭을 따라 줄이되
+   * 손가락으로 짚을 수 있는 크기 아래로는 내려가지 않게 잡는다.
+   */
+  .seats--chips .token {
+    width: clamp(20px, 5.4vw, 26px);
+    height: clamp(20px, 5.4vw, 26px);
+    font-size: clamp(10px, 2.6vw, 12px);
+  }
+
+  .seats--chips .seat__name {
+    font-size: 13px;
+  }
+
+  /* 상태 줄이 낮아진 만큼 알림도 올라온다. */
+  .toasts {
+    top: 56px;
   }
 }

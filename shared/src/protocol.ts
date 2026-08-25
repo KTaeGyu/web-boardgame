@@ -181,6 +181,14 @@ export interface ServerToClientEvents {
     text?: string
     cards?: Card[]
   }) => void
+  /**
+   * 방금 나에게 벌어진 일. 잠깐 떴다 사라지고 아무 데도 남지 않는다.
+   *
+   * 쪽지(`game:note`)와 다르다. 저쪽은 「내가 알게 된 것」이라 판이 끝날 때까지 드로어에
+   * 남고, 이쪽은 「내 것이 바뀌었다」는 알림이라 지나가면 그만이다. 공개 상태만으로는
+   * 남이 내 토큰을 가져간 것과 내가 스스로 놓은 것이 구별되지 않아, 서버가 짚어 준다.
+   */
+  'game:toast': (payload: { text: string; tone?: 'info' | 'warn' }) => void
 }
 
 export const NICKNAME_MAX = 12

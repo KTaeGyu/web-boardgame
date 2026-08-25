@@ -54,7 +54,11 @@ export function Token({
       className={classes}
       ref={innerRef as (node: HTMLButtonElement | null) => void}
       onClick={onClick}
-      disabled={locked}
+      /*
+       * 붙박이는 잠긴 것처럼 보이지만 눌리기는 해야 한다 — 눌러야 서버가 왜 안 되는지
+       * 답해 준다. 아무 반응도 없는 단추는 고장으로 보인다.
+       */
+      disabled={locked && !stuck}
       aria-label={`${value}번 토큰 가져오기${stuck ? ' — 한 번 정해지면 바뀌지 않습니다' : ''}`}
       title={stuck ? '한 번 정해지면 바뀌지 않는 토큰입니다' : undefined}
     >

@@ -280,6 +280,38 @@ describe('도전자 카드 효과', () => {
     assert.ok(ctx.game.view().lockedTokens.includes(1), '화면에도 잠긴 것으로 보인다')
   })
 
+  it('소음 감지기 — 막힌 세 가지 시도 모두 이유를 알려준다', () => {
+    const ctx = gameWith([2])
+    ctx.game.takeToken('p1', 1)
+    ctx.advance(TOKEN_LOCK_MS)
+    ctx.game.takeToasts() // 집을 때의 「되돌려 놓을 수 없습니다」는 여기서 비운다
+
+    ctx.game.takeToken('p2', 1)
+    const stealing = ctx.game.takeToasts()
+    assert.equal(stealing.length, 1)
+    assert.equal(stealing[0].toId, 'p2', '뺏으려던 사람만 궁금하다')
+    assert.match(stealing[0].text, /소음 감지기.*뺏어갈 수 없습니다/)
+
+    ctx.game.takeToken('p1', 3)
+    const swapping = ctx.game.takeToasts()
+    assert.equal(swapping.length, 1)
+    assert.equal(swapping[0].toId, 'p1')
+    assert.match(swapping[0].text, /내려놓을 수 없습니다/)
+
+    ctx.game.takeToken('p1', 1)
+    const putting = ctx.game.takeToasts()
+    assert.equal(putting.length, 1, '쥔 것을 다시 누르는 것도 내려놓으려는 시도다')
+    assert.match(putting[0].text, /내려놓을 수 없습니다/)
+  })
+
+  it('환기구 — 막힌 이유로 환기구를 댄다', () => {
+    const ctx = gameWith([6])
+    ctx.game.takeToken('p1', 3) // 세 명이면 3번이 붙박이다
+    const taking = ctx.game.takeToasts()
+    assert.equal(taking.length, 1)
+    assert.match(taking[0].text, /환기구.*되돌려 놓을 수 없습니다/)
+  })
+
   it('붙박이 토큰은 집기 전부터 표시된다', () => {
     const { game } = gameWith([2])
     assert.deepEqual(game.view().stuckTokens, [1], '중앙에 있어도 미리 보여야 한다')

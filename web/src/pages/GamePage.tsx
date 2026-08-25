@@ -27,10 +27,32 @@ import { useTokenFlight } from '../lib/useTokenFlight.ts'
 /** 방이 닫힌 사유를 사람 말로. 아무 설명 없이 튕겨나가면 고장으로 느껴진다. */
 const CLOSED_MESSAGE: Record<string, string> = {
   empty: '방에 아무도 남지 않아 닫혔습니다.',
-  idle: '10분 동안 아무 움직임이 없어 방이 닫혔습니다.',
+  idle: '30분 동안 아무 움직임이 없어 방이 닫혔습니다.',
   rematchDeclined: '재경기를 원하지 않는 사람이 있어 방이 닫혔습니다.',
   hostClosed: '방장이 방을 닫았습니다.',
 }
+
+/**
+ * 좁은 화면에서 남의 자리를 어떻게 볼 것인가.
+ *
+ * 'cards' 는 카드까지 옆으로 밀어 보는 것, 'chips' 는 카드를 접고 칩 이력만 두 줄로 모으는 것이다.
+ * 한눈에 전원의 판단을 늘어놓고 보려는 사람이 있어서 두 벌을 둔다. 넓은 화면은 이미 다 보이므로
+ * 이 값이 쓰이지 않는다.
+ */
+type SeatView = 'cards' | 'chips'
+const SEAT_VIEW_KEY = 'the-gang:seatView'
+
+/** 저장이 막힌 환경(시크릿 창 등)이 있다. 못 읽어도 이번 판은 돌아가야 한다. */
+function savedSeatView(): SeatView {
+  try {
+    return localStorage.getItem(SEAT_VIEW_KEY) === 'chips' ? 'chips' : 'cards'
+  } catch {
+    return 'cards'
+  }
+}
+
+/** 알림이 떠 있는 시간. 한 줄을 읽고 눈을 판으로 되돌릴 만큼만. */
+const TOAST_MS = 3800
 
 /** 쇼다운은 한 사람씩 차례로 뒤집어야 순서가 맞았는지 눈에 들어온다. */
 const REVEAL_STEP_MS = 1900
@@ -69,6 +91,32 @@ export function GamePage() {
   const [notes, setNotes] = useState<CardNote[]>([])
   /** 방금 도착한 쪽지. 한 번 보여주고 나면 드로어에서 다시 볼 수 있다. */
   const [fresh, setFresh] = useState<CardNote | null>(null)
+  /** 좁은 화면에서 남의 자리를 보는 방식. 한 번 고르면 다음 판에도 그대로 온다. */
+  const [seatView, setSeatView] = useState<SeatView>(savedSeatView)
+  /**
+   * 방금 나에게 벌어진 일. 여러 개가 겹칠 수 있어 쌓아 두고 오래된 것부터 지운다.
+   *
+   * 같은 글이 연달아 올 수 있으므로(같은 사람에게 두 번 뺏기는 일) 내용이 아니라
+   * 번호로 구별한다.
+   */
+  const [toasts, setToasts] = useState<{ id: number; text: string; tone: 'info' | 'warn' }[]>([])
+  const toastSeq = useRef(0)
+
+  const dropToast = useCallback((id: number) => {
+    setToasts((current) => current.filter((toast) => toast.id !== id))
+  }, [])
+
+  const toggleSeatView = useCallback(() => {
+    setSeatView((current) => {
+      const next: SeatView = current === 'cards' ? 'chips' : 'cards'
+      try {
+        localStorage.setItem(SEAT_VIEW_KEY, next)
+      } catch {
+        /* 기억하지 못할 뿐이다 */
+      }
+      return next
+    })
+  }, [])
 
   const tokenRef = useTokenFlight(TOKEN_LOCK_MS)
 
@@ -163,6 +211,21 @@ export function GamePage() {
       setNotes((current) => [...current.filter((n) => n.specialist !== payload.specialist), payload])
       setFresh(payload) // 도착하자마자 한 번은 보여준다
     }, []),
+  )
+
+  useServerEvent(
+    'game:toast',
+    useCallback(
+      (payload: { text: string; tone?: 'info' | 'warn' }) => {
+        const id = (toastSeq.current += 1)
+        // 세 줄까지만 남긴다. 그 이상 쌓이면 판이 가려진다.
+        setToasts((current) =>
+          [...current, { id, text: payload.text, tone: payload.tone ?? ('info' as const) }].slice(-3),
+        )
+        setTimeout(() => dropToast(id), TOAST_MS)
+      },
+      [dropToast],
+    ),
   )
 
   useServerEvent(
@@ -345,6 +408,25 @@ export function GamePage() {
         </button>
       </header>
 
+      {/*
+        방금 나에게 벌어진 일. 공개 안내(announcements)와 다른 층위라 자리도 다르다 —
+        저쪽은 판에 남는 기록이고, 이쪽은 지나가면 그만인 알림이다.
+      */}
+      {toasts.length > 0 && (
+        <div className="toasts" role="status" aria-live="polite">
+          {toasts.map((toast) => (
+            <button
+              key={toast.id}
+              type="button"
+              className={`toast toast--${toast.tone}`}
+              onClick={() => dropToast(toast.id)}
+            >
+              {toast.text}
+            </button>
+          ))}
+        </div>
+      )}
+
       {game.announcements.length > 0 && (
         <ul className="announcements">
           {game.announcements.map((item) => (
@@ -359,21 +441,33 @@ export function GamePage() {
         </p>
       )}
 
-      <section className="seats">
-        {others.map((player) => (
-          <PlayerSeat
-            key={player.id}
-            player={player}
-            round={game.round}
-            phase={game.phase}
-            lockedTokens={game.lockedTokens}
-            stuckTokens={game.stuckTokens}
-            rejected={rejected}
-            tokenRef={tokenRef}
-            onTakeToken={take}
-          />
-        ))}
-      </section>
+      <div className="seats-area">
+        {/* 좁은 화면에서만 보인다. 넓은 화면은 카드도 칩도 이미 다 보인다. */}
+        <button
+          type="button"
+          className="seats-view"
+          onClick={toggleSeatView}
+          aria-pressed={seatView === 'chips'}
+        >
+          {seatView === 'cards' ? '칩만 모아 보기' : '카드도 보기'}
+        </button>
+
+        <section className={`seats seats--${seatView}`}>
+          {others.map((player) => (
+            <PlayerSeat
+              key={player.id}
+              player={player}
+              round={game.round}
+              phase={game.phase}
+              lockedTokens={game.lockedTokens}
+              stuckTokens={game.stuckTokens}
+              rejected={rejected}
+              tokenRef={tokenRef}
+              onTakeToken={take}
+            />
+          ))}
+        </section>
+      </div>
 
       <section className="table">
         <div className="table__community">
@@ -682,6 +776,18 @@ function Showdown({ game, revealed, finished, playerId }: ShowdownProps) {
                     .map((question) => question.kind),
                 )}
         </h2>
+
+        {/*
+          판정의 근거가 되는 다섯 장. 모달이 테이블을 덮고 있어, 이것이 없으면
+          「내 카드가 왜 그 족보인지」를 확인하려고 모달을 닫아야 한다.
+        */}
+        {game.community.length > 0 && (
+          <div className="showdown__community">
+            {game.community.map((card, index) => (
+              <PlayingCard key={card} card={card} size="sm" delay={index * 60} />
+            ))}
+          </div>
+        )}
 
         <ol className="reveal-list">
           {reveals.map((reveal, index) => {

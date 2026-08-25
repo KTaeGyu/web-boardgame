@@ -121,6 +121,38 @@ describe('토큰 집기', () => {
   })
 })
 
+describe('뺏겼다는 알림', () => {
+  it('뺏긴 사람에게만 간다 — 누가 가져갔는지 공개 상태로는 알 수 없다', () => {
+    const ctx = makeGame(3)
+    ctx.game.takeToken('p1', 2)
+    ctx.advance(TOKEN_LOCK_MS)
+    ctx.game.takeToasts() // 여기까지는 아무 일도 없었다
+
+    ctx.game.takeToken('p2', 2)
+
+    const toasts = ctx.game.takeToasts()
+    assert.equal(toasts.length, 1)
+    assert.equal(toasts[0].toId, 'p1')
+    assert.match(toasts[0].text, /사람2님에게 2번 토큰을 뺏겼습니다/)
+  })
+
+  it('중앙에서 집은 것은 아무에게도 알리지 않는다', () => {
+    const ctx = makeGame(3)
+    ctx.game.takeToken('p1', 1)
+    assert.deepEqual(ctx.game.takeToasts(), [])
+  })
+
+  it('한 번 가져가면 비워진다 — 같은 알림이 두 번 가지 않는다', () => {
+    const ctx = makeGame(3)
+    ctx.game.takeToken('p1', 2)
+    ctx.advance(TOKEN_LOCK_MS)
+    ctx.game.takeToken('p2', 2)
+
+    assert.equal(ctx.game.takeToasts().length, 1)
+    assert.deepEqual(ctx.game.takeToasts(), [])
+  })
+})
+
 describe('토큰 잠금', () => {
   it('방금 움직인 토큰은 잠시 아무도 만질 수 없다', () => {
     const ctx = makeGame(3)

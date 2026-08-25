@@ -82,11 +82,27 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
 
     const view = game.view()
     io.to(code).emit('game:state', view)
+    sendToasts(code)
 
     if (options.hands) {
       for (const player of view.players) sendHand(code, player.id)
     }
     scheduleUnlock(code, view)
+  }
+
+  /**
+   * 「방금 나에게 벌어진 일」을 각자에게. 상태를 보낼 때마다 함께 비운다.
+   *
+   * 거절된 동작에도 알릴 것이 있다 — 붙박이 토큰은 눌러도 오지 않는데, 그 이유는
+   * 공개 상태 어디에도 나타나지 않는다. 그래서 상태 전송과 따로 부를 수 있어야 한다.
+   */
+  function sendToasts(code: string): void {
+    const game = games.get(code)
+    if (!game) return
+    for (const toast of game.takeToasts()) {
+      const socketId = socketOfPlayer.get(toast.toId)
+      if (socketId) io.to(socketId).emit('game:toast', { text: toast.text, tone: toast.tone })
+    }
   }
 
   function sendHand(code: string, playerId: string): void {
@@ -300,7 +316,9 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
       withGame(ack, (game, code, playerId) => {
         const result = game.takeToken(playerId, Number(token))
         ack(result)
+        // 붙박이에 막힌 것은 거절이지만 알려줄 것이 있다. 흔들림만으로는 이유가 없다.
         if (result.ok) sendGame(code)
+        else sendToasts(code)
       })
     })
 

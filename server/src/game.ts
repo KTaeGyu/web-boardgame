@@ -19,6 +19,7 @@ import {
   TOKEN_LOCK_MS,
   VAULTS_TO_WIN,
   AUTOMATIC_SPECIALISTS,
+  CHALLENGES,
   JACK_CARD,
   SETUP_SPECIALISTS,
   SPECIALIST_NEEDS,
@@ -88,6 +89,18 @@ export interface PrivateNote {
   cards?: Card[]
 }
 
+/**
+ * 한 사람에게만 잠깐 뜨는 알림.
+ *
+ * 공개 상태는 「지금 어떤가」만 말해서, 내 토큰이 사라진 것이 남이 가져갔기 때문인지
+ * 내가 옮겼기 때문인지 화면이 알 수 없다. 그 차이를 아는 것은 여기뿐이다.
+ */
+export interface Toast {
+  toId: string
+  text: string
+  tone?: 'info' | 'warn'
+}
+
 export interface StartingPlayer {
   id: string
   nickname: string
@@ -129,6 +142,8 @@ export class Game {
   /** 「근육」을 맡은 사람. 쇼다운에서 같은 족보끼리의 우열을 뒤집는다. */
   private muscleId: string | null = null
   private announcements: Announcement[] = []
+  /** 다음 전송에 실려 나갈 개인 알림. 한 번 나가면 비운다. */
+  private toasts: Toast[] = []
   /** 직전 판의 결과. 다음 판에 무엇이 걸릴지가 여기서 갈린다. */
   private lastSuccess: boolean | null = null
   /**
@@ -280,6 +295,7 @@ export class Game {
     return this.seats.map((seat, index) => {
       const from = (index - 1 + this.seats.length) % this.seats.length
       seat.hole.push(given[from])
+      this.tell(seat.id, '「조율가」 — 카드 한 장이 오갔습니다')
       return {
         toId: seat.id,
         heist: this.heist,
@@ -302,6 +318,8 @@ export class Game {
       seat.hole = pool.slice(cursor, cursor + count)
       cursor += count
     }
+
+    for (const seat of this.seats) this.tell(seat.id, '「사기꾼」 — 카드가 섞여 다시 왔습니다')
 
     return this.seats.map((seat, index) => ({
       toId: seat.id,
@@ -371,6 +389,18 @@ export class Game {
   }
 
   /** 화면에 부를 이름. 여러 곳에서 같은 이름을 써야 한다. */
+  /** 그 사람에게만 잠깐 뜨는 한 줄. 쌓아 두었다가 다음 전송에 함께 나간다. */
+  private tell(toId: string, text: string, tone: 'info' | 'warn' = 'info'): void {
+    this.toasts.push({ toId, text, tone })
+  }
+
+  /** 소켓 계층이 상태를 보낼 때 함께 가져간다. 두 번 가지 않도록 비운다. */
+  takeToasts(): Toast[] {
+    const pending = this.toasts
+    this.toasts = []
+    return pending
+  }
+
   private nameOf(playerId: string): string {
     const names = displayNames(this.seats.map((seat) => seat.nickname))
     const index = this.seats.findIndex((seat) => seat.id === playerId)
@@ -494,11 +524,19 @@ export class Game {
     if (this.isLocked(token, now)) return err('TOKEN_LOCKED', '방금 움직인 토큰입니다.')
 
     const holder = this.holders.get(token)
-    if (holder === playerId) return err('INVALID_TOKEN', '이미 쥐고 있는 토큰입니다.')
+    if (holder === playerId) {
+      // 쥔 것을 다시 누르는 것은 「내려놓겠다」는 뜻이다. 붙박이라면 그것이 막힌 이유다.
+      if (this.stuckTokens().includes(token)) {
+        this.tell(playerId, `「${this.stuckCardName(token)}」 — 내려놓을 수 없습니다`, 'warn')
+      }
+      return err('INVALID_TOKEN', '이미 쥐고 있는 토큰입니다.')
+    }
 
     // 붙박이 토큰은 한 번 주인이 정해지면 그 판단을 되돌릴 수 없다.
     const stuck = this.stuckTokens()
     if (holder !== undefined && stuck.includes(token)) {
+      // 왜 눌러도 오지 않는지는 누른 사람만 궁금하다. 흔들림만으로는 이유가 없다.
+      this.tell(playerId, `「${this.stuckCardName(token)}」 — 뺏어갈 수 없습니다`, 'warn')
       return err('TOKEN_LOCKED', '이 토큰은 한 번 정해지면 바꿀 수 없습니다.')
     }
 
@@ -506,11 +544,22 @@ export class Game {
     const mine = this.tokenOf(playerId)
     if (mine !== null) {
       if (stuck.includes(mine)) {
+        this.tell(playerId, `「${this.stuckCardName(mine)}」 — 내려놓을 수 없습니다`, 'warn')
         return err('TOKEN_LOCKED', '쥐고 있는 토큰이 붙박이라 다른 토큰을 집을 수 없습니다.')
       }
       if (this.isLocked(mine, now)) return err('TOKEN_LOCKED', '방금 움직인 토큰입니다.')
       this.holders.delete(mine)
       this.lockedUntil.set(mine, now + this.lockMs)
+    }
+
+    // 뺏긴 사람에게만 알린다. 공개 상태에는 「없어졌다」만 남아 누가 가져갔는지 모른다.
+    if (holder !== undefined) {
+      this.tell(holder, `${this.nameOf(playerId)}님에게 ${token}번 토큰을 뺏겼습니다`, 'warn')
+    }
+    // 붙박이를 집는 것은 되돌릴 수 없는 선택이다. 집은 뒤에 알아야 할 일은 아니지만,
+    // 규칙을 모르고 집었을 때 무슨 일이 벌어졌는지는 알려 준다.
+    if (stuck.includes(token)) {
+      this.tell(playerId, `「${this.stuckCardName(token)}」 — 토큰을 되돌려 놓을 수 없습니다`, 'warn')
     }
 
     this.holders.set(token, playerId)
@@ -622,6 +671,7 @@ export class Game {
     if (this.has(8)) {
       for (const seat of this.seats) {
         for (let round = 1; round < this.round && round <= 3; round++) seat.history[round - 1] = null
+        this.tell(seat.id, `「${CHALLENGES[8].name}」 — 지난 라운드 토큰이 사라졌습니다`)
       }
     }
 
@@ -652,6 +702,7 @@ export class Game {
 
     victim.hole = victim.hole.map(() => this.draw())
     this.sensorFired = { challenge: this.has(3) ? 3 : 7, playerId: victim.id }
+    this.tell(victim.id, `「${CHALLENGES[this.sensorFired.challenge].name}」 — 카드를 다시 받습니다`, 'warn')
     this.announcements.push({
       playerId: victim.id,
       text: `${this.nameOf(victim.id)} — 카드를 새로 받았습니다`,
@@ -746,6 +797,11 @@ export class Game {
   }
 
   // ── 상태 읽기 ───────────────────────────────────────────
+
+  /** 이 토큰을 붙박이로 만든 카드의 이름. 1번은 「소음 감지기」, 마지막 번호는 「환기구」다. */
+  private stuckCardName(token: number): string {
+    return token === 1 ? CHALLENGES[2].name : CHALLENGES[6].name
+  }
 
   /** 한 번 주인이 정해지면 바뀌지 않는 토큰. 1~3라운드에만 있다. */
   private stuckTokens(): number[] {
