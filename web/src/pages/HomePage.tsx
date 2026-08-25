@@ -4,12 +4,15 @@ import { NICKNAME_MAX, normalizeNickname } from '@the-gang/shared'
 
 import { getNickname, setNickname as saveNickname } from '../lib/identity.ts'
 import { createRoom } from '../lib/rooms.ts'
+import { useConnected } from '../lib/socket.ts'
 
 export function HomePage() {
   const navigate = useNavigate()
   const [nickname, setNickname] = useState(getNickname())
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  // 서버가 잠들어 있으면 화면이 덮이지만, 키보드로는 그 아래에 닿는다. 손잡이 자체를 잠근다.
+  const connected = useConnected()
 
   const clean = normalizeNickname(nickname)
 
@@ -70,10 +73,15 @@ export function HomePage() {
         {error && <p className="error">{error}</p>}
 
         <div className="btn-row home-form__actions">
-          <button type="button" className="btn" onClick={() => void makeRoom()} disabled={busy}>
+          <button
+            type="button"
+            className="btn"
+            onClick={() => void makeRoom()}
+            disabled={busy || !connected}
+          >
             {busy ? '만드는 중…' : '방 만들기'}
           </button>
-          <button type="submit" className="btn btn--primary" disabled={busy}>
+          <button type="submit" className="btn btn--primary" disabled={busy || !connected}>
             방 찾기
           </button>
         </div>

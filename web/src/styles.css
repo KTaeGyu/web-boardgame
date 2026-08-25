@@ -982,6 +982,84 @@ select {
   color: var(--gold);
 }
 
+/* ── 서버가 없을 때 ───────────────────────── */
+
+/*
+ * 서버가 잠들어 있는 동안 화면을 덮는다. 무료 요금제는 아무도 오지 않으면 내려가고,
+ * 다시 뜨는 데 1~2분이 걸린다. 그동안 눌러도 아무 일이 없으므로 아예 막고 이유를 적는다.
+ */
+.gate {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: var(--scrim);
+  backdrop-filter: blur(3px);
+}
+
+.gate__panel {
+  width: min(88vw, 320px);
+  padding: 26px 24px;
+  border: 1px solid var(--gold-dim);
+  border-radius: 14px;
+  background: var(--card);
+  box-shadow: 0 24px 70px rgba(var(--shadow-rgb), 0.7);
+  text-align: center;
+}
+
+.gate__panel--bad {
+  border-color: var(--danger-line);
+}
+
+.gate__title {
+  margin: 0 0 8px;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--gold);
+}
+
+.gate__panel--bad .gate__title {
+  color: var(--danger-ink);
+}
+
+.gate__body {
+  margin: 0;
+  font-size: 14px;
+  color: var(--ink);
+}
+
+.gate__hint {
+  margin: 12px 0 0;
+  font-size: 12px;
+  color: var(--ink-dim);
+}
+
+/* 도는 것이 하나 있어야 「멈춘 것이 아니다」로 읽힌다. */
+.gate__spinner {
+  display: block;
+  width: 26px;
+  height: 26px;
+  margin: 0 auto 14px;
+  border: 2px solid rgba(var(--gold-rgb), 0.25);
+  border-top-color: var(--gold);
+  border-radius: 50%;
+  animation: gate-spin 0.9s linear infinite;
+}
+
+@keyframes gate-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gate__spinner {
+    animation-duration: 2.4s;
+  }
+}
+
 .conn {
   position: fixed;
   left: 50%;

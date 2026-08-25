@@ -5,7 +5,7 @@ import type { RoomSummary, RoomView } from '@the-gang/shared'
 import { ConfirmModal } from '../components/Modal.tsx'
 import { getNickname, getPlayerId } from '../lib/identity.ts'
 import { createRoom } from '../lib/rooms.ts'
-import { call, socket, useServerEvent } from '../lib/socket.ts'
+import { call, socket, useConnected, useServerEvent } from '../lib/socket.ts'
 import { useEscape } from '../lib/useEscape.ts'
 
 export function RoomsPage() {
@@ -18,6 +18,8 @@ export function RoomsPage() {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [making, setMaking] = useState(false)
+  // 서버가 잠들어 있으면 화면이 덮이지만, 키보드로는 그 아래에 닿는다. 손잡이 자체를 잠근다.
+  const connected = useConnected()
 
   // 닉네임 없이 들어온 경우는 주소를 직접 친 것이다. 처음으로 돌려보낸다.
   useEffect(() => {
@@ -87,7 +89,7 @@ export function RoomsPage() {
           type="button"
           className="btn btn--primary rooms-head__create"
           onClick={() => void makeRoom()}
-          disabled={making}
+          disabled={making || !connected}
         >
           {making ? '만드는 중…' : '방 만들기'}
         </button>
@@ -116,7 +118,7 @@ export function RoomsPage() {
                   type="button"
                   className="room-item"
                   onClick={() => setAsking(room)}
-                  disabled={playing || full}
+                  disabled={playing || full || !connected}
                 >
                   <span className="room-item__code">{room.code}</span>
                   <span className="room-item__main">
