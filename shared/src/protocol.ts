@@ -307,7 +307,14 @@ export interface ServerToClientEvents {
    * 게임 알림(game:toast)과 다른 통로인 이유가 그것이다. 저쪽은 지나가는 소식이고
    * 이쪽은 사람이 닫아야 다음이 있다.
    */
-  'tutorial:tip': (payload: { step: number; total: number; title: string; text: string }) => void
+  'tutorial:tip': (payload: {
+    step: number
+    total: number
+    title: string
+    text: string
+    /** 읽고 나서 바로 할 일. 규칙만 알려주고 무엇을 누르라는 말이 없으면 거기서 멈춘다. */
+    action: string
+  }) => void
 }
 
 export const NICKNAME_MAX = 12

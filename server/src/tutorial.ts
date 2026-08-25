@@ -38,6 +38,13 @@ const RANK_ORDER = '23456789TJQKA'
 export interface TutorialTip {
   title: string
   text: string
+  /**
+   * 읽고 나서 바로 할 일. 화면의 어디를 누르라는 말이다.
+   *
+   * 규칙만 적어두면 처음 하는 사람은 안내를 닫은 자리에서 멈춘다 — 토큰을 눌러야
+   * 가져온다는 것조차 어디에도 적혀 있지 않았다.
+   */
+  action: string
   /** 이 안내를 띄울 때인가. 위에서부터 차례로 한 번씩만 뜬다. */
   when: (view: GameView, humanId: string) => boolean
 }
@@ -54,6 +61,7 @@ export const TIPS: TutorialTip[] = [
     text:
       '카드 이야기는 금지입니다. 「내 거 좋아」도 안 됩니다. 할 수 있는 말은 토큰 하나뿐입니다.\n\n' +
       '지금 받은 두 장과, 곧 가운데 깔릴 공용 카드를 합쳐 가장 센 다섯 장이 내 손입니다.',
+    action: '가운데 놓인 토큰 중 하나를 눌러 가져오세요.',
     when: (view) => view.round === 1,
   },
   {
@@ -62,6 +70,9 @@ export const TIPS: TutorialTip[] = [
       '작은 번호는 「내가 제일 약하다」, 큰 번호는 「내가 제일 세다」는 뜻입니다.\n\n' +
       '지금 내 패를 기준으로 집으세요. 나중에 좋아질 것 같다고 미리 큰 번호를 집으면, ' +
       '그 선언을 믿고 자기 자리를 정한 사람들이 통째로 어긋납니다.',
+    action:
+      '번호를 바꾸려면 다른 토큰을 누르고, 아예 물리려면 쥔 토큰을 다시 누르세요. ' +
+      '모두가 하나씩 쥐면 아래 「확정」이 열립니다.',
     when: (view, humanId) =>
       view.round === 1 &&
       view.players.some((player) => player.id === humanId && player.currentToken !== null),
@@ -72,16 +83,19 @@ export const TIPS: TutorialTip[] = [
       '라운드마다 순위를 다시 정합니다. 남이 쥔 토큰도 뺏을 수 있고, 뺏긴 사람은 남은 것에서 다시 고릅니다.\n\n' +
       '족보가 완성됐다면 숫자를 올리고, 아직이라면 그대로 두는 편이 좋습니다. ' +
       '나를 앞지른 사람이 생겼다면 하나 내려 자리를 비켜주는 것도 방법입니다.',
+    action: '바꿀 번호가 있으면 그 토큰을 누르고, 그대로 갈 거면 「확정」을 누르세요.',
     when: (view) => view.round === 2,
   },
   {
     title: '네 번째 카드입니다',
     text: '남은 선언이 두 번뿐입니다. 확신이 섰다면 자리를 굳히고, 아니라면 아직 바꿀 수 있습니다.',
+    action: '토큰을 정하고 「확정」을 누르세요.',
     when: (view) => view.round === 3,
   },
   {
     title: '마지막 카드입니다',
     text: '이번이 마지막 선언입니다. 모두가 확정하면 카드를 공개합니다.',
+    action: '마지막 번호를 정하고 「확정」을 누르세요.',
     when: (view) => view.round === 4,
   },
   {
@@ -89,6 +103,7 @@ export const TIPS: TutorialTip[] = [
     text:
       '가장 작은 번호부터 한 사람씩 뒤집습니다. 약한 손에서 센 손으로 이어지면 금고가 열리고, ' +
       '한 번이라도 순서가 어긋나면 경보가 울립니다.',
+    action: '안내를 닫고 공개를 지켜보세요. 다 열리면 「나가기」로 연습을 마칩니다.',
     when: (view) => view.phase !== 'picking',
   },
 ]
@@ -103,7 +118,7 @@ export interface TutorialHooks {
   /** 봇이 무언가 눌렀다. 화면을 새로 보내야 한다. */
   onMoved: () => void
   /** 여기서 멈춘다. 사람이 닫을 때까지 봇은 움직이지 않는다. */
-  onTip: (payload: { step: number; total: number; title: string; text: string }) => void
+  onTip: (payload: { step: number; total: number; title: string; text: string; action: string }) => void
 }
 
 /**
@@ -150,7 +165,13 @@ export class Tutorial {
     if (tip && tip.when(view, this.humanId)) {
       this.fired += 1
       this.waiting = true
-      this.hooks.onTip({ step: this.fired, total: TIPS.length, title: tip.title, text: tip.text })
+      this.hooks.onTip({
+        step: this.fired,
+        total: TIPS.length,
+        title: tip.title,
+        text: tip.text,
+        action: tip.action,
+      })
       return
     }
     if (this.waiting) return

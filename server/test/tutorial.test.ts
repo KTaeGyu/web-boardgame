@@ -33,7 +33,7 @@ const players: StartingPlayer[] = [
 /** 봇이 기다리지 않는 판. 사이를 0 으로 두어 예약이 곧바로 돌아온다. */
 function makeTutorial(seed = 3) {
   const game = new Game('TUTO', players, { mode: 'basic', rng: mulberry32(seed), lockMs: 0 })
-  const tips: { title: string }[] = []
+  const tips: { title: string; action: string }[] = []
   let moves = 0
   const tutorial = new Tutorial(
     game,
@@ -55,6 +55,14 @@ function makeTutorial(seed = 3) {
 const settle = () => new Promise((resolve) => setTimeout(resolve, 20))
 
 describe('혼자 해보기', () => {
+  it('안내마다 지금 할 일이 적혀 있다', () => {
+    // 규칙만 적어두면 처음 하는 사람은 안내를 닫은 자리에서 멈춘다.
+    for (const tip of TIPS) {
+      assert.ok(tip.action.length > 5, `${tip.title} — 할 일이 없다`)
+    }
+    assert.match(TIPS[0].action, /토큰/, '첫 안내는 토큰을 눌러 가져오라고 말해야 한다')
+  })
+
   it('판이 열리면 첫 안내부터 뜬다', async () => {
     const ctx = makeTutorial()
     ctx.tutorial.poke()
@@ -62,6 +70,7 @@ describe('혼자 해보기', () => {
 
     assert.equal(ctx.tips.length, 1)
     assert.equal(ctx.tips[0].title, TIPS[0].title)
+    assert.equal(ctx.tips[0].action, TIPS[0].action, '할 일까지 화면으로 나간다')
     assert.equal(ctx.moves(), 0, '읽는 동안 봇은 움직이지 않는다')
     assert.deepEqual(ctx.game.view().centerTokens, [1, 2, 3], '토큰도 그대로 가운데 있다')
     ctx.tutorial.stop()

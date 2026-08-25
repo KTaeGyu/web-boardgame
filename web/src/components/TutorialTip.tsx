@@ -13,6 +13,8 @@ export interface TipPayload {
   total: number
   title: string
   text: string
+  /** 읽고 나서 바로 할 일. 없으면 처음 하는 사람은 안내를 닫은 자리에서 멈춘다. */
+  action?: string
 }
 
 export function TutorialTip({ tip, onClose }: { tip: TipPayload; onClose: () => void }) {
@@ -28,6 +30,16 @@ export function TutorialTip({ tip, onClose }: { tip: TipPayload; onClose: () => 
         </button>
       </header>
       <p className="tip__text">{tip.text}</p>
+      {/*
+        할 일은 설명과 갈라 둔다. 규칙 이야기 끝에 한 문장으로 붙이면 같이 읽히고,
+        정작 무엇을 누르라는 말이 문단 속에 묻힌다.
+      */}
+      {tip.action && (
+        <p className="tip__action">
+          <span className="tip__action-label">지금 할 일</span>
+          {tip.action}
+        </p>
+      )}
       <button type="button" className="btn btn--primary tip__ok" onClick={onClose}>
         알겠습니다
       </button>

@@ -1287,6 +1287,136 @@ select {
   }
 }
 
+/*
+ * 소리 조절판.
+ *
+ * 도구 줄의 단추 아래에 매달린다. 자리를 잡을 기준이 있어야 아래로 펼칠 수 있는데,
+ * 도구 줄 자체는 가로로 세우는 일만 하므로 여기서 따로 잡는다.
+ */
+.sound {
+  position: relative;
+  display: flex;
+}
+
+.sound__panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 200px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+  box-shadow: 0 8px 24px rgba(var(--shadow-rgb), 0.35);
+  animation: sound-panel-in 0.16s ease backwards;
+}
+
+@keyframes sound-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+
+.sound__mute {
+  padding: 7px 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink-dim);
+  font-size: 12px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.sound__mute:hover,
+.sound__mute:focus-visible {
+  border-color: var(--gold-dim);
+  color: var(--gold);
+  outline: none;
+}
+
+/* 꺼져 있는 동안에는 켜는 것이 할 일이라 그쪽이 눈에 띄어야 한다. */
+.sound__mute--on {
+  border-color: var(--gold-dim);
+  color: var(--gold);
+}
+
+.sound__row {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  transition: opacity 0.15s;
+}
+
+/* 음소거 중에는 값이 남아 있어도 소리가 나지 않는다. */
+.sound__row--dim {
+  opacity: 0.45;
+}
+
+.sound__label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--ink-dim);
+}
+
+/* 숫자가 흔들리면 옮기는 동안 글자가 춤춘다. */
+.sound__value {
+  font-variant-numeric: tabular-nums;
+}
+
+.sound__range {
+  width: 100%;
+  accent-color: var(--gold);
+  cursor: pointer;
+}
+
+/* 곡 고르기. 셋이 한 줄에 나란해야 무엇들 중에 고르는지가 한눈에 보인다. */
+.sound__tracks {
+  display: flex;
+  gap: 4px;
+  transition: opacity 0.15s;
+}
+
+.sound__tracks--dim {
+  opacity: 0.45;
+}
+
+.sound__track {
+  flex: 1;
+  padding: 5px 0;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink-dim);
+  font-size: 11px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.sound__track:hover,
+.sound__track:focus-visible {
+  border-color: var(--gold-dim);
+  color: var(--gold);
+  outline: none;
+}
+
+.sound__track--on {
+  border-color: var(--gold);
+  color: var(--gold);
+  font-weight: 600;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sound__panel {
+    animation: none;
+  }
+}
+
 .theme-toggle {
   width: 36px;
   height: 36px;
@@ -1505,6 +1635,32 @@ select {
   color: var(--ink);
   /* 대본이 줄바꿈으로 문단을 나눈다. 그대로 살린다. */
   white-space: pre-wrap;
+}
+
+/*
+ * 지금 할 일.
+ *
+ * 설명과 같은 크기로 이어 붙이면 규칙 이야기에 묻힌다. 왼쪽에 금색 선을 세워
+ * 「여기부터는 읽는 것이 아니라 하는 것」이라고 갈라 둔다.
+ */
+.tip__action {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border-left: 3px solid var(--gold);
+  border-radius: 0 8px 8px 0;
+  background: rgba(var(--gold-rgb), 0.09);
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--ink);
+}
+
+.tip__action-label {
+  display: block;
+  margin-bottom: 3px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--gold);
 }
 
 .tip__ok {
