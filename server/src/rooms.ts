@@ -18,6 +18,7 @@ import {
   MIN_PLAYERS,
   READY_CHALLENGES,
   READY_SPECIALISTS,
+  conflictsWith,
   displayNames,
   emptyRounds,
   maxHeists,
@@ -451,6 +452,15 @@ export class RoomStore {
     }
     if (next.pickedChallenges.some((id) => !READY_CHALLENGES.includes(id as ChallengeId))) {
       return err('INVALID_SETTINGS', '고를 수 없는 도전자 카드입니다.')
+    }
+    /*
+     * 함께 걸면 서로 어긋나는 짝이 있다.
+     *
+     * 화면이 이미 막고 있지만 여기서도 본다 — 계약은 방에 있지 화면에 있지 않다.
+     */
+    const together = [...new Set(next.pickedChallenges)] as ChallengeId[]
+    if (together.some((id) => conflictsWith(id).some((other) => together.includes(other)))) {
+      return err('INVALID_SETTINGS', '「빠른 접근」과 감지기(동작·레이저)는 함께 걸 수 없습니다.')
     }
     if (!inRange(next.randomChallenges, 0, MAX_RANDOM_CHALLENGES)) {
       return err('INVALID_SETTINGS', `무작위 도전자는 0~${MAX_RANDOM_CHALLENGES}장입니다.`)

@@ -582,6 +582,18 @@ describe('스캔 — 마지막 사람 차례에 답을 맞힌다', () => {
 
 describe('카드를 새로 받게 만드는 감지기', () => {
   /** 플롭에 그림카드가 있는지 없는지에 따라 갈리므로, 그 조건이 맞는 판을 찾는다. */
+  /** 여러 장을 함께 건 판. 감지기 둘이 같이 걸린 자리를 보려면 이쪽이 필요하다. */
+  function findFlopWith(challenges: ChallengeId[], wantFace: boolean) {
+    for (let seed = 1; seed < 400; seed++) {
+      const ctx = gameWith(challenges, seed)
+      passRound(ctx)
+      const flop = ctx.game.view().community.slice(0, 3)
+      const hasFace = flop.some((card) => ['J', 'Q', 'K'].includes(card[0]))
+      if (hasFace === wantFace) return ctx
+    }
+    throw new Error('조건에 맞는 판을 못 찾았다')
+  }
+
   function findFlop(challenge: ChallengeId, wantFace: boolean) {
     for (let seed = 1; seed < 400; seed++) {
       const ctx = gameWith([challenge], seed)
@@ -609,6 +621,17 @@ describe('카드를 새로 받게 만드는 감지기', () => {
       view.announcements.some((a) => a.playerId === 'p1' && a.text.includes('새로 받았습니다')),
       '누가 새로 받았는지 모두에게 알려야 한다',
     )
+  })
+
+  it('둘 다 걸려도 친 것은 하나다 — 그림카드가 없으면 레이저 감지선', () => {
+    // 「3이 걸려 있으면 3」으로 적으면 레이저가 친 판에서도 동작 감지기라고 말한다.
+    const ctx = findFlopWith([3, 7], false)
+    assert.deepEqual(ctx.game.view().sensor, { challenge: 7, playerId: 'p3' }, '가장 큰 토큰을 친다')
+  })
+
+  it('둘 다 걸리고 그림카드가 있으면 동작 감지기다', () => {
+    const ctx = findFlopWith([3, 7], true)
+    assert.deepEqual(ctx.game.view().sensor, { challenge: 3, playerId: 'p1' }, '1번 토큰을 친다')
   })
 
   it('동작 감지기 — 그림카드가 없으면 아무 일도 없다', () => {
@@ -943,6 +966,25 @@ describe('직접 고르기 — 무작위 도전자', () => {
     const picked = READY_CHALLENGES.slice(0, READY_CHALLENGES.length - 1)
     const dealer = new ExtraDealer('custom', mulberry32(1), picked, [], { random: 3 })
     assert.equal(dealer.next(null).challenges.length, READY_CHALLENGES.length, '더미가 바닥나면 거기까지')
+  })
+
+  it('고른 것과 부딪히는 카드는 무작위로도 오지 않는다', () => {
+    // 방장이 감지기를 골랐는데 무작위가 빠른 접근을 얹으면, 막아둔 조합이 뒷문으로 든다.
+    for (let seed = 1; seed <= 40; seed += 1) {
+      const rolled = new ExtraDealer('custom', mulberry32(seed), [3], [], { random: 3 })
+        .next(null)
+        .challenges
+      assert.equal(rolled.includes(1), false, `씨앗 ${seed} — 빠른 접근이 얹혔다`)
+    }
+  })
+
+  it('무작위끼리도 부딪히지 않는다', () => {
+    for (let seed = 1; seed <= 60; seed += 1) {
+      const rolled = new ExtraDealer('custom', mulberry32(seed), [], [], { random: 3 }).next(null).challenges
+      const quick = rolled.includes(1)
+      const sensor = rolled.some((id) => id === 3 || id === 7)
+      assert.equal(quick && sensor, false, `씨앗 ${seed} — ${rolled.join(',')}`)
+    }
   })
 
   it('무작위 0장이면 고른 것만 걸린다', () => {

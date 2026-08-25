@@ -158,3 +158,26 @@ export const READY_SPECIALISTS = SPECIALIST_IDS.filter((id) => SPECIALISTS[id].r
 
 /** 프로·마스터 시프 모드에서는 「빠른 접근」을 쓰지 않는다. */
 export const QUICK_ACCESS: ChallengeId = 1
+
+/** 「처음 선언」을 보고 치는 감지기들. 빠른 접근과 함께 걸리면 그 「처음」이 밀린다. */
+export const SENSORS: ChallengeId[] = [3, 7]
+
+/**
+ * 한 판에 함께 걸 수 없는 짝.
+ *
+ * 「빠른 접근」은 1라운드를 통째로 건너뛴다. 감지기(동작·레이저)는 처음 선언을 보고
+ * 치는데, 건너뛴 판에서는 그 처음이 2라운드가 된다 — 카드를 두 번 집은 뒤에야 감지가
+ * 오는 셈이라, 규칙대로 돌아도 고장으로 읽힌다. 그래서 같이 고르지 못하게 막는다.
+ *
+ * 프로·마스터 시프는 애초에 빠른 접근을 더미에서 뺐다. 고급은 한 판에 한 장이라
+ * 겹칠 일이 없다. 겹칠 수 있는 것은 「직접 고르기」뿐이다.
+ */
+export function conflictsWith(challenge: ChallengeId): ChallengeId[] {
+  if (challenge === QUICK_ACCESS) return [...SENSORS]
+  return SENSORS.includes(challenge) ? [QUICK_ACCESS] : []
+}
+
+/** 이 카드를 지금 고른 것들 위에 얹을 수 있는가. */
+export function canPick(challenge: ChallengeId, picked: readonly ChallengeId[]): boolean {
+  return !conflictsWith(challenge).some((other) => picked.includes(other))
+}

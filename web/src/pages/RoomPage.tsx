@@ -11,6 +11,7 @@ import {
   MIN_MARKS,
   MIN_PLAYERS,
   READY_CHALLENGES,
+  canPick,
   maxHeists,
   nextHost,
   type ChallengeId,
@@ -335,13 +336,23 @@ export function RoomPage() {
                 </div>
               </div>
 
+              {/*
+                함께 걸면 어긋나는 짝은 서로 잠근다. 「빠른 접근」이 1라운드를 건너뛰면
+                감지기가 보는 「처음 선언」이 2라운드가 되어, 규칙대로 돌아도
+                「두 번 집은 뒤에 감지가 왔다」로 읽힌다.
+              */}
               <CardPicker
                 label={`도전자 카드 (${room.settings.pickedChallenges.length}장)`}
-                hint="고른 것이 모든 판에 함께 걸립니다."
+                hint={
+                  READY_CHALLENGES.some((id) => !canPick(id, room.settings.pickedChallenges))
+                    ? '고른 것이 모든 판에 함께 걸립니다. 「빠른 접근」과 감지기는 함께 걸 수 없어 서로 잠깁니다.'
+                    : '고른 것이 모든 판에 함께 걸립니다.'
+                }
                 options={READY_CHALLENGES.map((id) => ({
                   id,
                   name: CHALLENGES[id].name,
                   text: CHALLENGES[id].text,
+                  locked: !canPick(id, room.settings.pickedChallenges),
                 }))}
                 picked={room.settings.pickedChallenges}
                 disabled={!iAmHost}

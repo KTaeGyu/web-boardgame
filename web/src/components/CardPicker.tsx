@@ -5,6 +5,8 @@ export interface PickOption {
   name: string
   /** 설명. 목록을 짧게 두려고 화면에 늘어놓지 않고 짚을 때만 보여준다. */
   text: string
+  /** 이 카드만 잠근다. 이미 고른 것과 함께 걸 수 없을 때다 — 이유는 hint 에 적는다. */
+  locked?: boolean
 }
 
 interface Props {
@@ -42,7 +44,7 @@ export function CardPicker({ label, hint, options, picked, single, describePicke
               key={option.id}
               type="button"
               className={`pick-chip ${on ? 'pick-chip--on' : ''}`}
-              disabled={disabled}
+              disabled={disabled || option.locked}
               aria-pressed={on}
               {...handlers(option.text)}
               onClick={() => {

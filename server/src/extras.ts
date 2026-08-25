@@ -9,6 +9,7 @@ import {
   QUICK_ACCESS,
   READY_CHALLENGES,
   READY_SPECIALISTS,
+  conflictsWith,
   type ChallengeId,
   type GameMode,
   type SpecialistId,
@@ -100,13 +101,25 @@ export class ExtraDealer {
     this.challenges = new Stack(pool)
     this.specialists = new Stack(READY_SPECIALISTS)
 
-    // 무작위로 얹을 몫은 여기서 다 뽑아 둔다. 남은 더미에서 골라야 고른 것과 겹치지 않는다.
+    /*
+     * 무작위로 얹을 몫은 여기서 다 뽑아 둔다.
+     *
+     * 남은 더미에서 골라야 고른 것과 겹치지 않고, 함께 걸면 어긋나는 짝도 미리 뺀다 —
+     * 방장이 감지기를 골랐는데 무작위가 「빠른 접근」을 얹으면 막아둔 조합이 뒷문으로 든다.
+     */
     if (mode === 'custom') {
-      const rest = READY_CHALLENGES.filter((id) => !this.picked.includes(id))
-      const count = Math.min(options.random ?? 0, rest.length)
-      for (let i = 0; i < count; i += 1) {
+      const rest = READY_CHALLENGES.filter(
+        (id) => !this.picked.includes(id) && !conflictsWith(id).some((other) => this.picked.includes(other)),
+      )
+      const count = options.random ?? 0
+      for (let i = 0; i < count && rest.length > 0; i += 1) {
         const [drawn] = rest.splice(Math.floor(rng() * rest.length), 1)
         this.rolled.push(drawn)
+        // 방금 뽑은 것과 부딪히는 카드도 뺀다. 무작위끼리 어긋나도 판은 똑같이 이상해진다.
+        for (const other of conflictsWith(drawn)) {
+          const at = rest.indexOf(other)
+          if (at >= 0) rest.splice(at, 1)
+        }
       }
     }
 

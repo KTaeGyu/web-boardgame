@@ -717,18 +717,31 @@ export class Game {
     if (this.firstRoundTokens.size === 0) return
 
     const flopHasFace = this.community.slice(0, 3).some((card) => FACE_RANKS.has(rankOf(card)))
+    /*
+     * 어느 카드가 쳤는지를 대상과 함께 정한다.
+     *
+     * 「3이 걸려 있으면 3」으로 적으면 둘 다 걸린 판에서 레이저가 쳐도 동작 감지기라고
+     * 말한다. 둘은 그림카드가 있느냐로 갈려 한 판에 하나만 치는데, 이름만 어긋났다.
+     */
     let target: number | null = null
-    if (this.has(3) && flopHasFace) target = 1
-    if (this.has(7) && !flopHasFace) target = this.seats.length
-    if (target === null) return
+    let fired: ChallengeId | null = null
+    if (this.has(3) && flopHasFace) {
+      target = 1
+      fired = 3
+    }
+    if (this.has(7) && !flopHasFace) {
+      target = this.seats.length
+      fired = 7
+    }
+    if (target === null || fired === null) return
 
     const victimId = [...this.firstRoundTokens].find(([, token]) => token === target)?.[0]
     const victim = this.seats.find((seat) => seat.id === victimId)
     if (!victim) return
 
     victim.hole = victim.hole.map(() => this.draw())
-    this.sensorFired = { challenge: this.has(3) ? 3 : 7, playerId: victim.id }
-    this.tell(victim.id, `「${CHALLENGES[this.sensorFired.challenge].name}」 — 카드를 다시 받습니다`, 'warn')
+    this.sensorFired = { challenge: fired, playerId: victim.id }
+    this.tell(victim.id, `「${CHALLENGES[fired].name}」 — 카드를 다시 받습니다`, 'warn')
     this.announcements.push({
       playerId: victim.id,
       text: `${this.nameOf(victim.id)} — 카드를 새로 받았습니다`,

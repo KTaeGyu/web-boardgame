@@ -404,6 +404,18 @@ describe('방 설정', () => {
     assert.deepEqual(ctx.store.view(code)?.settings.pickedChallenges, [2])
   })
 
+  it('빠른 접근과 감지기는 함께 걸 수 없다', () => {
+    // 빠른 접근이 1라운드를 건너뛰면 감지기가 보는 「처음 선언」이 2라운드가 된다.
+    // 규칙대로 돌아도 「두 번 집은 뒤에 감지가 왔다」로 읽힌다.
+    for (const sensor of [3, 7] as const) {
+      const clash = ctx.store.updateSettings('p1', { pickedChallenges: [1, sensor] })
+      assert.equal(clash.ok, false, `빠른 접근 + ${sensor}`)
+      if (!clash.ok) assert.equal(clash.code, 'INVALID_SETTINGS')
+    }
+    assert.equal(ctx.store.updateSettings('p1', { pickedChallenges: [3, 7] }).ok, true, '감지기끼리는 된다')
+    assert.equal(ctx.store.updateSettings('p1', { pickedChallenges: [1, 2] }).ok, true, '다른 카드와는 된다')
+  })
+
   it('금고와 경보는 1~5 사이다', () => {
     for (const bad of [0, 6, 2.5]) {
       assert.equal(ctx.store.updateSettings('p1', { vaultsToWin: bad }).ok, false, `금고 ${bad}`)
