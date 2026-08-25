@@ -2,7 +2,7 @@ import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 
 import type { Card } from '../src/cards.ts'
-import { bestHolding } from '../src/handEval.ts'
+import { bestHolding, orderForReading } from '../src/handEval.ts'
 
 const cards = (s: string) => s.split(' ') as Card[]
 const used = (s: string) => bestHolding(cards(s))?.used.slice().sort()
@@ -45,5 +45,39 @@ describe('족보를 이루는 카드', () => {
   it('카드가 없으면 짚을 것도 없다', () => {
     assert.equal(bestHolding([]), null)
     assert.equal(bestHolding(cards('Ks')), null)
+  })
+})
+
+describe('읽는 차례로 늘어놓기', () => {
+  it('페어가 앞에 서고 나머지는 높은 것부터다', () => {
+    // 딜 순서대로 오면 무엇이 짝인지 눈으로 세어야 한다.
+    assert.deepEqual(orderForReading(['7h', 'Kd', '7s', '2c', 'As']), ['7h', '7s', 'As', 'Kd', '2c'])
+  })
+
+  it('투 페어는 높은 쪽 페어부터, 그다음이 키커다', () => {
+    assert.deepEqual(orderForReading(['4d', 'Qs', '4c', 'Qh', '9s']), ['Qs', 'Qh', '4d', '4c', '9s'])
+  })
+
+  it('트리플은 셋이 함께 앞에 선다', () => {
+    assert.deepEqual(orderForReading(['5h', 'Jd', '5s', '5c', 'Ah']), ['5h', '5s', '5c', 'Ah', 'Jd'])
+  })
+
+  it('짝이 없으면 그냥 높은 순이다 — A · K · Q …', () => {
+    assert.deepEqual(orderForReading(['3c', 'Ks', 'Ah', '9d', 'Qs']), ['Ah', 'Ks', 'Qs', '9d', '3c'])
+  })
+
+  it('휠은 A 를 맨 뒤에 둔다 — 여기서 A 는 1이다', () => {
+    assert.deepEqual(orderForReading(['Ah', '4d', '2s', '5c', '3h']), ['5c', '4d', '3h', '2s', 'Ah'])
+  })
+
+  it('A 부터 이어지는 스트레이트는 그대로 높은 순이다', () => {
+    assert.deepEqual(orderForReading(['Ts', 'Ah', 'Jd', 'Kc', 'Qs']), ['Ah', 'Kc', 'Qs', 'Jd', 'Ts'])
+  })
+
+  it('원래 배열을 건드리지 않는다', () => {
+    const cards = ['7h', 'Kd', '7s'] as const
+    const before = [...cards]
+    orderForReading(cards)
+    assert.deepEqual([...cards], before)
   })
 })

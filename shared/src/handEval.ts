@@ -207,3 +207,33 @@ export function bestHolding(cards: readonly Card[]): Holding | null {
 export function describeHolding(cards: readonly Card[]): string | null {
   return bestHolding(cards)?.description ?? null
 }
+
+/**
+ * 사람이 읽기 좋은 차례로 늘어놓는다.
+ *
+ * 족보를 이룬 카드가 앞에 선다 — 같은 숫자가 여럿이면 그것이 이 손이 센 이유이고,
+ * 뒤의 것은 키커라 큰 것부터 읽는 편이 빠르다. 판정에는 영향이 없다.
+ * 서버가 고른 다섯 장은 딜 순서 그대로라, 무엇이 짝이었는지 눈으로 세어야 했다.
+ *
+ * 휠(A2345)만 예외다. 여기서 A 는 1처럼 쓰이므로 맨 뒤에 세운다 —
+ * 앞에 두면 「A 로 시작하는 다섯 장」으로 읽혀 무엇이 이어졌는지가 흐려진다.
+ */
+export function orderForReading(cards: readonly Card[]): Card[] {
+  const count = new Map<number, number>()
+  for (const card of cards) {
+    const rank = rankValueOf(card)
+    count.set(rank, (count.get(rank) ?? 0) + 1)
+  }
+
+  const wheel = count.size === 5 && [14, 5, 4, 3, 2].every((rank) => count.has(rank))
+
+  return [...cards].sort((a, b) => {
+    const left = rankValueOf(a)
+    const right = rankValueOf(b)
+    const pairedLeft = count.get(left) ?? 0
+    const pairedRight = count.get(right) ?? 0
+    if (pairedLeft !== pairedRight) return pairedRight - pairedLeft
+    if (wheel && left !== right && (left === 14 || right === 14)) return left === 14 ? 1 : -1
+    return right - left
+  })
+}

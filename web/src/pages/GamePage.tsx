@@ -6,6 +6,7 @@ import {
   ROUND_LABEL,
   TOKEN_LOCK_MS,
   bestHolding,
+  orderForReading,
   type Card,
   type GamePlayerView,
   type GameView,
@@ -1061,8 +1062,12 @@ function Showdown({ game, revealed, finished, playerId, iAmHost, tutorial, onLea
                   </span>
                 </span>
                 <span className={`reveal__cards ${view === 'combo' ? 'reveal__cards--combo' : ''}`}>
+                  {/*
+                    조합 보기는 읽는 차례로 세운다 — 짝이 앞, 나머지는 높은 것부터.
+                    서버가 고른 다섯 장은 딜 순서 그대로라 무엇이 짝이었는지 눈으로 세어야 했다.
+                  */}
                   {(view === 'combo' && shown
-                    ? (bestHolding([...reveal.hole, ...game.community])?.used ?? reveal.hole)
+                    ? orderForReading(bestHolding([...reveal.hole, ...game.community])?.used ?? reveal.hole)
                     : reveal.hole
                   ).map((card) => (
                     <PlayingCard
