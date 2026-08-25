@@ -70,6 +70,8 @@ export function Chat({ code }: { code: string }) {
   const [open, setOpen] = useState(false)
   const [messages, setMessages] = useState<ChatMessage[]>(() => loadSaved(code))
   const [draft, setDraft] = useState('')
+  /** 서버가 거절한 이유. 도배로 막혔을 때가 거의 전부다. */
+  const [notice, setNotice] = useState('')
   /** 접힌 동안 왼쪽에 붙어 있는 마지막 한 줄. */
   const [peek, setPeek] = useState<ChatMessage | null>(null)
   const [unread, setUnread] = useState(0)
@@ -137,8 +139,15 @@ export function Chat({ code }: { code: string }) {
     event.preventDefault()
     const text = draft.trim()
     if (!text) return
+
+    const result = await call<null>('chat:send', { text })
+    // 막혔을 때 쓴 것을 지우면 다시 쳐야 한다. 나간 것이 확인된 뒤에만 비운다.
+    if (!result.ok) {
+      setNotice(result.message)
+      return
+    }
+    setNotice('')
     setDraft('')
-    await call<null>('chat:send', { text })
   }
 
   return (
@@ -169,7 +178,13 @@ export function Chat({ code }: { code: string }) {
                     {broken && <p className="chat__break">이 사이의 대화는 남아 있지 않습니다</p>}
                     <div className={`chat__line ${mine ? 'chat__line--mine' : ''}`}>
                       {/* 내 말에 내 이름을 붙일 이유는 없다. 오른쪽에 선 것이 곧 표시다. */}
-                      {!mine && <span className="chat__who">{message.name}</span>}
+                      {!mine && (
+                      <span className="chat__who">
+                        {message.name}
+                        {/* 판 밖에서 보는 사람의 말은 선언과 무게가 다르다. 그것이 보여야 한다. */}
+                        {message.spectator && <span className="chat__watcher">관전</span>}
+                      </span>
+                    )}
                       <span className="chat__bubble">{message.text}</span>
                     </div>
                   </Fragment>
@@ -177,6 +192,8 @@ export function Chat({ code }: { code: string }) {
               })
             )}
           </div>
+
+          {notice && <p className="chat__notice">{notice}</p>}
 
           <form className="chat__form" onSubmit={(event) => void send(event)}>
             <input

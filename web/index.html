@@ -23,6 +23,15 @@
         }
         var dark = saved ? saved === 'dark' : !window.matchMedia('(prefers-color-scheme: light)').matches
         document.documentElement.dataset.theme = dark ? 'dark' : 'light'
+
+        // 화면 크기도 같은 이유로 여기서 정한다. 뒤늦게 붙이면 한 칠은 큰 채로 나온다.
+        try {
+          if (localStorage.getItem('the-gang:density') === 'compact') {
+            document.documentElement.dataset.density = 'compact'
+          }
+        } catch (error) {
+          /* 저장이 막혔으면 기본 크기로 둔다 */
+        }
       })()
     </script>
   </head>

@@ -39,7 +39,8 @@ const RANK_VALUES = [14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2]
  * 읽을 수 있어야 하지만, 늘 펼쳐 두면 테이블을 가린다.
  */
 export function ExtrasDrawer({ game, playerId, hand, notes, onUse }: Props) {
-  const [open, setOpen] = useState(true)
+  // 접힌 채로 시작한다. 펼쳐 두면 테이블을 가리고, 대개는 걸린 것을 이미 옆에서 보고 있다.
+  const [open, setOpen] = useState(false)
   const [asking, setAsking] = useState(false)
   const [targetId, setTargetId] = useState('')
   const [value, setValue] = useState(14)
@@ -181,7 +182,7 @@ export function ExtrasDrawer({ game, playerId, hand, notes, onUse }: Props) {
 }
 
 /** 도전자 카드가 지금 어떤 상태인지. 스캔처럼 결과가 남는 카드가 있다. */
-function challengeStatus(game: GameView, id: number): string {
+export function challengeStatus(game: GameView, id: number): string {
   const kind = id === 4 ? 'rank' : id === 9 ? 'category' : null
   const question = kind ? game.scan?.questions.find((q) => q.kind === kind) : null
   if (question) {
@@ -209,7 +210,7 @@ interface TileProps {
  * 앞면은 이름만 두어 한눈에 몇 장인지 보이게 하고, 마우스를 올리면 설명이 커서 옆에 뜬다.
  * 눌러서 뒤집으면 설명과 지금까지의 결과가 나온다 — 길어질 수 있어 뒷면은 스크롤된다.
  */
-function ExtraTile({ kind, card, status, note, onUse }: TileProps) {
+export function ExtraTile({ kind, card, status, note, onUse }: TileProps) {
   const [flipped, setFlipped] = useState(false)
   const [tip, setTip] = useState<{ x: number; y: number } | null>(null)
 

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import type { RoomSummary, RoomView } from '@the-gang/shared'
 
-import { ConfirmModal } from '../components/Modal.tsx'
+import { ChoiceModal } from '../components/Modal.tsx'
 import { getNickname, getPlayerId } from '../lib/identity.ts'
 import { createRoom } from '../lib/rooms.ts'
 import { call, socket, useConnected, useServerEvent } from '../lib/socket.ts'
@@ -86,9 +86,15 @@ export function RoomsPage() {
 
   return (
     <main className="page page--column rooms-page">
-      <Link className="link-back" to="/">
-        ← 처음으로
-      </Link>
+      <div className="rooms-top">
+        <Link className="link-back" to="/">
+          ← 처음으로
+        </Link>
+        {/* 기록은 이 기기에만 남는다. 자랑할 곳이 아니라 스스로 보는 자리다. */}
+        <Link className="link-back" to="/history">
+          지난 기록 →
+        </Link>
+      </div>
 
       <div className="rooms-head">
         <div>
@@ -127,11 +133,15 @@ export function RoomsPage() {
             const full = room.playerCount >= room.maxPlayers
             return (
               <li key={room.code}>
+                {/*
+                  판이 도는 방은 들어가 앉을 수는 없지만 볼 수는 있다. 그래서 잠그지 않고
+                  가는 곳만 바꾼다 — 잠긴 줄은 「닫힌 문」으로 읽혀 아무도 두드리지 않는다.
+                */}
                 <button
                   type="button"
                   className="room-item"
-                  onClick={() => setAsking(room)}
-                  disabled={playing || full || !connected}
+                  onClick={() => (playing ? navigate(`/rooms/${room.code}/watch`) : setAsking(room))}
+                  disabled={(!playing && full) || !connected}
                 >
                   <span className="room-item__code">{room.code}</span>
                   <span className="room-item__main">
@@ -139,9 +149,10 @@ export function RoomsPage() {
                     <br />
                     <span className="room-item__meta">
                       {room.playerCount} / {room.maxPlayers}명
+                      {room.spectatorCount > 0 && ` · 관전 ${room.spectatorCount}명`}
                     </span>
                   </span>
-                  {playing && <span className="badge badge--playing">게임 중</span>}
+                  {playing && <span className="badge badge--playing">게임 중 · 관전</span>}
                   {!playing && full && <span className="badge">정원 참</span>}
                 </button>
               </li>
@@ -153,14 +164,26 @@ export function RoomsPage() {
       {error && <p className="error">{error}</p>}
 
       {asking && (
-        <ConfirmModal
-          title={`${asking.hostNickname}님의 방에 입장하시겠습니까?`}
-          onConfirm={() => void enter(asking)}
-          onCancel={() => setAsking(null)}
-          busy={busy}
+        <ChoiceModal
+          title={`${asking.hostNickname}님의 방`}
+          onClose={() => setAsking(null)}
+          actions={[
+            {
+              label: busy ? '들어가는 중…' : '들어가기',
+              tone: 'primary',
+              onClick: () => void enter(asking),
+            },
+            {
+              label: '관전하기',
+              onClick: () => navigate(`/rooms/${asking.code}?watch=1`),
+            },
+          ]}
         >
           현재 {asking.playerCount}명이 기다리고 있습니다.
-        </ConfirmModal>
+          <br />
+          관전은 자리를 차지하지 않아 <strong>시작 인원에 들어가지 않습니다.</strong>
+          {asking.spectatorCount > 0 && ` 지금 ${asking.spectatorCount}명이 보고 있습니다.`}
+        </ChoiceModal>
       )}
     </main>
   )

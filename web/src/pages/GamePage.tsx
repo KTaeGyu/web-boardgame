@@ -17,10 +17,12 @@ import { Chat } from '../components/Chat.tsx'
 import { ExtrasDrawer, NoteCard, type CardNote } from '../components/ExtrasDrawer.tsx'
 import { ScanVote } from '../components/ScanVote.tsx'
 import { SetupStep } from '../components/SetupStep.tsx'
+import { TableChallenges, TableSpecialist } from '../components/TableExtras.tsx'
 import { TutorialTip, type TipPayload } from '../components/TutorialTip.tsx'
 import { ConfirmModal } from '../components/Modal.tsx'
 import { CardSlot, PlayingCard } from '../components/PlayingCard.tsx'
 import { Token, TokenBlank } from '../components/Token.tsx'
+import { record } from '../lib/history.ts'
 import { getNickname, getPlayerId } from '../lib/identity.ts'
 import { call, socket, useServerEvent } from '../lib/socket.ts'
 import { useEscape } from '../lib/useEscape.ts'
@@ -64,7 +66,7 @@ const VERDICT_MS = 1200
 const FINAL_GAP_MS = 350
 const FINAL_MS = 2400
 
-export function GamePage() {
+export function GamePage({ spectating = false }: { spectating?: boolean } = {}) {
   const { code = '' } = useParams()
   const navigate = useNavigate()
   const playerId = getPlayerId()
@@ -89,6 +91,8 @@ export function GamePage() {
   const [confirmLeave, setConfirmLeave] = useState(false)
   /** 방장인지. 방장은 나가는 대신 판을 접어 모두를 대기실로 되돌린다. */
   const [hostId, setHostId] = useState('')
+  /** 혼자 해보는 판인가. 돌아갈 대기실도, 다음 금고도 없다. */
+  const [tutorial, setTutorial] = useState(false)
   /** 카드가 나에게만 알려준 것들. 이번 판 동안 드로어에 남는다. */
   const [notes, setNotes] = useState<CardNote[]>([])
   /** 방금 도착한 쪽지. 한 번 보여주고 나면 드로어에서 다시 볼 수 있다. */
@@ -154,11 +158,11 @@ export function GamePage() {
     }
     let alive = true
     const enter = async () => {
-      const result = await call<{ hostId: string; phase: string }>('room:join', {
-        playerId,
-        nickname,
-        code,
-      })
+      // 보러 온 사람은 자리에 앉지 않는다. 같은 화면이지만 들어가는 문이 다르다.
+      const result = await call<{ hostId: string; phase: string; tutorial: boolean }>(
+        spectating ? 'room:spectate' : 'room:join',
+        { playerId, nickname, code },
+      )
       if (!alive) return
 
       // 실패를 삼키면 「테이블을 차리는 중」에서 영영 멈춘다. 서버가 다시 뜬 뒤
@@ -173,8 +177,11 @@ export function GamePage() {
         return
       }
       setHostId(result.value.hostId)
-      // 방은 있는데 판이 없으면 여기 있을 이유가 없다.
-      if (result.value.phase === 'lobby') navigate(`/rooms/${code}`, { replace: true })
+      setTutorial(result.value.tutorial)
+      // 방은 있는데 판이 없으면 여기 있을 이유가 없다. 보러 온 사람은 대기실에도 갈 자리가 없다.
+      if (result.value.phase === 'lobby') {
+        navigate(spectating ? '/rooms' : `/rooms/${code}`, { replace: true })
+      }
     }
 
     void enter()
@@ -186,7 +193,20 @@ export function GamePage() {
       alive = false
       socket.off('connect', onConnect)
     }
-  }, [code, nickname, playerId, navigate])
+  }, [code, nickname, playerId, navigate, spectating])
+
+  /*
+   * 지금 어느 화면인가를 body 에 적어 둔다.
+   *
+   * 테마·신고 단추는 App 이 그리는 붙박이라 이 화면의 자손이 아니다. 그래서 여기서
+   * 「판 화면이다」를 알려야 그 단추들이 상태 줄을 비켜설 수 있다.
+   */
+  useEffect(() => {
+    document.body.dataset.screen = 'game'
+    return () => {
+      delete document.body.dataset.screen
+    }
+  }, [])
 
   useEscape(
     !confirmLeave,
@@ -252,13 +272,19 @@ export function GamePage() {
   useServerEvent(
     'room:updated',
     useCallback(
-      (room: { code: string; phase: string; hostId: string }) => {
+      (room: { code: string; phase: string; hostId: string; tutorial: boolean }) => {
         if (room.code !== code) return
         setHostId(room.hostId)
+        setTutorial(room.tutorial)
         // 판이 접혔거나 아직 시작 전이면 이 화면에 있을 이유가 없다.
-        if (room.phase === 'lobby') navigate(`/rooms/${code}`, { replace: true })
+        if (room.phase === 'lobby') {
+          navigate(spectating ? '/rooms' : `/rooms/${code}`, {
+            replace: true,
+            ...(spectating ? { state: { notice: '판이 끝났습니다.' } } : {}),
+          })
+        }
       },
-      [code, navigate],
+      [code, navigate, spectating],
     ),
   )
 
@@ -360,6 +386,25 @@ export function GamePage() {
     return () => clearTimeout(timer)
   }, [sensorKey])
 
+  /*
+   * 끝을 본 판만 적는다 — 승·패·중도포기 셋뿐이라 그때만 세면 새로고침으로 두 번 세는
+   * 일이 없다. 연습과 관전은 세지 않는다. 남이 나가 접힌 판도 내 승패가 아니라 세지 않는다.
+   */
+  useEffect(() => {
+    if (spectating || tutorial || !game) return
+    if (game.phase !== 'gameOver' || !game.outcome) return
+    record(nickname, game.outcome === 'win' ? 'win' : 'lose', `${code}:${game.heist}:${game.outcome}`)
+  }, [spectating, tutorial, game, nickname, code])
+
+  /** 판이 끝나기 전에 스스로 나가는 것은 중도포기다. */
+  function leaveNow() {
+    if (!spectating && !tutorial && game && game.phase !== 'gameOver') {
+      record(nickname, 'quit', `${code}:${game.heist}:quit`)
+    }
+    setConfirmLeave(false)
+    void leave(navigate, tutorial)
+  }
+
   async function take(token: number) {
     const result = await call<null>('game:take', { token })
     if (result.ok) return
@@ -388,12 +433,15 @@ export function GamePage() {
   const me = game.players.find((player) => player.id === playerId)
   const others = game.players.filter((player) => player.id !== playerId)
   const picking = game.phase === 'picking'
-  // 방장에게는 나가기 대신 「로비로」가 있다. 정말 나가려면 대기실에서 한 번 더 눌러야 한다.
-  const iAmHost = hostId === playerId
+  /*
+   * 방장에게는 나가기 대신 「로비로」가 있다. 정말 나가려면 대기실에서 한 번 더 눌러야 한다.
+   * 튜토리얼은 만든 사람이 곧 방장이지만 돌아갈 대기실이 없다 — 혼자였으므로 그냥 나간다.
+   */
+  const iAmHost = hostId === playerId && !tutorial && !spectating
   const waitingFor = game.players.filter((player) => !player.connected)
 
   return (
-    <main className="game">
+    <main className={`game ${spectating ? 'game--watching' : ''}`}>
       <header className="game-bar">
         <span className="game-bar__heist">{game.heist}번째 금고</span>
         {/* 금고와 경보를 두 줄로 나눈다. 좁은 화면에서 한 줄로 늘어놓으면 나가기가 밀려난다. */}
@@ -412,6 +460,7 @@ export function GamePage() {
         <span className="game-bar__round">
           {picking ? `${game.round}라운드 · ${ROUND_LABEL[game.round]}` : '쇼다운'}
         </span>
+        {spectating && <span className="game-bar__watching">관전 중</span>}
         <button type="button" className="game-bar__leave" onClick={() => setConfirmLeave(true)}>
           {iAmHost ? '로비로' : '나가기'}
         </button>
@@ -478,6 +527,13 @@ export function GamePage() {
         </section>
       </div>
 
+      {/*
+        테이블과 그 양옆. 넓은 화면에서만 옆이 서고, 좁으면 테이블 하나만 남는다.
+        무엇이 걸렸는지 매번 드로어를 열어 확인하게 두면 잊은 채로 두는 쪽을 고르게 된다.
+      */}
+      <div className="table-row">
+        <TableSpecialist game={game} note={notes.find((n) => n.specialist === game.specialist) ?? null} />
+
       <section className="table">
         <div className="table__community">
           {Array.from({ length: 5 }, (_, index) =>
@@ -511,6 +567,9 @@ export function GamePage() {
           )}
         </div>
       </section>
+
+        <TableChallenges game={game} />
+      </div>
 
       {me && (
         <section className={`my-seat ${me.ready ? 'my-seat--ready' : ''}`}>
@@ -629,7 +688,15 @@ export function GamePage() {
       />
 
       {game.showdown && game.phase !== 'scanning' && (
-        <Showdown game={game} revealed={revealed} finished={finished} playerId={playerId} />
+        <Showdown
+          game={game}
+          revealed={revealed}
+          finished={finished}
+          playerId={playerId}
+          iAmHost={iAmHost}
+          tutorial={tutorial}
+          onLeave={() => setConfirmLeave(true)}
+        />
       )}
 
       {/* 쇼다운 밖에서도 뜬다. 감지기는 라운드 도중에 터진다. */}
@@ -659,13 +726,27 @@ export function GamePage() {
 
       {confirmLeave && !iAmHost && (
         <ConfirmModal
-          title="게임에서 나가시겠습니까?"
+          title={
+            spectating
+              ? '관전을 그만두시겠습니까?'
+              : tutorial
+                ? '연습을 그만두시겠습니까?'
+                : '게임에서 나가시겠습니까?'
+          }
           confirmLabel="나가기"
           cancelLabel="계속하기"
-          onConfirm={() => void leave(navigate)}
+          onConfirm={leaveNow}
           onCancel={() => setConfirmLeave(false)}
         >
-          지금 나가면 <strong>이 판이 취소되고</strong> 남은 사람들도 모두 대기실로 돌아갑니다.
+          {spectating ? (
+            <>보던 판에서 나갑니다. 판은 그대로 이어집니다.</>
+          ) : tutorial ? (
+            <>연습을 그만두고 첫 화면으로 돌아갑니다. 언제든 다시 시작할 수 있습니다.</>
+          ) : (
+            <>
+              지금 나가면 <strong>이 판이 취소되고</strong> 남은 사람들도 모두 대기실로 돌아갑니다.
+            </>
+          )}
         </ConfirmModal>
       )}
     </main>
@@ -680,9 +761,10 @@ function failureText(missed: ('rank' | 'category')[]): string {
   return `${missed.map((kind) => SCAN_NAME[kind]).join('·')} 스캔에 걸렸습니다!`
 }
 
-async function leave(navigate: ReturnType<typeof useNavigate>) {
+/** 연습은 첫 화면에서 들어왔으므로 첫 화면으로 되돌린다. 방 목록에 볼 것이 없다. */
+async function leave(navigate: ReturnType<typeof useNavigate>, tutorial = false) {
   await call<null>('room:leave')
-  navigate('/rooms')
+  navigate(tutorial ? '/' : '/rooms')
 }
 
 // ── 자리 ──────────────────────────────────────────────────
@@ -769,10 +851,30 @@ interface ShowdownProps {
   revealed: number
   finished: boolean
   playerId: string
+  /** 방장은 나가는 대신 판을 접어 모두를 대기실로 되돌린다. 확인창의 말도 달라진다. */
+  iAmHost: boolean
+  /** 혼자 해보는 판. 다음 금고가 없고, 여기서 끝난다. */
+  tutorial: boolean
+  onLeave: () => void
 }
 
-function Showdown({ game, revealed, finished, playerId }: ShowdownProps) {
+function Showdown({ game, revealed, finished, playerId, iAmHost, tutorial, onLeave }: ShowdownProps) {
   const navigate = useNavigate()
+  /**
+   * 마우스를 올린 사람의 다섯 장.
+   *
+   * 공개가 다 끝난 뒤에만 켠다 — 한 장씩 뒤집히는 동안 켜지면 아직 안 뒤집힌 카드까지
+   * 밝혀져 순서를 보여주는 연출이 무너진다.
+   */
+  const [hovered, setHovered] = useState<string | null>(null)
+  /**
+   * 무엇을 보여줄 것인가.
+   *
+   * 'hand' 는 그 사람이 쥐고 있던 두 장이고, 'combo' 는 그 두 장과 공용 카드로 만들어진
+   * 실제 다섯 장이다. 둘 다 필요하다 — 앞은 「무엇을 들고 그렇게 선언했나」, 뒤는
+   * 「그래서 얼마나 셌나」를 말한다.
+   */
+  const [view, setView] = useState<'hand' | 'combo'>('hand')
   const reveals = game.showdown?.reveals ?? []
   const done = finished
   const over = game.phase === 'gameOver'
@@ -783,6 +885,19 @@ function Showdown({ game, revealed, finished, playerId }: ShowdownProps) {
   // 끊긴 사람은 기다려주지 않으므로 분모도 접속 중인 사람 수다.
   const waitingOn = game.players.filter((player) => player.connected).length
   const askedToRematch = over && game.rematch.proposed && !iAgreed
+
+  /*
+   * 짚고 있는 사람이 실제로 쓴 다섯 장. 공개된 홀카드와 공용 카드로 다시 구해도
+   * 서버가 판정한 것과 같은 답이 나온다 — 같은 규칙이 shared 에 한 벌만 있기 때문이다.
+   */
+  const lit = new Set<string>(
+    hovered && view === 'hand'
+      ? (bestHolding([
+          ...(reveals.find((one) => one.playerId === hovered)?.hole ?? []),
+          ...game.community,
+        ])?.used ?? [])
+      : [],
+  )
 
   return (
     <div className="showdown">
@@ -806,23 +921,75 @@ function Showdown({ game, revealed, finished, playerId }: ShowdownProps) {
         {game.community.length > 0 && (
           <div className="showdown__community">
             {game.community.map((card, index) => (
-              <PlayingCard key={card} card={card} size="sm" delay={index * 60} />
+              <PlayingCard
+                key={card}
+                card={card}
+                size="sm"
+                delay={index * 60}
+                highlight={lit.has(card)}
+              />
             ))}
+          </div>
+        )}
+
+        {done && (
+          <div className="showdown__view">
+            <button
+              type="button"
+              className="showdown__swap"
+              onClick={() => setView(view === 'hand' ? 'combo' : 'hand')}
+              aria-label={view === 'hand' ? '조합 보기로 바꾸기' : '핸드 보기로 바꾸기'}
+            >
+              {view === 'hand' ? '조합 보기 →' : '← 핸드 보기'}
+            </button>
           </div>
         )}
 
         <ol className="reveal-list">
           {reveals.map((reveal, index) => {
             const shown = index < revealed
+            const seat = game.players.find((player) => player.id === reveal.playerId)
             return (
-              <li key={reveal.playerId} className={`reveal ${shown ? 'reveal--shown' : ''} ${shown && !reveal.ok ? 'reveal--bad' : ''}`}>
+              <li
+                key={reveal.playerId}
+                className={`reveal ${shown ? 'reveal--shown' : ''} ${shown && !reveal.ok ? 'reveal--bad' : ''} ${
+                  hovered === reveal.playerId ? 'reveal--lit' : ''
+                }`}
+                // 공개가 다 끝난 뒤에만. 그 전에는 아직 뒤집히지 않은 카드가 있다.
+                onMouseEnter={() => done && setHovered(reveal.playerId)}
+                onMouseLeave={() => setHovered(null)}
+              >
                 <span className="reveal__token">{reveal.token}</span>
                 <span className="reveal__name">
-                  {game.players.find((p) => p.id === reveal.playerId)?.displayName}
+                  {seat?.displayName}
+                  {/*
+                    라운드마다의 선언. 마지막 하나만 보면 「어쩌다 그 자리에 섰는지」가
+                    안 보인다 — 처음부터 세다가 밀린 것인지, 끝에 와서 올린 것인지가
+                    이 줄에 남는다.
+                  */}
+                  <span className="reveal__track">
+                    {ROUNDS.map((r) => {
+                      const past = seat?.history[r - 1]
+                      return past === null || past === undefined ? (
+                        <TokenBlank key={r} round={r} />
+                      ) : (
+                        <Token key={r} value={past} round={r} settled />
+                      )
+                    })}
+                  </span>
                 </span>
-                <span className="reveal__cards">
-                  {reveal.hole.map((card) => (
-                    <PlayingCard key={card} card={card} size="sm" faceDown={!shown} />
+                <span className={`reveal__cards ${view === 'combo' ? 'reveal__cards--combo' : ''}`}>
+                  {(view === 'combo' && shown
+                    ? (bestHolding([...reveal.hole, ...game.community])?.used ?? reveal.hole)
+                    : reveal.hole
+                  ).map((card) => (
+                    <PlayingCard
+                      key={card}
+                      card={card}
+                      size="sm"
+                      faceDown={!shown}
+                      highlight={lit.has(card)}
+                    />
                   ))}
                 </span>
                 <span className="reveal__hand">{shown ? reveal.description : ''}</span>
@@ -831,17 +998,33 @@ function Showdown({ game, revealed, finished, playerId }: ShowdownProps) {
           })}
         </ol>
 
-        {done && !over && (
-          <button
-            type="button"
-            className="btn btn--primary btn--block"
-            disabled={iContinued}
-            onClick={() => void call('game:continue')}
-          >
-            {iContinued
-              ? `다른 사람을 기다리는 중 (${continued.length}/${waitingOn})`
-              : `다음 금고로 (${continued.length}/${waitingOn})`}
+        {/* 연습은 금고 하나로 끝난다. 다음 금고를 걸어두면 끝나지 않는 연습이 된다. */}
+        {done && tutorial && (
+          <button type="button" className="btn btn--primary btn--block" onClick={onLeave}>
+            나가기
           </button>
+        )}
+
+        {done && !over && !tutorial && (
+          <div className="showdown__next">
+            <button
+              type="button"
+              className="btn btn--primary"
+              disabled={iContinued}
+              onClick={() => void call('game:continue')}
+            >
+              {iContinued
+                ? `다른 사람을 기다리는 중 (${continued.length}/${waitingOn})`
+                : `다음 금고로 (${continued.length}/${waitingOn})`}
+            </button>
+            {/*
+              다음 금고로를 이미 눌렀어도 여기서 빠져나갈 수 있어야 한다 — 다른 사람을
+              기다리는 동안 갇히면, 남은 길이 브라우저를 닫는 것뿐이다.
+            */}
+            <button type="button" className="btn showdown__leave" onClick={onLeave}>
+              {iAmHost ? '로비로' : '나가기'}
+            </button>
+          </div>
         )}
 
         {done && over && (

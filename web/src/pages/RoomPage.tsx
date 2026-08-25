@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
   CHALLENGES,
   GAME_MODES,
   GAME_MODE_HINT,
   GAME_MODE_LABEL,
+  MAX_SPECTATORS,
   MIN_PLAYERS,
   READY_CHALLENGES,
   nextHost,
@@ -17,7 +18,7 @@ import {
 import { CardPicker } from '../components/CardPicker.tsx'
 import { Chat } from '../components/Chat.tsx'
 import { SpecialistGrid } from '../components/SpecialistGrid.tsx'
-import { ConfirmModal } from '../components/Modal.tsx'
+import { ChoiceModal, ConfirmModal } from '../components/Modal.tsx'
 import { getNickname, getPlayerId } from '../lib/identity.ts'
 import { call, socket, useServerEvent } from '../lib/socket.ts'
 import { useEscape } from '../lib/useEscape.ts'
@@ -33,6 +34,12 @@ const CLOSED_MESSAGE: Record<string, string> = {
 export function RoomPage() {
   const { code = '' } = useParams()
   const navigate = useNavigate()
+  /*
+   * 자리 없이 보고만 있는가. 주소에 남겨 둔다 — 새로고침해도 자리에 앉혀지지 않아야 한다.
+   * 상태로만 들고 있으면 F5 한 번에 구경꾼이 선수가 된다.
+   */
+  const [params, setParams] = useSearchParams()
+  const watching = params.get('watch') === '1'
   const playerId = getPlayerId()
   const nickname = getNickname()
 
@@ -40,12 +47,26 @@ export function RoomPage() {
   const [error, setError] = useState('')
   const [starting, setStarting] = useState(false)
   const [confirmLeave, setConfirmLeave] = useState(false)
+  /** 내보내려는 사람. 확인창이 떠 있는 동안만 담아 둔다. */
+  const [kicking, setKicking] = useState<{ id: string; name: string } | null>(null)
 
   /** 설정 바꾸기는 방장만 할 수 있다. 거절 사유는 그대로 보여준다. */
   async function change(patch: Partial<RoomView['settings']>) {
     const result = await call<RoomView>('room:settings', patch)
     if (!result.ok) setError(result.message)
     else setError('')
+  }
+
+  /** 자리에서 물러나 보기만 한다. 성공해야 주소를 바꾼다 — 거절당하면 자리는 그대로다. */
+  async function becomeWatcher() {
+    const result = await call<RoomView>('room:spectate', { playerId, nickname, code })
+    if (!result.ok) {
+      setError(result.message)
+      return
+    }
+    setError('')
+    setRoom(result.value)
+    setParams({ watch: '1' }, { replace: true })
   }
 
   function toggleChallenge(id: ChallengeId, picked: ChallengeId[]) {
@@ -55,10 +76,11 @@ export function RoomPage() {
 
 
 
-  // 판이 열리면 방에 있는 모두가 함께 테이블로 옮겨간다.
+  // 판이 열리면 방에 있는 모두가 함께 테이블로 옮겨간다. 보고 있던 사람은 보는 자리로.
   useEffect(() => {
-    if (room?.phase === 'playing') navigate(`/rooms/${code}/game`, { replace: true })
-  }, [room?.phase, code, navigate])
+    if (room?.phase !== 'playing') return
+    navigate(watching ? `/rooms/${code}/watch` : `/rooms/${code}/game`, { replace: true })
+  }, [room?.phase, code, navigate, watching])
 
   /**
    * 들어오기. 처음 입장이든, 새로고침이든, 잠깐 끊겼다 돌아온 것이든 같은 요청이다.
@@ -72,7 +94,11 @@ export function RoomPage() {
 
     let alive = true
     const enter = async () => {
-      const result = await call<RoomView>('room:join', { playerId, nickname, code })
+      const result = await call<RoomView>(watching ? 'room:spectate' : 'room:join', {
+        playerId,
+        nickname,
+        code,
+      })
       if (!alive) return
       if (result.ok) {
         setRoom(result.value)
@@ -88,7 +114,7 @@ export function RoomPage() {
       alive = false
       socket.off('connect', enter)
     }
-  }, [code, nickname, playerId, navigate])
+  }, [code, nickname, playerId, navigate, watching])
 
   useServerEvent(
     'room:updated',
@@ -110,6 +136,16 @@ export function RoomPage() {
     useCallback(
       (payload: { reason: string }) =>
         navigate('/rooms', { replace: true, state: { notice: CLOSED_MESSAGE[payload.reason] } }),
+      [navigate],
+    ),
+  )
+
+  // 내보내진 것은 방이 닫힌 것과 다르다. 왜 튕겼는지 그 사람만 알아야 할 말이 있다.
+  useServerEvent(
+    'room:kicked',
+    useCallback(
+      (payload: { message: string }) =>
+        navigate('/rooms', { replace: true, state: { notice: payload.message } }),
       [navigate],
     ),
   )
@@ -188,9 +224,41 @@ export function RoomPage() {
                 </span>
                 {player.isHost && <span className="player__tag">방장</span>}
                 {!player.connected && <span className="player__tag--waiting">자리 비움</span>}
+                {/* 방장만, 자기 자신은 빼고. 판이 도는 중에는 서버가 막는다. */}
+                {iAmHost && player.id !== playerId && (
+                  <button
+                    type="button"
+                    className="player__kick"
+                    onClick={() => setKicking({ id: player.id, name: player.displayName })}
+                    aria-label={`${player.displayName}님 내보내기`}
+                    title="내보내기"
+                  >
+                    ×
+                  </button>
+                )}
               </li>
             ))}
           </ul>
+
+          {/*
+            보고만 있는 사람들. 자리에 앉은 사람과 같은 목록에 두면 인원수가 헷갈린다 —
+            게임을 시작할 수 있는지는 앉은 사람 수로만 정해진다.
+          */}
+          {room.spectators.length > 0 && (
+            <>
+              <h3 className="watchers__title">
+                관전 {room.spectators.length} / {MAX_SPECTATORS}
+              </h3>
+              <ul className="watchers">
+                {room.spectators.map((watcher) => (
+                  <li key={watcher.id} className={watcher.id === playerId ? 'watchers--me' : ''}>
+                    {watcher.nickname}
+                    {watcher.id === playerId && ' (나)'}
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
         </section>
 
         <section className="panel">
@@ -274,6 +342,32 @@ export function RoomPage() {
             {starting ? '차리는 중…' : '게임 시작'}
           </button>
         )}
+        {/*
+          자리와 관전 사이를 오간다. 자리가 하나뿐인 방에서는 물러날 수 없다 —
+          앉은 사람이 없어지면 방이 죽는다. 서버가 같은 판단을 한 번 더 한다.
+        */}
+        {watching ? (
+          <button
+            type="button"
+            className="btn"
+            onClick={() => {
+              setParams({}, { replace: true })
+            }}
+          >
+            자리에 앉기
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="btn"
+            disabled={room.players.length <= 1}
+            title={room.players.length <= 1 ? '혼자 있는 방에서는 바꿀 수 없습니다' : undefined}
+            onClick={() => void becomeWatcher()}
+          >
+            관전으로 바꾸기
+          </button>
+        )}
+
         <button type="button" className="btn btn--danger" onClick={() => setConfirmLeave(true)}>
           방 나가기
         </button>
@@ -288,6 +382,34 @@ export function RoomPage() {
         */}
         <Chat code={code} />
       </div>
+
+      {kicking && (
+        <ChoiceModal
+          title={`${kicking.name}님을 내보냅니다`}
+          onClose={() => setKicking(null)}
+          actions={[
+            {
+              label: '내보내기',
+              onClick: () => {
+                void call('room:kick', { playerId: kicking.id })
+                setKicking(null)
+              },
+            },
+            {
+              label: '차단하기',
+              tone: 'danger',
+              onClick: () => {
+                void call('room:kick', { playerId: kicking.id, ban: true })
+                setKicking(null)
+              },
+            },
+          ]}
+        >
+          <strong>내보내기</strong> — 방 번호를 알면 다시 들어올 수 있습니다.
+          <br />
+          <strong>차단하기</strong> — 내보내고, 이 방이 닫힐 때까지 다시 못 들어옵니다.
+        </ChoiceModal>
+      )}
 
       {confirmLeave && (
         <ConfirmModal

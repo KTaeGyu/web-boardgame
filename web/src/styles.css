@@ -367,6 +367,116 @@ select {
 }
 
 /* ── 방 목록 ──────────────────────────── */
+/*
+ * 처음으로 · 지난 기록.
+ *
+ * 오른쪽 위에는 테마·신고 단추가 떠 있다. 그 아래로 한 칸 내려야 「지난 기록」이
+ * 가려지지 않는다 — 붙박이 단추를 옮기는 것보다 이쪽이 옳다. 늘 같은 자리에 있는 것이
+ * 그 단추들의 쓸모다.
+ */
+.rooms-top {
+  margin-top: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+/* ── 지난 기록 ────────────────────────── */
+.record {
+  text-align: center;
+}
+
+.record__name {
+  margin: 0;
+  font-size: 14px;
+  color: var(--ink-dim);
+}
+
+.record__played {
+  margin: 6px 0 18px;
+  font-size: 15px;
+  color: var(--ink-dim);
+}
+
+.record__played strong {
+  font-size: 40px;
+  font-weight: 800;
+  color: var(--gold);
+  margin-right: 4px;
+}
+
+.record__grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin: 0;
+}
+
+.record__grid dt {
+  font-size: 12px;
+  color: var(--ink-dim);
+}
+
+.record__grid dd {
+  margin: 4px 0 0;
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.record__win {
+  color: var(--gold);
+}
+
+.record__lose {
+  color: var(--danger-ink);
+}
+
+.record__empty {
+  margin: 16px 0 0;
+  font-size: 13px;
+  color: var(--ink-dim);
+}
+
+.record__section {
+  margin-top: 28px;
+  font-size: 15px;
+}
+
+.record__others {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.record__others li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+}
+
+.record__others-name {
+  font-weight: 600;
+}
+
+.record__others-line {
+  font-size: 13px;
+  color: var(--ink-dim);
+}
+
+.record__note {
+  margin-top: 24px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--ink-dim);
+}
+
 .rooms-head {
   display: flex;
   align-items: center;
@@ -523,29 +633,34 @@ select {
  * 두 칸으로 갈리는 지점(720px)과 같은 선에서 켠다.
  */
 @media (min-width: 721px) {
+  /*
+   * 화면 높이를 넘지 않는다. min 만 주면 내용이 길어질 때 페이지가 늘어나 버튼 줄이
+   * 화면 밖으로 밀려나는데, 대기실에서 밀려나면 안 되는 것이 바로 「게임 시작」이다.
+   */
   .room-page {
     display: flex;
     flex-direction: column;
     justify-content: center;
     min-height: var(--app-height, 100dvh);
+    max-height: var(--app-height, 100dvh);
+    overflow: hidden;
     padding-bottom: 28px;
   }
 
+  /*
+   * 가운데는 남는 만큼만 차지하고 모자라면 줄어든다. 자라지는 않는다 —
+   * 내용이 적을 때는 덩어리째 가운데에 서야 한다.
+   */
   .room-body {
     align-items: stretch;
-    /*
-     * 가운데는 화면에 비례해 자란다. 200px 은 제목·버튼 줄·위아래 여백이 가져가는 몫이다.
-     * 「직접 고르기」로 카드를 다 펼치면 설정이 길어지는데, 그때 넘치는 만큼은 카드 안에서
-     * 스크롤된다 — 페이지가 늘어나면 버튼 줄이 화면 밖으로 밀려난다.
-     *
-     * 창이 아주 낮으면 max 가 min 보다 작아지는데, 그때는 min 이 이긴다(CSS 규칙).
-     * 가운데가 손바닥만 해지느니 페이지가 스크롤되는 편이 낫다.
-     */
-    min-height: 280px;
-    max-height: calc(var(--app-height, 100dvh) - 200px);
+    flex: 0 1 auto;
+    min-height: 0;
   }
 
-  /* 넘치는 쪽만 자기 안에서 스크롤한다. min-height: 0 이 없으면 격자 칸이 줄지 않는다. */
+  /*
+   * 넘치는 카드는 자기 안에서 스크롤한다. 「직접 고르기」로 카드를 다 펼쳤을 때가 그렇다.
+   * min-height: 0 이 없으면 격자 칸이 내용 높이 아래로 줄지 않아 스크롤이 생기지 않는다.
+   */
   .room-body > .panel {
     min-height: 0;
     overflow-y: auto;
@@ -626,6 +741,64 @@ select {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/*
+ * 내보내기. 방장에게만 보이고, 평소에는 흐릿하게 있다가 그 줄에 손이 가면 드러난다.
+ * 자주 누를 것이 아니라 눈에 먼저 띄면 안 된다.
+ */
+/*
+ * 보고만 있는 사람들. 참여자 목록과 갈라 둔다 —
+ * 게임을 시작할 수 있는지는 앉은 사람 수로만 정해지므로, 한 목록에 섞이면 인원이 헷갈린다.
+ */
+.watchers__title {
+  margin: 18px 0 8px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--ink-dim);
+}
+
+.watchers {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.watchers li {
+  padding: 4px 10px;
+  border: 1px dashed var(--line);
+  border-radius: 999px;
+  font-size: 12px;
+  color: var(--ink-dim);
+}
+
+.watchers li.watchers--me {
+  border-style: solid;
+  border-color: var(--gold-dim);
+  color: var(--gold);
+}
+
+.player__kick {
+  margin-left: 4px;
+  padding: 0 6px;
+  border: none;
+  background: none;
+  color: var(--ink-dim);
+  font-size: 18px;
+  line-height: 1;
+  opacity: 0.35;
+  cursor: pointer;
+  transition: opacity 0.15s, color 0.15s;
+}
+
+.player:hover .player__kick,
+.player__kick:focus-visible {
+  opacity: 1;
+  color: var(--danger-ink);
 }
 
 .player__tag {
@@ -1003,11 +1176,45 @@ select {
  * 불편 신고. 테마 단추 왼쪽에 나란히 선다 — 같은 줄에 있어야 「도구가 있는 자리」로 읽힌다.
  * 좁은 화면에서는 그림만 남겨 자리를 아끼고, 넓으면 글자까지 보인다.
  */
-.report-link {
+/*
+ * 어느 화면에서나 오른쪽 위. 셋이 한 줄로 선다 —
+ * 각자 좌표를 들고 있으면 하나가 늘어날 때마다 나머지를 손으로 다시 잡아야 한다.
+ */
+.tools {
   position: fixed;
   top: max(10px, env(safe-area-inset-top));
-  right: 56px;
+  right: 12px;
   z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 테마·화면 크기처럼 그림 하나짜리 단추. */
+.tool-btn {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--card);
+  color: var(--ink-dim);
+  box-shadow: 0 2px 10px rgba(var(--shadow-rgb), 0.25);
+  transition: color 0.15s, border-color 0.15s, transform 0.12s;
+  cursor: pointer;
+}
+
+.tool-btn:hover,
+.tool-btn:focus-visible {
+  border-color: var(--gold-dim);
+  color: var(--gold);
+  transform: translateY(-1px);
+  outline: none;
+}
+
+.report-link {
   height: 36px;
   display: inline-flex;
   align-items: center;
@@ -1048,10 +1255,6 @@ select {
 }
 
 .theme-toggle {
-  position: fixed;
-  top: max(10px, env(safe-area-inset-top));
-  right: 12px;
-  z-index: 4;
   width: 36px;
   height: 36px;
   display: grid;
@@ -1139,6 +1342,7 @@ select {
 }
 
 .modal {
+  position: relative;
   width: 100%;
   max-width: 380px;
   border: 1px solid var(--line);
@@ -1156,6 +1360,19 @@ select {
 .modal--tall {
   max-height: min(84vh, var(--app-height, 100dvh));
   overflow-y: auto;
+}
+
+/* 물러나기는 오른쪽 위 x 다. 선택지 옆에 서면 그것도 선택지로 읽힌다. */
+.modal__close {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  border: none;
+  background: none;
+  color: var(--ink-dim);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
 }
 
 .modal__title {
@@ -1260,6 +1477,16 @@ select {
 .tip__ok {
   margin-top: 14px;
   width: 100%;
+}
+
+/*
+ * 작은 휴대폰을 위한 축소.
+ *
+ * 값을 하나씩 줄여 잡으면 규칙이 수십 개로 늘고 어디 하나는 반드시 어긋난다.
+ * 뿌리에서 한 번에 줄이면 여백·글자·카드·토큰이 같은 비율로 함께 작아진다.
+ */
+:root[data-density='compact'] {
+  zoom: 0.85;
 }
 
 /* ── 서버가 없을 때 ───────────────────────── */

@@ -3,10 +3,14 @@
  * 펠트와 카드·토큰은 밝은 쪽에서도 같은 색이다 — 조명이 바뀌어도 물건은 그대로다.
  */
 
+/*
+ * 위쪽 여백은 오른쪽 위에 떠 있는 테마·신고 단추의 몫이다.
+ * 단추를 내리는 대신 화면이 비켜선다 — 늘 같은 자리에 있는 것이 그 단추들의 쓸모다.
+ */
 .game {
   max-width: 1100px;
   margin: 0 auto;
-  padding: 16px 16px 40px;
+  padding: 56px 16px 40px;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -20,8 +24,8 @@
   display: flex;
   align-items: center;
   gap: 16px;
-  /* 오른쪽은 넉넉히 — 화면 오른쪽 위에 떠 있는 밝기 단추가 앉을 자리다. */
-  padding: 10px 54px 10px 16px;
+  /* 단추들이 이 줄 위로 올라갔으므로 오른쪽을 비워둘 이유가 없다. */
+  padding: 10px 16px;
   border: 1px solid var(--line);
   border-radius: 10px;
   background: var(--card);
@@ -88,6 +92,17 @@
   letter-spacing: 0.08em;
 }
 
+/* 지금 보고만 있다는 표시. 자리가 없다는 것이 화면만으로는 잘 안 읽힌다. */
+.game-bar__watching {
+  padding: 3px 9px;
+  border: 1px solid var(--gold-dim);
+  border-radius: 999px;
+  color: var(--gold);
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
 .game-bar__leave {
   padding: 6px 12px;
   border: 1px solid var(--line);
@@ -117,7 +132,8 @@
  */
 .drawer {
   position: fixed;
-  top: 84px;
+  /* 상태 줄 아래에서 시작한다. 그 줄이 단추들 밑으로 내려온 만큼 함께 내려왔다. */
+  top: 128px;
   right: 0;
   z-index: 6;
   display: flex;
@@ -551,6 +567,16 @@
   color: var(--ink-dim);
 }
 
+.chat__watcher {
+  margin-left: 4px;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: rgba(var(--gold-rgb), 0.16);
+  color: var(--gold);
+  font-size: 10px;
+  font-weight: 700;
+}
+
 .chat__bubble {
   max-width: 84%;
   padding: 7px 11px;
@@ -589,6 +615,16 @@
   flex: 1;
   height: 1px;
   background: var(--line);
+}
+
+/* 서버가 거절한 이유. 도배로 막힌 자리라 붉게 둔다. */
+.chat__notice {
+  margin: 0;
+  padding: 8px 14px;
+  border-top: 1px solid var(--danger-line);
+  background: rgba(var(--danger-rgb), 0.14);
+  color: var(--danger-ink);
+  font-size: 12px;
 }
 
 .chat__form {
@@ -634,7 +670,8 @@
  */
 .toasts {
   position: fixed;
-  top: 74px;
+  /* 상태 줄 바로 아래. 그 줄이 단추들 밑으로 내려온 만큼 함께 내려온다. */
+  top: 116px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 7;
@@ -678,6 +715,108 @@
   .toast {
     animation: none;
   }
+}
+
+/* ── 테이블과 그 양옆 ─────────────────── */
+
+/*
+ * 좁은 화면에서는 옆이 서지 않는다. 테이블이 이미 자리를 다 쓰고 있어, 옆에 세우면
+ * 정작 봐야 할 공용 카드가 줄어든다. 아래 미디어 쿼리에서 1024px 부터 켠다 —
+ * 카드 다섯 장(약 420px)과 양옆 두 장(약 300px)이 여유 있게 서려면 그쯤이 필요하다.
+ */
+.table-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+}
+
+.table-row > .table {
+  flex: 1;
+  min-width: 0;
+}
+
+.table-side {
+  display: none;
+  flex: none;
+  width: 150px;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.table-side__label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--ink-dim);
+}
+
+.table-side__count {
+  margin-left: 6px;
+  color: var(--gold);
+}
+
+/* 카드와 화살표가 겹쳐 선다. 화살표가 자리를 차지하면 카드가 그만큼 작아진다. */
+.table-side__deck {
+  position: relative;
+  width: 100%;
+}
+
+.table-side__arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 2;
+  width: 26px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--card);
+  color: var(--ink-dim);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  /* 평소에는 숨어 있다가 그 자리에 손이 갈 때 드러난다. */
+  opacity: 0;
+  transition: opacity 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.table-side:hover .table-side__arrow,
+.table-side__arrow:focus-visible {
+  opacity: 1;
+}
+
+.table-side__arrow:hover {
+  color: var(--gold);
+  border-color: var(--gold-dim);
+}
+
+.table-side__arrow--prev {
+  left: -13px;
+}
+
+.table-side__arrow--next {
+  right: -13px;
+}
+
+/*
+ * 보고만 있는 화면은 아래 절반이 통째로 비어 있다 — 내 자리도 확정 버튼도 없다.
+ * 그대로 두면 위쪽 auto 여백만 남아 판이 화면 바닥으로 가라앉는다.
+ * 테이블에 아래 여백을 줘서 위아래가 남는 높이를 반씩 나눠 갖게 한다.
+ */
+/*
+ * 남는 높이를 전부 아래에 몰아준다. 위아래로 나눠 가지면 판이 화면 한가운데에 뜨는데,
+ * 보러 온 사람에게는 위쪽이 곧 시작점이라 거기서부터 차 있는 편이 읽기 쉽다.
+ */
+.game--watching .seats-area {
+  margin-top: 0;
+}
+
+.game--watching .table-row {
+  margin-bottom: auto;
 }
 
 /* ── 테이블 ───────────────────────────── */
@@ -1261,6 +1400,47 @@ button.token:hover:not(:disabled) {
   opacity: 1;
 }
 
+/*
+ * 핸드 보기 ↔ 조합 보기.
+ *
+ * 목록 위 오른쪽에 작게 둔다 — 결과를 보러 온 자리라 이 단추가 먼저 눈에 들어오면 안 된다.
+ */
+.showdown__view {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 8px;
+}
+
+.showdown__swap {
+  padding: 5px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--ink-dim);
+  font-size: 12px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.showdown__swap:hover,
+.showdown__swap:focus-visible {
+  color: var(--gold);
+  border-color: var(--gold-dim);
+  outline: none;
+}
+
+/* 다섯 장은 두 장보다 넓다. 좁은 화면에서는 줄을 바꿔 선다. */
+.reveal__cards--combo {
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+/* 지금 짚고 있는 줄. 위의 공용 카드에서 어느 다섯 장인지가 함께 밝아진다. */
+.reveal--lit {
+  border-color: var(--gold-dim);
+  background: rgba(var(--gold-rgb), 0.08);
+}
+
 /* 사슬을 끊은 사람. 어디서 순서가 어긋났는지 한눈에 보여야 한다. */
 .reveal--bad {
   border-color: var(--danger-line);
@@ -1281,12 +1461,28 @@ button.token:hover:not(:disabled) {
 }
 
 .reveal__name {
-  width: 76px;
+  width: 104px;
   flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 14px;
+}
+
+/* 라운드별 선언. 자리 옆에 붙는 이력과 같은 모양이되 더 작다. */
+.reveal__track {
+  display: flex;
+  gap: 3px;
+}
+
+.reveal__track .token {
+  width: 20px;
+  height: 20px;
+  font-size: 10px;
+  border-width: 1px;
 }
 
 .reveal__cards {
@@ -1299,6 +1495,31 @@ button.token:hover:not(:disabled) {
   font-size: 13px;
   color: var(--gold);
   text-align: right;
+}
+
+/*
+ * 다음 금고로 · 나가기.
+ *
+ * 나가기는 작게 옆에 붙인다 — 여기서 주로 누를 것은 「다음 금고로」이고, 나가기는
+ * 기다리다 그만두고 싶을 때의 뒷문이다. 크기가 그 차이를 말해야 한다.
+ */
+.showdown__next {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+  margin-bottom: 4px;
+}
+
+.showdown__next .btn--primary {
+  flex: 1;
+  min-width: 0;
+}
+
+.showdown__leave {
+  flex: none;
+  padding: 0 14px;
+  font-size: 13px;
+  color: var(--ink-dim);
 }
 
 .outcome {
@@ -1355,6 +1576,18 @@ button.token:hover:not(:disabled) {
   /* 흐름의 마지막이 확정 버튼이므로 여기서 아래 절반을 받는다. */
   .game-actions {
     margin-bottom: auto;
+  }
+}
+
+/*
+ * 테이블 양옆은 넓은 화면에서만 선다.
+ *
+ * 1024px 아래에서는 테이블이 화면 폭을 거의 다 쓰고 있어, 옆에 두 장을 세우면
+ * 공용 카드가 그만큼 줄어든다. 그쪽에서는 오른쪽 드로어가 같은 일을 맡는다.
+ */
+@media (min-width: 1024px) {
+  .table-side {
+    display: flex;
   }
 }
 
@@ -1424,7 +1657,7 @@ button.token:hover:not(:disabled) {
   /* 좁은 화면에서는 드로어가 테이블을 다 덮지 않도록 위치를 낮추고 폭을 줄인다. */
   /* 좁은 화면에서는 오른쪽 위. 아래는 확정 버튼이 차지하고 있다. */
   .drawer {
-    top: 62px;
+    top: 108px;
     bottom: auto;
   }
 
@@ -1518,9 +1751,26 @@ button.token:hover:not(:disabled) {
     font-size: 13px;
   }
 
-  /* 상태 줄이 낮아진 만큼 알림도 올라온다. */
+  /* 상태 줄 바로 아래. 위쪽 여백만큼 함께 내려온다. */
   .toasts {
-    top: 56px;
+    top: 108px;
+  }
+
+  /*
+   * 보고만 있는 화면에는 아래에 붙박이 버튼이 없다. 그것을 피하려고 비워둔 자리와
+   * 들어올린 대화 단추를 모두 되돌린다 — 없는 것을 피해 서 있으면 바닥이 휑하다.
+   */
+  .game--watching {
+    padding-bottom: 24px;
+  }
+
+  .game--watching .chat-fab,
+  .game--watching .chat {
+    bottom: max(24px, env(safe-area-inset-bottom));
+  }
+
+  .game--watching .chat-peek {
+    bottom: max(30px, env(safe-area-inset-bottom));
   }
 
   /*
