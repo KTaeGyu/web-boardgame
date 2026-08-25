@@ -21,6 +21,7 @@ import {
 
 import { IDLE_ROOM_MS, MAX_CONNECTIONS, MAX_ROOMS, SWEEP_INTERVAL_MS } from './config.ts'
 import { Game } from './game.ts'
+import { Tutorial } from './tutorial.ts'
 import { uniqueRoomCode } from './ids.ts'
 import { RoomStore } from './rooms.ts'
 
@@ -66,6 +67,8 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
   const socketOfPlayer = new Map<string, string>()
   /** 잠금이 풀리는 시점에 상태를 한 번 더 쏘기 위한 타이머. */
   const unlockTimers = new Map<string, NodeJS.Timeout>()
+  /** 혼자 해보는 방의 진행자. 봇을 움직이고 안내를 띄운다. */
+  const tutorials = new Map<string, Tutorial>()
 
   const sendRoom = (room: RoomView) => io.to(room.code).emit('room:updated', room)
   const sendLobbyStats = () =>
@@ -89,6 +92,8 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
     const view = game.view()
     io.to(code).emit('game:state', view)
     sendToasts(code)
+    // 혼자 해보는 방이면 여기서 봇이 다음 한 수를 생각한다. 예약은 늘 최신 상태 기준이다.
+    tutorials.get(code)?.poke()
 
     if (options.hands) {
       for (const player of view.players) sendHand(code, player.id)
@@ -141,6 +146,8 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
 
   /** 방이 사라졌다. 딸려 있던 판과 타이머도 함께 정리한다. */
   function forgetRoom(code: string): void {
+    tutorials.get(code)?.stop()
+    tutorials.delete(code)
     games.delete(code)
     clearTimeout(unlockTimers.get(code))
     unlockTimers.delete(code)
@@ -192,6 +199,11 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
 
       const { playerId, nickname } = identity.value
       const previous = store.codeOf(playerId)
+      const wanted = payload.code.trim().toUpperCase()
+      // 혼자 해보는 방은 남이 들어올 자리가 아니다. 목록에 없지만 번호를 찍어 넣을 수는 있다.
+      if (store.isTutorial(wanted) && !store.humanIds(wanted).includes(playerId)) {
+        return ack({ ok: false, code: 'ROOM_NOT_FOUND', message: '없는 방입니다. 방 번호를 다시 확인해 주세요.' })
+      }
       const result = store.joinRoom(playerId, nickname, payload.code.trim())
       if (!result.ok) return ack(result)
 
@@ -211,6 +223,72 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
         sendGame(code)
         sendHand(code, playerId)
       }
+    })
+
+    /**
+     * 혼자 해보기. 방을 만들고 봇을 앉히고 시작하는 것이 한 동작이다 —
+     * 대기실에서 기다릴 사람이 없으므로 거칠 이유가 없다.
+     */
+    socket.on('tutorial:start', (payload, ack) => {
+      const identity = readIdentity(payload)
+      if (!identity.ok) return ack(identity)
+
+      const { playerId, nickname } = identity.value
+      const previous = store.codeOf(playerId)
+
+      // 봇 자리 이름은 사람처럼 꾸미지 않는다. 상대가 사람이 아님이 보여야 한다.
+      const stamp = `${Date.now().toString(36)}${Math.floor(Math.random() * 1e4)}`
+      const bots = [
+        { id: `bot1-${stamp}`, nickname: '봇1' },
+        { id: `bot2-${stamp}`, nickname: '봇2' },
+      ]
+
+      const made = store.createTutorialRoom(playerId, nickname, bots)
+      if (!made.ok) return ack(made)
+
+      const code = made.value.code
+      if (previous) leftRoom(previous, playerId)
+      bind(socket, playerId, code)
+      store.touch(code)
+
+      // 도전자·해결사 없는 기본 진행. 처음 배우는 자리에 예외 규칙을 얹지 않는다.
+      const game = new Game(
+        code,
+        made.value.players.map((player) => ({
+          id: player.id,
+          nickname: player.nickname,
+          connected: true,
+        })),
+        { mode: 'basic', pickedChallenges: [], specialistRounds: [null, null, null, null, null] },
+      )
+      games.set(code, game)
+      store.setPhase(code, 'playing')
+
+      const tutorial = new Tutorial(
+        game,
+        playerId,
+        bots.map((bot) => bot.id),
+        {
+          onMoved: () => sendGame(code),
+          onTip: (tip) => io.to(code).emit('tutorial:tip', tip),
+        },
+      )
+      tutorials.set(code, tutorial)
+
+      ack({ ok: true, value: { code } })
+      sendGame(code, { hands: true })
+      sendRoomList()
+    })
+
+    /** 안내를 닫았다. 멈춰 있던 판이 다시 흐른다. */
+    socket.on('tutorial:next', (ack) => {
+      const playerId = playerOfSocket.get(socket.id)
+      const code = playerId ? store.codeOf(playerId) : null
+      const tutorial = code ? tutorials.get(code) : null
+      if (!tutorial) return ack({ ok: false, code: 'GAME_NOT_RUNNING', message: '진행 중인 판이 없습니다.' })
+      store.touch(code)
+      tutorial.resume()
+      ack({ ok: true, value: null })
     })
 
     socket.on('chat:send', ({ text }, ack) => {

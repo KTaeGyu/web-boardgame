@@ -17,6 +17,7 @@ import { Chat } from '../components/Chat.tsx'
 import { ExtrasDrawer, NoteCard, type CardNote } from '../components/ExtrasDrawer.tsx'
 import { ScanVote } from '../components/ScanVote.tsx'
 import { SetupStep } from '../components/SetupStep.tsx'
+import { TutorialTip, type TipPayload } from '../components/TutorialTip.tsx'
 import { ConfirmModal } from '../components/Modal.tsx'
 import { CardSlot, PlayingCard } from '../components/PlayingCard.tsx'
 import { Token, TokenBlank } from '../components/Token.tsx'
@@ -102,6 +103,8 @@ export function GamePage() {
    */
   const [toasts, setToasts] = useState<{ id: number; text: string; tone: 'info' | 'warn' }[]>([])
   const toastSeq = useRef(0)
+  /** 튜토리얼 안내. 떠 있는 동안 서버가 봇을 멈춰 두므로 스스로 사라지지 않는다. */
+  const [tip, setTip] = useState<TipPayload | null>(null)
 
   const dropToast = useCallback((id: number) => {
     setToasts((current) => current.filter((toast) => toast.id !== id))
@@ -231,6 +234,8 @@ export function GamePage() {
       [dropToast],
     ),
   )
+
+  useServerEvent('tutorial:tip', useCallback((payload: TipPayload) => setTip(payload), []))
 
   useServerEvent(
     'game:aborted',
@@ -593,6 +598,16 @@ export function GamePage() {
         notes={notes}
         onUse={(input) => void call('game:useSpecialist', input)}
       />
+
+      {tip && (
+        <TutorialTip
+          tip={tip}
+          onClose={() => {
+            setTip(null)
+            void call('tutorial:next')
+          }}
+        />
+      )}
 
       {/* 대화. 접힌 채로도 새 말 한 줄은 단추 옆에 잠깐 붙는다. */}
       <Chat code={code} />

@@ -147,6 +147,14 @@ export interface ClientToServerEvents {
     payload: { kind: 'rank' | 'category'; value: number },
     ack: (result: Result<null>) => void,
   ) => void
+  /**
+   * 혼자 해보는 판을 연다. 봇 둘이 함께 앉고, 곧바로 시작된다.
+   *
+   * 방을 만들고 시작하는 것이 한 동작인 이유는 대기실에서 기다릴 사람이 없기 때문이다.
+   */
+  'tutorial:start': (payload: Identity, ack: (result: Result<{ code: string }>) => void) => void
+  /** 안내를 읽고 닫았다. 이걸 받아야 봇이 다시 움직인다. */
+  'tutorial:next': (ack: (result: Result<null>) => void) => void
   /** 한 줄 보낸다. 방 안에서만 오간다. */
   'chat:send': (payload: { text: string }, ack: (result: Result<null>) => void) => void
   /** 해결사 카드를 쓴다. 누른 사람이 쓰는 사람이고, 카드에 따라 대상·숫자·내 카드가 더 필요하다. */
@@ -223,6 +231,13 @@ export interface ServerToClientEvents {
   'chat:message': (message: ChatMessage) => void
   /** 방에 들어온 사람에게만. 새로고침해도 앞의 흐름이 남는다. */
   'chat:history': (payload: { messages: ChatMessage[] }) => void
+  /**
+   * 튜토리얼 안내. 스스로 사라지지 않는다 — 읽고 닫을 때까지 판이 멈춰 서 있다.
+   *
+   * 게임 알림(game:toast)과 다른 통로인 이유가 그것이다. 저쪽은 지나가는 소식이고
+   * 이쪽은 사람이 닫아야 다음이 있다.
+   */
+  'tutorial:tip': (payload: { step: number; total: number; title: string; text: string }) => void
 }
 
 export const NICKNAME_MAX = 12

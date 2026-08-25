@@ -44,6 +44,8 @@ interface Player {
   connected: boolean
   disconnectedAt: number | null
   joinedAt: number
+  /** 사람이 아니다. 튜토리얼에서만 앉는다. */
+  bot?: boolean
 }
 
 interface Room {
@@ -58,6 +60,11 @@ interface Room {
   lastActivityAt: number
   /** 지난 말. 방과 함께 살고 방과 함께 사라진다. */
   chat: ChatMessage[]
+  /**
+   * 혼자 해보는 방인가. 목록에 뜨지 않고, 사람이 빠지면 그대로 닫힌다.
+   * 봇만 남은 방은 아무도 없는 방이지만 인원이 0 이 아니라 저절로 닫히지 않는다.
+   */
+  tutorial: boolean
   /**
    * 이 방에서 몇 번째 말인가.
    *
@@ -119,10 +126,44 @@ export class RoomStore {
       lastActivityAt: now,
       chat: [],
       chatSeq: 0,
+      tutorial: false,
     }
     this.rooms.set(code, room)
     this.whereIs.set(playerId, code)
     return ok(toView(room))
+  }
+
+  /**
+   * 혼자 해보는 방. 봇이 함께 앉은 채로 만들어진다.
+   *
+   * 보통 방과 갈라 두는 것은 「사람이 아닌 자리」가 규칙에 끼어들기 때문이다 —
+   * 목록에 뜨면 남이 들어오고, 사람이 나가도 봇 때문에 방이 닫히지 않는다.
+   */
+  createTutorialRoom(playerId: string, nickname: string, bots: { id: string; nickname: string }[]): Result<RoomView> {
+    const created = this.createRoom(playerId, nickname)
+    if (!created.ok) return created
+
+    const room = this.rooms.get(created.value.code)
+    if (!room) return err('ROOM_NOT_FOUND', '방을 만들지 못했습니다.')
+
+    room.tutorial = true
+    const now = this.now()
+    for (const bot of bots) {
+      room.players.push({ ...bot, connected: true, disconnectedAt: null, joinedAt: now, bot: true })
+    }
+    room.settings = { ...room.settings, mode: 'basic', maxPlayers: room.players.length }
+    return ok(toView(room))
+  }
+
+  /** 이 방이 혼자 해보는 방인가. 소켓 계층이 봇을 움직일지 판단한다. */
+  isTutorial(code: string | null): boolean {
+    return code ? (this.rooms.get(code)?.tutorial ?? false) : false
+  }
+
+  /** 봇이 아닌 자리들. 「아무도 없는 방」을 가릴 때 쓴다. */
+  humanIds(code: string | null): string[] {
+    const room = code ? this.rooms.get(code) : undefined
+    return room ? room.players.filter((player) => !player.bot).map((player) => player.id) : []
   }
 
   joinRoom(playerId: string, nickname: string, code: string): Result<RoomView> {
@@ -158,7 +199,9 @@ export class RoomStore {
     if (!room) return { room: null, closedCode: null }
 
     room.players = room.players.filter((p) => p.id !== playerId)
-    if (room.players.length === 0) {
+    // 봇만 남은 방은 아무도 없는 방이다. 인원이 0 이 아니라 저절로 닫히지 않으므로 여기서 닫는다.
+    if (room.players.length === 0 || (room.tutorial && !room.players.some((p) => !p.bot))) {
+      for (const left of room.players) this.whereIs.delete(left.id)
       this.rooms.delete(room.code)
       return { room: null, closedCode: room.code }
     }
@@ -249,7 +292,8 @@ export class RoomStore {
       const expiredIds = new Set(expired.map((p) => p.id))
       room.players = room.players.filter((p) => !expiredIds.has(p.id))
 
-      if (room.players.length === 0) {
+      if (room.players.length === 0 || (room.tutorial && !room.players.some((p) => !p.bot))) {
+        for (const left of room.players) this.whereIs.delete(left.id)
         this.rooms.delete(room.code)
         closedCodes.push(room.code)
         continue
@@ -299,6 +343,8 @@ export class RoomStore {
   list(): RoomSummary[] {
     const summaries: RoomSummary[] = []
     for (const room of this.rooms.values()) {
+      // 혼자 해보는 방은 남이 들어올 자리가 아니다.
+      if (room.tutorial) continue
       const connected = room.players.filter((p) => p.connected)
       if (connected.length === 0) continue
       const host = toView(room).players.find((p) => p.isHost)
