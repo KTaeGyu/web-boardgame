@@ -126,7 +126,16 @@ export function GamePage({ spectating = false }: { spectating?: boolean } = {}) 
     })
   }, [])
 
-  const tokenRef = useTokenFlight(TOKEN_LOCK_MS)
+  /*
+   * 토큰 자리표. 이것이 바뀔 때만 날아가는 계산을 다시 한다 —
+   * 알림 한 줄이나 남의 채팅에도 화면은 다시 그려지는데, 그때마다 재면 비행이 끊긴다.
+   */
+  const layoutKey = game
+    ? `${game.round}:${game.centerTokens.join(',')}|${game.players
+        .map((player) => `${player.id}:${player.currentToken ?? '-'}`)
+        .join(',')}`
+    : ''
+  const tokenRef = useTokenFlight(TOKEN_LOCK_MS, layoutKey)
 
   // 내 홀카드와 이미 공개된 보드만으로 구한다. 남의 정보는 쓰지 않으므로 새는 것이 없다.
   const myHolding = useMemo(() => bestHolding([...hand, ...(game?.community ?? [])]), [hand, game?.community])
@@ -164,6 +173,26 @@ export function GamePage({ spectating = false }: { spectating?: boolean } = {}) 
         { playerId, nickname, code },
       )
       if (!alive) return
+
+      /*
+       * 보러 왔는데 사실 내 자리가 있는 방이었다.
+       *
+       * 방 목록에서 판이 도는 방을 누르면 관전으로 들어가는데, 뒤로가기로 나갔다 돌아온
+       * 사람도 같은 길을 탄다. 그 사람에게는 관전이 아니라 제자리가 맞다 —
+       * 자리가 없으면 서버가 어차피 거절하므로, 한 번 물어보는 것으로 갈린다.
+       */
+      if (!result.ok && spectating) {
+        const seat = await call<{ hostId: string; phase: string; tutorial: boolean }>('room:join', {
+          playerId,
+          nickname,
+          code,
+        })
+        if (!alive) return
+        if (seat.ok) {
+          navigate(`/rooms/${code}/game`, { replace: true })
+          return
+        }
+      }
 
       // 실패를 삼키면 「테이블을 차리는 중」에서 영영 멈춘다. 서버가 다시 뜬 뒤
       // 새로고침하면 방이 없으므로, 무슨 일인지 알리고 목록으로 돌려보낸다.
@@ -434,6 +463,15 @@ export function GamePage({ spectating = false }: { spectating?: boolean } = {}) 
   const others = game.players.filter((player) => player.id !== playerId)
   const picking = game.phase === 'picking'
   /*
+   * 내 토큰이 날아가는 중이다.
+   *
+   * 이 동안 다른 토큰을 눌러도 서버가 「방금 움직인 토큰입니다」로 거절한다 — 쥔 것이
+   * 아직 잠겨 있어 내려놓을 수 없기 때문이다. 거절하고 흔드느니 아예 잠가 둔다.
+   * 손이 도착하는 순간 잠금도 함께 풀린다.
+   */
+  const flying =
+    picking && me?.currentToken != null && game.lockedTokens.includes(me.currentToken)
+  /*
    * 방장에게는 나가기 대신 「로비로」가 있다. 정말 나가려면 대기실에서 한 번 더 눌러야 한다.
    * 튜토리얼은 만든 사람이 곧 방장이지만 돌아갈 대기실이 없다 — 혼자였으므로 그냥 나간다.
    */
@@ -520,6 +558,7 @@ export function GamePage({ spectating = false }: { spectating?: boolean } = {}) 
               lockedTokens={game.lockedTokens}
               stuckTokens={game.stuckTokens}
               rejected={rejected}
+              busy={flying}
               tokenRef={tokenRef}
               onTakeToken={take}
             />
@@ -558,6 +597,7 @@ export function GamePage({ spectating = false }: { spectating?: boolean } = {}) 
               round={game.round}
               locked={game.lockedTokens.includes(token)}
               stuck={game.stuckTokens.includes(token)}
+              busy={flying}
               innerRef={tokenRef(token)}
               onClick={picking ? () => void take(token) : undefined}
             />
@@ -623,6 +663,7 @@ export function GamePage({ spectating = false }: { spectating?: boolean } = {}) 
               lockedTokens={game.lockedTokens}
               stuckTokens={game.stuckTokens}
               rejected={rejected}
+              busy={flying}
               tokenRef={tokenRef}
               onTakeToken={take}
             />
@@ -776,6 +817,8 @@ interface SeatProps {
   lockedTokens: number[]
   stuckTokens: number[]
   rejected: number | null
+  /** 내 토큰이 날아가는 중. 도착할 때까지 아무것도 누를 수 없다. */
+  busy: boolean
   tokenRef: (token: number) => (node: HTMLElement | null) => void
   onTakeToken: (token: number) => void
 }
@@ -813,6 +856,7 @@ function TokenTrack({
   lockedTokens,
   stuckTokens,
   rejected,
+  busy,
   tokenRef,
   onTakeToken,
 }: SeatProps) {
@@ -831,6 +875,7 @@ function TokenTrack({
               round={r}
               locked={lockedTokens.includes(player.currentToken)}
               stuck={stuckTokens.includes(player.currentToken)}
+              busy={busy}
               innerRef={tokenRef(player.currentToken)}
               onClick={() => onTakeToken(player.currentToken as number)}
             />

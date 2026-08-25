@@ -6,6 +6,11 @@ interface Props {
   locked?: boolean
   /** 한 번 정해지면 주인이 바뀌지 않는 토큰. 집기 전부터 알아야 한다. */
   stuck?: boolean
+  /**
+   * 지금은 아무것도 누를 수 없다. 내 토큰이 날아가는 중이라 쥔 것을 내려놓을 수 없고,
+   * 눌러 봐야 거절당한다. 흔들리는 것보다 잠긴 편이 낫다.
+   */
+  busy?: boolean
   onClick?: () => void
   /** 지난 라운드에 확정된 토큰. 눌리지 않고 작게 표시한다. */
   settled?: boolean
@@ -22,6 +27,7 @@ export function Token({
   round,
   locked = false,
   stuck = false,
+  busy = false,
   onClick,
   settled = false,
   innerRef,
@@ -32,6 +38,7 @@ export function Token({
     settled ? 'token--settled' : '',
     stuck ? 'token--stuck' : '',
     locked ? 'token--locked' : '',
+    busy ? 'token--busy' : '',
   ]
     .filter(Boolean)
     .join(' ')
@@ -58,7 +65,7 @@ export function Token({
        * 붙박이는 잠긴 것처럼 보이지만 눌리기는 해야 한다 — 눌러야 서버가 왜 안 되는지
        * 답해 준다. 아무 반응도 없는 단추는 고장으로 보인다.
        */
-      disabled={locked && !stuck}
+      disabled={busy || (locked && !stuck)}
       aria-label={`${value}번 토큰 가져오기${stuck ? ' — 한 번 정해지면 바뀌지 않습니다' : ''}`}
       title={stuck ? '한 번 정해지면 바뀌지 않는 토큰입니다' : undefined}
     >
