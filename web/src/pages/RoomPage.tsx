@@ -51,6 +51,8 @@ export function RoomPage() {
   const [error, setError] = useState('')
   const [starting, setStarting] = useState(false)
   const [confirmLeave, setConfirmLeave] = useState(false)
+  /** 방장이 자리에서 물러나려 한다. 방장이 넘어가는 일이라 한 번 묻는다. */
+  const [confirmWatch, setConfirmWatch] = useState(false)
   /** 내보내려는 사람. 확인창이 떠 있는 동안만 담아 둔다. */
   const [kicking, setKicking] = useState<{ id: string; name: string } | null>(null)
 
@@ -69,6 +71,7 @@ export function RoomPage() {
       return
     }
     setError('')
+    setConfirmWatch(false)
     setRoom(result.value)
     setParams({ watch: '1' }, { replace: true })
   }
@@ -143,7 +146,7 @@ export function RoomPage() {
   )
 
   useEscape(
-    !confirmLeave,
+    !confirmLeave && !confirmWatch,
     useCallback(() => setConfirmLeave(true), []),
   )
 
@@ -436,9 +439,9 @@ export function RoomPage() {
             className="btn"
             disabled={room.players.length <= 1}
             title={room.players.length <= 1 ? '혼자 있는 방에서는 바꿀 수 없습니다' : undefined}
-            onClick={() => void becomeWatcher()}
+            onClick={() => (iAmHost ? setConfirmWatch(true) : void becomeWatcher())}
           >
-            관전으로 바꾸기
+            관전하기
           </button>
         )}
 
@@ -483,6 +486,27 @@ export function RoomPage() {
           <br />
           <strong>차단하기</strong> — 내보내고, 이 방이 닫힐 때까지 다시 못 들어옵니다.
         </ChoiceModal>
+      )}
+
+      {confirmWatch && (
+        <ConfirmModal
+          title="관전으로 바꾸시겠습니까?"
+          confirmLabel="관전하기"
+          cancelLabel="취소"
+          onConfirm={() => void becomeWatcher()}
+          onCancel={() => setConfirmWatch(false)}
+        >
+          자리에서 물러나 보기만 합니다. 구경하는 사람은 방장이 될 수 없어서,{' '}
+          {successor ? (
+            <>
+              방장이 <strong>{successor.displayName}</strong>님에게 넘어갑니다.
+            </>
+          ) : (
+            <>방장이 남아 있는 사람에게 넘어갑니다.</>
+          )}
+          <br />
+          시작 인원에도 들어가지 않습니다.
+        </ConfirmModal>
       )}
 
       {confirmLeave && (
