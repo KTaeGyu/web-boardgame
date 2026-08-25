@@ -1,5 +1,7 @@
 import { useEffect, type ReactNode } from 'react'
 
+import { useBackClose } from '../lib/back.ts'
+
 interface Props {
   title: string
   children: ReactNode
@@ -20,6 +22,9 @@ export function ConfirmModal({
   onCancel,
   busy = false,
 }: Props) {
+  // 휴대폰의 뒤로가기는 화면을 떠나는 것이 아니라 이 창을 닫는 것이어야 한다.
+  useBackClose(onCancel)
+
   // 손이 마우스로 가지 않아도 끝낼 수 있게. Esc 는 물러나기, Enter 는 밀고 나가기.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -72,6 +77,8 @@ export function ChoiceModal({
   actions: { label: string; tone?: 'danger' | 'primary'; onClick: () => void }[]
   onClose: () => void
 }) {
+  useBackClose(onClose)
+
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return

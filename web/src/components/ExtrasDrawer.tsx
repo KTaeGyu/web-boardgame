@@ -10,6 +10,7 @@ import {
   type GameView,
 } from '@the-gang/shared'
 
+import { useBackIntercept } from '../lib/back.ts'
 import { tipPosition } from '../lib/tooltip.ts'
 import { PlayingCard } from './PlayingCard.tsx'
 
@@ -41,6 +42,8 @@ const RANK_VALUES = [14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2]
 export function ExtrasDrawer({ game, playerId, hand, notes, onUse }: Props) {
   // 접힌 채로 시작한다. 펼쳐 두면 테이블을 가리고, 대개는 걸린 것을 이미 옆에서 보고 있다.
   const [open, setOpen] = useState(false)
+  // 펼쳐 둔 채 뒤로가기를 누르면 판을 떠나는 것이 아니라 서랍을 접는다.
+  useBackIntercept(open, () => setOpen(false))
   const [asking, setAsking] = useState(false)
   const [targetId, setTargetId] = useState('')
   const [value, setValue] = useState(14)

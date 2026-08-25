@@ -22,6 +22,7 @@ import { TutorialTip, type TipPayload } from '../components/TutorialTip.tsx'
 import { ConfirmModal } from '../components/Modal.tsx'
 import { CardSlot, PlayingCard } from '../components/PlayingCard.tsx'
 import { Token, TokenBlank } from '../components/Token.tsx'
+import { useBackIntercept } from '../lib/back.ts'
 import { record } from '../lib/history.ts'
 import { getNickname, getPlayerId } from '../lib/identity.ts'
 import { sfx } from '../lib/sfx.ts'
@@ -90,6 +91,14 @@ export function GamePage({ spectating = false }: { spectating?: boolean } = {}) 
   /** 마지막 결과까지 다 보여줬는가. 이때가 되어야 다음으로 넘어가는 버튼이 열린다. */
   const [finished, setFinished] = useState(false)
   const [confirmLeave, setConfirmLeave] = useState(false)
+  /*
+   * 판이 도는 중의 뒤로가기는 나가는 것이 아니라 묻는 것이다.
+   *
+   * 휴대폰의 뒤로가기는 실수로 눌리는 단추다. 그대로 나가면 화면만 목록으로 가고
+   * 자리는 남아, 라운드가 내 확정을 기다리며 선다 — 남들 화면에는 아무 일도 없는데
+   * 판만 멈춘다. 취소하면 제자리이므로 잃는 것이 없다.
+   */
+  useBackIntercept(true, () => setConfirmLeave(true), true)
   /** 방장인지. 방장은 나가는 대신 판을 접어 모두를 대기실로 되돌린다. */
   const [hostId, setHostId] = useState('')
   /** 혼자 해보는 판인가. 돌아갈 대기실도, 다음 금고도 없다. */

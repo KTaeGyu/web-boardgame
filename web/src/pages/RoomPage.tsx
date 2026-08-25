@@ -24,6 +24,7 @@ import { CardPicker } from '../components/CardPicker.tsx'
 import { Chat } from '../components/Chat.tsx'
 import { SpecialistGrid } from '../components/SpecialistGrid.tsx'
 import { ChoiceModal, ConfirmModal } from '../components/Modal.tsx'
+import { useBackIntercept } from '../lib/back.ts'
 import { getNickname, getPlayerId } from '../lib/identity.ts'
 import { call, socket, useServerEvent } from '../lib/socket.ts'
 import { useEscape } from '../lib/useEscape.ts'
@@ -174,6 +175,21 @@ export function RoomPage() {
     await call<null>('room:leave')
     navigate('/rooms')
   }
+
+  /*
+   * 대기실에서의 뒤로가기는 방에서 나가는 것이다.
+   *
+   * 화면만 목록으로 보내면 자리는 남는다 — 정원을 먹고, 남들에게는 아직 있는 사람으로
+   * 보인다. 대기실은 언제든 다시 들어올 수 있으니 묻지 않고 나간다. 관전 중이었으면
+   * 관전 목록에서 빠진다.
+   *
+   * 돌아가는 자리는 목록으로 바꿔 둔다(replace). 그러지 않으면 뒤로가기 한 번에
+   * 방금 나온 방 주소로 되돌아와 다시 들어가진다.
+   */
+  useBackIntercept(true, () => {
+    void call<null>('room:leave')
+    navigate('/rooms', { replace: true })
+  })
 
   if (error) {
     return (

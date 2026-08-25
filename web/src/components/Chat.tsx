@@ -10,6 +10,7 @@
 import { Fragment, useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { CHAT_MAX, type ChatMessage } from '@the-gang/shared'
 
+import { useBackIntercept } from '../lib/back.ts'
 import { getPlayerId } from '../lib/identity.ts'
 import { call, useServerEvent } from '../lib/socket.ts'
 
@@ -87,6 +88,8 @@ function mergeById(a: ChatMessage[], b: ChatMessage[]): ChatMessage[] {
 export function Chat({ code }: { code: string }) {
   const me = getPlayerId()
   const [open, setOpen] = useState(false)
+  // 펼쳐 둔 채 휴대폰의 뒤로가기를 누르면 판을 떠나는 것이 아니라 대화를 접는다.
+  useBackIntercept(open, () => setOpen(false))
   const [messages, setMessages] = useState<ChatMessage[]>(() => loadSaved(code).messages)
   /** 창이 들고 있는 대화가 어느 방의 것인가. 서버가 건네주는 시각과 맞춰 본다. */
   const sinceRef = useRef(loadSaved(code).since)
