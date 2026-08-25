@@ -279,7 +279,12 @@ export function GamePage({ spectating = false }: { spectating?: boolean } = {}) 
          * 종류를 따로 보내지 않아 문구로 가른다 — server/src/game.ts 의 그 한 줄이
          * 바뀌면 여기도 함께 본다. 어긋나도 소리 하나가 달라질 뿐이다.
          */
-        if (payload.tone === 'warn') sfx(payload.text.includes('뺏겼') ? 'steal' : 'deny')
+        if (payload.tone === 'warn') {
+          if (payload.text.includes('뺏겼')) sfx('steal')
+          // 거절은 하나같이 「~할 수 없습니다」로 끝난다. 그 밖의 warn 은 거절이 아니라
+          // 사건이므로 툭 소리를 내면 어긋난다 — 감지기가 그렇고, 저쪽은 따로 운다.
+          else if (payload.text.includes('수 없습니다')) sfx('deny')
+        }
         const id = (toastSeq.current += 1)
         // 세 줄까지만 남긴다. 그 이상 쌓이면 판이 가려진다.
         setToasts((current) =>
@@ -357,6 +362,48 @@ export function GamePage({ spectating = false }: { spectating?: boolean } = {}) 
       [navigate],
     ),
   )
+
+  /*
+   * 남이 토큰을 움직였을 때도 소리가 난다.
+   *
+   * 토큰이 이 판의 유일한 언어라, 남의 선언이 들리지 않으면 화면에서 눈을 뗄 수 없다.
+   * 내 일은 take·steal 이 이미 맡으므로 여기서는 남의 자리만 본다.
+   *
+   * 한 번의 뺏기가 두 사람의 자리를 함께 바꾼다 — 뺏은 쪽은 새로 쥐고 뺏긴 쪽은 빈다.
+   * 그래서 「새로 쥔 사람」에서만 울리고, 빈 자리는 그 토큰이 중앙으로 돌아갔을 때에만,
+   * 곧 스스로 내려놓았을 때에만 울린다. 그러지 않으면 한 동작에 두 번 난다.
+   */
+  const seatTokens = game?.players.map((player) => player.currentToken)
+  const heldBefore = useRef<Map<string, number | null> | null>(null)
+  const roundKey = game ? `${game.heist}:${game.round}` : ''
+  const roundBefore = useRef(roundKey)
+
+  useEffect(() => {
+    if (!game) return
+    const before = heldBefore.current
+    const sameRound = roundBefore.current === roundKey
+    heldBefore.current = new Map(game.players.map((player) => [player.id, player.currentToken]))
+    roundBefore.current = roundKey
+    // 라운드가 넘어가면 모두의 자리가 한꺼번에 비워진다. 그건 누가 움직인 것이 아니다.
+    if (!before || !sameRound) return
+
+    for (const player of game.players) {
+      if (player.id === playerId) continue
+      const was = before.get(player.id)
+      // 방금 들어온 사람에게는 견줄 앞자리가 없다.
+      if (was === undefined || was === player.currentToken) continue
+
+      if (player.currentToken !== null) {
+        // 내 손에서 간 것이면 뺏겼다는 소리가 이미 울렸다.
+        const from = [...before].find(([, token]) => token === player.currentToken)?.[0]
+        if (from !== playerId) sfx('otherTake')
+      } else if (was !== null && game.centerTokens.includes(was)) {
+        sfx('otherDrop')
+      }
+    }
+    // seatTokens 가 배치가 바뀐 것을 알린다. game 하나만 매면 채팅 한 줄에도 다시 돈다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seatTokens?.join(','), roundKey, playerId])
 
   /*
    * 보드에 카드가 깔릴 때 소리를 낸다.
@@ -456,6 +503,7 @@ export function GamePage({ spectating = false }: { spectating?: boolean } = {}) 
     const fired = sensorRef.current
     if (!fired) return
 
+    sfx('sensor')
     setFlash({
       key: sensorKey,
       text: `${CHALLENGES[fired.challenge].name} 작동!`,
@@ -810,6 +858,7 @@ export function GamePage({ spectating = false }: { spectating?: boolean } = {}) 
           playerId={playerId}
           iAmHost={iAmHost}
           tutorial={tutorial}
+          spectating={spectating}
           onLeave={() => setConfirmLeave(true)}
         />
       )}
@@ -980,10 +1029,21 @@ interface ShowdownProps {
   iAmHost: boolean
   /** 혼자 해보는 판. 다음 금고가 없고, 여기서 끝난다. */
   tutorial: boolean
+  /** 자리 없이 보고만 있다. 판을 넘기는 것은 앉은 사람들이 정할 일이다. */
+  spectating: boolean
   onLeave: () => void
 }
 
-function Showdown({ game, revealed, finished, playerId, iAmHost, tutorial, onLeave }: ShowdownProps) {
+function Showdown({
+  game,
+  revealed,
+  finished,
+  playerId,
+  iAmHost,
+  tutorial,
+  spectating,
+  onLeave,
+}: ShowdownProps) {
   const navigate = useNavigate()
   /**
    * 마우스를 올린 사람의 다섯 장.
@@ -1136,15 +1196,21 @@ function Showdown({ game, revealed, finished, playerId, iAmHost, tutorial, onLea
 
         {done && !over && !tutorial && (
           <div className="showdown__next">
+            {/*
+              판을 넘기는 것은 자리에 앉은 사람들이 정한다. 구경꾼에게는 세는 것만 보인다 —
+              눌러도 서버가 「이 판에 참여하고 있지 않습니다」로 돌려보낸다.
+            */}
             <button
               type="button"
               className="btn btn--primary"
-              disabled={iContinued}
+              disabled={iContinued || spectating}
               onClick={() => void call('game:continue')}
             >
-              {iContinued
-                ? `다른 사람을 기다리는 중 (${continued.length}/${waitingOn})`
-                : `다음 금고로 (${continued.length}/${waitingOn})`}
+              {spectating
+                ? `넘어가기를 기다리는 중 (${continued.length}/${waitingOn})`
+                : iContinued
+                  ? `다른 사람을 기다리는 중 (${continued.length}/${waitingOn})`
+                  : `다음 금고로 (${continued.length}/${waitingOn})`}
             </button>
             {/*
               다음 금고로를 이미 눌렀어도 여기서 빠져나갈 수 있어야 한다 — 다른 사람을
