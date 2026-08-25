@@ -108,6 +108,11 @@ function fitRounds(rounds: readonly (SpecialistId | null)[], slots: number): (Sp
   return Array.from({ length: slots }, (_, index) => rounds[index] ?? null)
 }
 
+/** 배치표 맨 윗줄(무작위)도 같은 길이로 맞춘다. */
+function fitFlags(flags: readonly boolean[], slots: number): boolean[] {
+  return Array.from({ length: slots }, (_, index) => flags[index] === true)
+}
+
 export interface RoomStoreOptions {
   now?: () => number
   makeCode?: (taken: (code: string) => boolean) => string
@@ -480,7 +485,18 @@ export class RoomStore {
     if (patch.specialistRounds !== undefined && patch.specialistRounds.length !== slots) {
       return err('INVALID_SETTINGS', '해결사 자리는 판마다 하나씩입니다.')
     }
+    if (patch.specialistRandomRounds !== undefined && patch.specialistRandomRounds.length !== slots) {
+      return err('INVALID_SETTINGS', '해결사 자리는 판마다 하나씩입니다.')
+    }
     const rounds = fitRounds(next.specialistRounds, slots)
+    const randomRounds = fitFlags(next.specialistRandomRounds, slots)
+    /*
+     * 한 판에 해결사는 하나뿐이다. 무작위를 찍은 판에는 지정 카드가 서 있을 수 없다 —
+     * 표가 그것을 막지만, 계약은 방에 있지 화면에 있지 않다.
+     */
+    for (const [at, random] of randomRounds.entries()) {
+      if (random) rounds[at] = null
+    }
     const placed = rounds.filter((id): id is SpecialistId => id !== null)
     if (placed.some((id) => !READY_SPECIALISTS.includes(id))) {
       return err('INVALID_SETTINGS', '고를 수 없는 해결사 카드입니다.')
@@ -492,6 +508,7 @@ export class RoomStore {
       pickedChallenges: [...new Set(next.pickedChallenges)].sort((a, b) => a - b),
       // 정렬하지 않는다 — 여기서는 자리가 곧 뜻이다.
       specialistRounds: rounds,
+      specialistRandomRounds: randomRounds,
     }
     return ok(toView(room))
   }

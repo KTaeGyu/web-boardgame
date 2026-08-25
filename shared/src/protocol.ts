@@ -54,12 +54,40 @@ export interface RoomSettings {
    */
   specialistRounds: (SpecialistId | null)[]
   /**
+   * 그 판의 해결사를 무작위로 뽑을 것인가. 배치표 맨 윗줄이다.
+   *
+   * 한 판에 해결사는 하나뿐이라 지정 카드와 같은 칸에 함께 설 수 없다 —
+   * 무작위를 찍으면 그 칸에 서 있던 카드가 자리를 내준다. 길이는 자리 수와 같다.
+   */
+  specialistRandomRounds: boolean[]
+  /**
+   * 해결사를 **직전 판을 졌을 때만** 내보내는가. 기본은 그렇다.
+   *
+   * 원작에서 해결사는 실패한 다음 판을 거들어주는 카드다. 끄면 결과와 무관하게
+   * 배치표대로 나온다. 켜져 있으면 첫 판에는 나오지 않는다 — 직전 판이 없다.
+   */
+  specialistOnLoss: boolean
+  /**
    * 「직접 고르기」에서 고른 것 위에 무작위로 더 얹을 도전자 수(0~3).
    *
-   * 게임을 시작할 때 한 번 뽑아 끝까지 그대로 걸린다. 고른 것과 겹치지 않게 뽑으므로,
-   * 고른 장수와 이 수를 더한 만큼이 매 판 걸린다.
+   * **판마다 새로 뽑는다.** 고른 카드(고정)와는 겹치지 않지만, 지난 판에 나왔던 카드가
+   * 다시 나오는 것은 막지 않는다 — 매 판 달라지는 것이 이 설정의 뜻이다.
    */
   randomChallenges: number
+  /**
+   * 무작위 도전자를 **직전 판을 이겼을 때만** 뽑는가. 기본은 아니다(매 판 뽑는다).
+   *
+   * 원작의 「성공하면 어려워진다」를 쓰고 싶을 때 켠다. 첫 판은 직전 결과가 없으므로
+   * 켜져 있으면 나오지 않는다. 고른 카드(고정)는 이 조건과 무관하게 늘 걸린다.
+   */
+  randomChallengesOnWin: boolean
+  /**
+   * 한 번 나온 무작위 도전자가 그다음 판에도 남는가. 기본은 아니다(그 판에만).
+   *
+   * 켜면 판이 갈수록 쌓인다 — 이미 걸려 있는 것은 다시 뽑지 않으므로 매 판 새 카드가
+   * 그만큼 더해진다.
+   */
+  randomChallengesStay: boolean
   /** 몇 개를 열면 이기는가. 「직접 고르기」에서만 3이 아닐 수 있다. */
   vaultsToWin: number
   /** 몇 번 울리면 지는가. 「직접 고르기」에서만 3이 아닐 수 있다. */
@@ -75,11 +103,20 @@ export function emptyRounds(count: number = SPECIALIST_ROUNDS): (SpecialistId | 
   return Array.from({ length: count }, () => null)
 }
 
+/** 배치표 맨 윗줄(무작위)의 빈 한 벌. 길이는 자리 수를 따른다. */
+export function emptyFlags(count: number = SPECIALIST_ROUNDS): boolean[] {
+  return Array.from({ length: count }, () => false)
+}
+
 export const DEFAULT_SETTINGS: RoomSettings = {
   mode: 'basic',
   pickedChallenges: [],
   specialistRounds: emptyRounds(),
+  specialistRandomRounds: emptyFlags(),
+  specialistOnLoss: true,
   randomChallenges: 0,
+  randomChallengesOnWin: false,
+  randomChallengesStay: false,
   vaultsToWin: VAULTS_TO_WIN,
   alarmsToLose: ALARMS_TO_LOSE,
   maxPlayers: 6,

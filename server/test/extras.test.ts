@@ -199,15 +199,27 @@ describe('직접 고르기', () => {
   })
 
   it('해결사는 방장이 앉힌 판에 그대로 나온다', () => {
-    const dealer = new ExtraDealer('custom', mulberry32(1), [2], [3, null, 10, null, null])
+    // 「진 다음에만」을 끄면 결과와 무관하게 배치표대로 나온다.
+    const dealer = new ExtraDealer('custom', mulberry32(1), [2], [3, null, 10, null, null], {
+      specialistOnLoss: false,
+    })
     assert.equal(dealer.next(null).specialist, 3, '첫 판')
     assert.equal(dealer.next(true).specialist, null, '둘째 판은 비워 두었다')
     assert.equal(dealer.next(false).specialist, 10, '셋째 판')
   })
 
+  it('기본은 진 다음에만 나온다 — 첫 판에는 직전 판이 없다', () => {
+    const dealer = new ExtraDealer('custom', mulberry32(1), [], [10, 10, 10, null, null])
+    assert.equal(dealer.next(null).specialist, null, '첫 판')
+    assert.equal(dealer.next(true).specialist, null, '이긴 다음')
+    assert.equal(dealer.next(false).specialist, 10, '진 다음')
+  })
+
   it('빈칸만 있는 판은 해결사 없이 지나간다', () => {
     // 마지막 판에만 하나 앉히는 것이 「직접 고르기」를 만든 이유다.
-    const dealer = new ExtraDealer('custom', mulberry32(1), [], [null, null, null, null, 10])
+    const dealer = new ExtraDealer('custom', mulberry32(1), [], [null, null, null, null, 10], {
+      specialistOnLoss: false,
+    })
     for (let heist = 1; heist <= 4; heist += 1) {
       assert.equal(dealer.next(heist === 1 ? null : true).specialist, null, `${heist}판`)
     }
@@ -215,14 +227,16 @@ describe('직접 고르기', () => {
   })
 
   it('같은 해결사가 판마다 다시 걸린다', () => {
-    const dealer = new ExtraDealer('custom', mulberry32(1), [], [10, 10, null, null, null])
+    const dealer = new ExtraDealer('custom', mulberry32(1), [], [10, 10, null, null, null], {
+      specialistOnLoss: false,
+    })
     assert.equal(dealer.next(null).specialist, 10, '첫 판')
     assert.equal(dealer.next(true).specialist, 10, '둘째 판에도 같은 카드')
     assert.equal(dealer.next(true).specialist, null, '셋째 판은 비어 있다')
   })
 
   it('배치표를 넘어선 판은 해결사가 없다', () => {
-    const dealer = new ExtraDealer('custom', mulberry32(1), [], [10])
+    const dealer = new ExtraDealer('custom', mulberry32(1), [], [10], { specialistOnLoss: false })
     assert.equal(dealer.next(null).specialist, 10)
     assert.equal(dealer.next(true).specialist, null)
   })
@@ -232,6 +246,7 @@ describe('직접 고르기', () => {
       mode: 'custom',
       pickedChallenges: [],
       specialistRounds: [10],
+      specialistOnLoss: false,
       rng: mulberry32(5),
     })
     const view = game.view()
@@ -939,15 +954,49 @@ describe('해결사 카드 효과', () => {
 })
 
 describe('직접 고르기 — 무작위 도전자', () => {
-  it('고른 것 위에 얹히고, 게임 내내 같은 카드다', () => {
+  it('판마다 새로 뽑는다 — 고른 것은 그대로 남는다', () => {
     const dealer = new ExtraDealer('custom', mulberry32(5), [2], [], { random: 2 })
-    const first = dealer.next(null).challenges
-    assert.equal(first.length, 3, '고른 하나 + 무작위 둘')
-    assert.ok(first.includes(2), '고른 것은 그대로 있다')
-
-    for (const result of [true, false, true] as const) {
-      assert.deepEqual(dealer.next(result).challenges, first, '판이 바뀌어도 다시 뽑지 않는다')
+    const seen: string[] = []
+    for (const result of [null, true, false, true] as const) {
+      const challenges = dealer.next(result).challenges
+      assert.equal(challenges.length, 3, '고른 하나 + 무작위 둘')
+      assert.equal(challenges[0], 2, '고른 것은 늘 걸린다')
+      assert.equal(new Set(challenges).size, 3, '한 판 안에서는 겹치지 않는다')
+      seen.push(challenges.slice(1).join(','))
     }
+    // 매 판 다시 뽑으므로 네 판이 모두 같을 수는 없다. 지난 판과 겹치는 것 자체는 막지 않는다.
+    assert.ok(new Set(seen).size > 1, `판마다 달라져야 한다: ${seen.join(' / ')}`)
+  })
+
+  it('누적으로 두면 한 번 나온 것이 그대로 남는다', () => {
+    const dealer = new ExtraDealer('custom', mulberry32(5), [2], [], { random: 1, stay: true })
+    let before = dealer.next(null).challenges
+    assert.equal(before.length, 2, '고른 하나 + 무작위 하나')
+
+    for (const result of [true, false] as const) {
+      const now = dealer.next(result).challenges
+      assert.equal(now.length, before.length + 1, '판마다 한 장씩 쌓인다')
+      for (const id of before) assert.ok(now.includes(id), `${id} 가 사라졌다`)
+      assert.equal(new Set(now).size, now.length, '쌓인 것과 새로 뽑은 것이 겹치지 않는다')
+      before = now
+    }
+  })
+
+  it('「이겼을 때만」이면 진 다음과 첫 판에는 뽑지 않는다', () => {
+    const dealer = new ExtraDealer('custom', mulberry32(5), [2], [], { random: 2, onWin: true })
+    assert.deepEqual(dealer.next(null).challenges, [2], '첫 판 — 직전 판이 없다')
+    assert.deepEqual(dealer.next(false).challenges, [2], '진 다음')
+    assert.equal(dealer.next(true).challenges.length, 3, '이긴 다음에는 얹힌다')
+  })
+
+  it('무작위 해결사는 찍은 판에서 한 장 뽑는다', () => {
+    const dealer = new ExtraDealer('custom', mulberry32(7), [], [null, null, null, null, null], {
+      specialistRandom: [true, false, false, false, false],
+      specialistOnLoss: false,
+    })
+    const first = dealer.next(null).specialist
+    assert.ok(first !== null && READY_SPECIALISTS.includes(first), `뽑힌 것: ${first}`)
+    assert.equal(dealer.next(true).specialist, null, '찍지 않은 판은 그대로 비어 있다')
   })
 
   it('고른 카드와 겹치지 않고, 무작위끼리도 겹치지 않는다', () => {

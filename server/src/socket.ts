@@ -473,7 +473,8 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
       const pickedNothing =
         room.settings.pickedChallenges.length === 0 &&
         room.settings.randomChallenges === 0 &&
-        room.settings.specialistRounds.every((id) => id === null)
+        room.settings.specialistRounds.every((id) => id === null) &&
+        room.settings.specialistRandomRounds.every((on) => !on)
       if (room.settings.mode === 'custom' && pickedNothing) {
         return ack({
           ok: false,
@@ -506,6 +507,10 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
           ...(room.settings.mode === 'custom'
             ? {
                 randomChallenges: room.settings.randomChallenges,
+                randomChallengesOnWin: room.settings.randomChallengesOnWin,
+                randomChallengesStay: room.settings.randomChallengesStay,
+                specialistRandomRounds: room.settings.specialistRandomRounds,
+                specialistOnLoss: room.settings.specialistOnLoss,
                 vaultsToWin: room.settings.vaultsToWin,
                 alarmsToLose: room.settings.alarmsToLose,
               }

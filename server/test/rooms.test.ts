@@ -59,7 +59,11 @@ describe('방 만들기', () => {
       mode: 'basic',
       pickedChallenges: [],
       specialistRounds: [null, null, null, null, null],
+      specialistRandomRounds: [false, false, false, false, false],
+      specialistOnLoss: true,
       randomChallenges: 0,
+      randomChallengesOnWin: false,
+      randomChallengesStay: false,
       vaultsToWin: 3,
       alarmsToLose: 3,
       maxPlayers: 6,
@@ -402,6 +406,29 @@ describe('방 설정', () => {
     if (!result.ok) return
     result.value.settings.pickedChallenges.push(5)
     assert.deepEqual(ctx.store.view(code)?.settings.pickedChallenges, [2])
+  })
+
+  it('무작위를 찍은 판에서는 지정한 해결사가 물러난다', () => {
+    // 한 판에 해결사는 하나뿐이다. 표가 막지만 계약은 방에 있다.
+    ctx.store.updateSettings('p1', { mode: 'custom', specialistRounds: [10, 3, null, null, null] })
+    const result = ctx.store.updateSettings('p1', {
+      specialistRandomRounds: [true, false, false, false, false],
+    })
+    assert.equal(result.ok, true)
+    if (!result.ok) return
+    assert.deepEqual(result.value.settings.specialistRounds, [null, 3, null, null, null])
+    assert.deepEqual(result.value.settings.specialistRandomRounds, [true, false, false, false, false])
+  })
+
+  it('무작위 줄도 승·패 수를 따라 길이가 바뀐다', () => {
+    ctx.store.updateSettings('p1', {
+      mode: 'custom',
+      specialistRandomRounds: [false, false, false, false, true],
+    })
+    const grown = ctx.store.updateSettings('p1', { vaultsToWin: 4 })
+    assert.equal(grown.ok, true)
+    if (!grown.ok) return
+    assert.deepEqual(grown.value.settings.specialistRandomRounds, [false, false, false, false, true, false])
   })
 
   it('빠른 접근과 감지기는 함께 걸 수 없다', () => {

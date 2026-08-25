@@ -77,8 +77,16 @@ export interface GameOptions {
   pickedChallenges?: readonly ChallengeId[]
   /** 「직접 고르기」에서 방장이 고른 해결사 카드. */
   specialistRounds?: readonly (SpecialistId | null)[]
-  /** 「직접 고르기」에서 고른 것 위에 무작위로 더 얹을 도전자 수. */
+  /** 「직접 고르기」에서 판마다 무작위로 더 얹을 도전자 수. */
   randomChallenges?: number
+  /** 무작위 도전자를 직전 판을 이겼을 때만 뽑는가. */
+  randomChallengesOnWin?: boolean
+  /** 한 번 나온 무작위 도전자가 그다음 판에도 남는가. */
+  randomChallengesStay?: boolean
+  /** 배치표 맨 윗줄 — 그 판의 해결사를 무작위로 뽑는가. */
+  specialistRandomRounds?: readonly boolean[]
+  /** 해결사를 직전 판을 졌을 때만 내보내는가. */
+  specialistOnLoss?: boolean
   /**
    * 몇 개를 열면 이기고 몇 번 울리면 지는가. 「직접 고르기」에서만 넘어온다.
    * 다른 모드는 원작 그대로이고, 마스터 시프의 경보 2는 모드가 정하므로 여기서 받지 않는다.
@@ -197,6 +205,10 @@ export class Game {
     this.specialistRounds = options.specialistRounds ?? []
     this.dealer = new ExtraDealer(this.mode, this.rng, this.picked, this.specialistRounds, {
       random: options.randomChallenges ?? 0,
+      onWin: options.randomChallengesOnWin ?? false,
+      stay: options.randomChallengesStay ?? false,
+      specialistRandom: options.specialistRandomRounds ?? [],
+      specialistOnLoss: options.specialistOnLoss ?? true,
     })
     this.seats = players.map((player) => ({
       id: player.id,
