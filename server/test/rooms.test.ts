@@ -598,3 +598,72 @@ describe('방이 열린 시각', () => {
     assert.notEqual(ctx.store.openedAt(second), openedFirst, '시각이 같으면 창이 두 방을 구별하지 못한다')
   })
 })
+
+/*
+ * 관전. 자리와 다른 것이라 규칙도 따로다 —
+ * 시작 인원에 들지 않고, 지켜줄 자리가 없어 끊기면 그 자리에서 빠진다.
+ */
+describe('관전', () => {
+  it('다섯까지만 본다', () => {
+    const { store } = makeStore()
+    const code = seed(store, ['p1'])
+    for (let i = 0; i < 5; i += 1) {
+      assert.equal(store.spectate(`w${i}`, `구경${i}`, code).ok, true, `${i + 1}번째`)
+    }
+    const sixth = store.spectate('w5', '구경5', code)
+    assert.equal(sixth.ok, false)
+    if (!sixth.ok) assert.equal(sixth.code, 'ROOM_FULL')
+  })
+
+  it('앉아 있던 사람은 스스로 물러날 수 있다 — 대기실에서만', () => {
+    const { store } = makeStore()
+    const code = seed(store, ['p1', 'p2'])
+    const stepped = store.spectate('p2', '민수', code)
+    assert.equal(stepped.ok, true)
+    if (!stepped.ok) return
+    assert.deepEqual(stepped.value.players.map((p) => p.id), ['p1'])
+    assert.deepEqual(stepped.value.spectators.map((w) => w.id), ['p2'])
+  })
+
+  it('판이 도는 중에는 자리에서 물러날 수 없다', () => {
+    // 자리가 비면 라운드가 끝나지 않아 판이 통째로 접힌다. 화면은 이 거절을 보고
+    // 「관전이 아니라 제자리로 돌아갈 사람」이라고 판단한다.
+    const { store } = makeStore()
+    const code = seed(store, ['p1', 'p2', 'p3'])
+    store.setPhase(code, 'playing')
+    const result = store.spectate('p2', '민수', code)
+    assert.equal(result.ok, false)
+    if (!result.ok) assert.equal(result.code, 'WRONG_PHASE')
+  })
+
+  it('혼자 있는 방에서는 물러날 수 없다', () => {
+    const { store } = makeStore()
+    const code = seed(store, ['p1'])
+    assert.equal(store.spectate('p1', '태규', code).ok, false)
+  })
+
+  it('방장이 물러나면 앉아 있는 사람에게 넘어간다 — 구경꾼은 방장이 되지 않는다', () => {
+    const { store } = makeStore()
+    const code = seed(store, ['p1', 'p2'])
+    store.spectate('w0', '구경', code)
+    const result = store.spectate('p1', '태규', code)
+    assert.equal(result.ok, true)
+    if (!result.ok) return
+    assert.equal(result.value.hostId, 'p2')
+  })
+
+  it('차단당한 사람은 보러 올 수도 없다', () => {
+    const { store } = makeStore()
+    const code = seed(store, ['p1', 'p2'])
+    store.kick('p1', 'p2', true)
+    assert.equal(store.spectate('p2', '민수', code).ok, false)
+  })
+
+  it('혼자 해보는 방은 보러 갈 수 없다', () => {
+    const { store } = makeStore()
+    const made = store.createTutorialRoom('p1', '태규', [{ id: 'b1', nickname: '봇1' }])
+    assert.equal(made.ok, true)
+    if (!made.ok) return
+    assert.equal(store.spectate('w0', '구경', made.value.code).ok, false)
+  })
+})

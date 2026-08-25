@@ -495,3 +495,47 @@ describe('내보내기', () => {
     if (!result.ok) assert.equal(result.code, 'NOT_HOST')
   })
 })
+
+/*
+ * 도배 막기. 규칙이 아니라 운영 한도다 —
+ * 1초에 열 줄을 넘기는 것은 손으로 치는 속도가 아니라 붙여넣기나 장난이다.
+ */
+describe('대화 도배', () => {
+  it('1초에 열 줄까지는 지나가고 그다음은 잠긴다', async () => {
+    const { host } = await seatThree()
+
+    // 한꺼번에 던진다. 하나씩 주고받으면 느린 기계에서 창(1초)이 먼저 넘어가 버린다.
+    // 도착 순서가 곧 처리 순서라(Node 는 한 줄기) 열은 지나가고 열한 번째가 걸린다.
+    const results = await Promise.all(
+      Array.from({ length: 11 }, (_, i) => call<null>(host.socket, 'chat:send', { text: `줄 ${i}` })),
+    )
+    assert.equal(results.filter((result) => result.ok).length, 10, '열 줄까지는 지나간다')
+
+    const blocked = results.find((result) => !result.ok)
+    assert.ok(blocked && !blocked.ok, '열한 번째는 막혀야 한다')
+    if (blocked && !blocked.ok) {
+      assert.equal(blocked.code, 'TOO_FAST')
+      assert.match(blocked.message, /초 뒤에/)
+    }
+
+    // 잠긴 뒤에는 남은 시간을 알려주며 계속 막는다.
+    const again = await call<null>(host.socket, 'chat:send', { text: '또 한 줄' })
+    assert.equal(again.ok, false)
+  })
+
+  it('남의 몫까지 잠기지는 않는다', async () => {
+    const { host, guests } = await seatThree()
+    await Promise.all(
+      Array.from({ length: 11 }, (_, i) => call<null>(host.socket, 'chat:send', { text: `줄 ${i}` })),
+    )
+
+    const other = await call<null>(guests[0].socket, 'chat:send', { text: '나는 처음인데' })
+    assert.equal(other.ok, true, '한 사람이 도배해도 옆 사람은 말할 수 있어야 한다')
+  })
+
+  it('빈 말은 오류가 아니라 아무 일도 아니다', async () => {
+    const { host } = await seatThree()
+    const sent = await call<null>(host.socket, 'chat:send', { text: '   ' })
+    assert.equal(sent.ok, true, '붉어질 이유가 없는데 붉어지면 안 된다')
+  })
+})
