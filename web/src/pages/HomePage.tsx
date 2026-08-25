@@ -49,7 +49,7 @@ export function HomePage() {
   }
 
   return (
-    <main className="page page--narrow page--column">
+    <main className="page page--narrow page--column home-page">
       <header className="brand">
         <h1 className="brand__title">THE GANG</h1>
         <div className="brand__rule" />

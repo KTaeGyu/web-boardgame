@@ -68,7 +68,13 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
   const unlockTimers = new Map<string, NodeJS.Timeout>()
 
   const sendRoom = (room: RoomView) => io.to(room.code).emit('room:updated', room)
-  const sendRoomList = () => io.to(LOBBY_WATCHERS).emit('rooms:changed', store.list())
+  const sendLobbyStats = () =>
+    io.to(LOBBY_WATCHERS).emit('lobby:stats', { online: io.engine.clientsCount, rooms: store.size })
+
+  const sendRoomList = () => {
+    io.to(LOBBY_WATCHERS).emit('rooms:changed', store.list())
+    sendLobbyStats()
+  }
 
   const announce = (room: RoomView | null) => {
     if (room) sendRoom(room)
@@ -158,6 +164,9 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
       return
     }
 
+    // 새로 붙은 사람도 「지금 몇 명」에 든다. 목록을 보고 있는 사람들에게 알린다.
+    sendLobbyStats()
+
     socket.on('room:create', (payload, ack) => {
       const identity = readIdentity(payload)
       if (!identity.ok) return ack(identity)
@@ -241,6 +250,7 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
       if (watching) {
         socket.join(LOBBY_WATCHERS)
         socket.emit('rooms:changed', store.list())
+        socket.emit('lobby:stats', { online: io.engine.clientsCount, rooms: store.size })
       } else {
         socket.leave(LOBBY_WATCHERS)
       }
@@ -444,6 +454,8 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
     socket.on('disconnect', () => {
       const playerId = playerOfSocket.get(socket.id)
       unbind(socket.id, playerId)
+      // 방에 들지 않은 사람이 나가도 「지금 몇 명」은 달라진다.
+      setImmediate(sendLobbyStats)
       if (!playerId) return
 
       const code = store.codeOf(playerId)

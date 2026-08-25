@@ -164,6 +164,35 @@ select {
   margin-top: auto;
 }
 
+/*
+ * 넓은 화면의 첫 화면은 통째로 가운데에 놓인다.
+ *
+ * 좁은 화면에서는 버튼이 바닥에 붙어야 엄지에 닿지만(그쪽은 .home-form 이 남는 높이를
+ * 받아 actions 를 아래로 민다), 넓은 화면에서는 그렇게 두면 표제만 위에 뜨고 버튼은
+ * 저 아래에 떨어져 한 화면에 있는 것으로 읽히지 않는다.
+ *
+ * 닉네임과 버튼 사이는 조금 띄운다 — 「쓰는 곳」과 「가는 곳」이 붙어 있으면
+ * 엔터를 치기 전에 눈이 한 번 멈추지 않는다.
+ */
+@media (min-width: 641px) {
+  .home-page {
+    justify-content: center;
+  }
+
+  .home-page .brand {
+    margin: 0 0 40px;
+  }
+
+  /* 남는 높이를 form 이 가져가지 않아야 덩어리째 가운데에 선다. */
+  .home-page .home-form {
+    flex: initial;
+  }
+
+  .home-page .home-form__actions {
+    margin-top: 36px;
+  }
+}
+
 /* ── 표제 ─────────────────────────────── */
 .brand {
   text-align: center;
@@ -322,6 +351,19 @@ select {
   margin: 0;
 }
 
+/*
+ * 지금 몇 명 · 방 몇 개.
+ *
+ * 값이 오기 전에도 자리는 잡아 둔다(내용 없는 한 칸). 나중에 나타나면 그만큼
+ * 아래가 밀려 목록이 한 번 출렁인다.
+ */
+.rooms-head__stats {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--ink-dim);
+  min-height: 1.4em;
+}
+
 /* ── 카드/목록 ────────────────────────── */
 .panel {
   border: 1px solid var(--line);
@@ -437,6 +479,79 @@ select {
 @media (max-width: 720px) {
   .room-body {
     grid-template-columns: 1fr;
+  }
+}
+
+/*
+ * 넓은 화면의 대기실은 통째로 화면 가운데에 놓인다.
+ *
+ * 제목 · 두 카드 · 버튼 줄이 한 덩어리로 서고, 그 덩어리가 위아래 가운데에 온다.
+ * 위아래로 펼쳐 붙이면 내용이 적을 때 사이가 휑하게 벌어진다.
+ *
+ * 두 카드는 둘 중 긴 쪽의 높이로 나란히 선다(align-items: stretch).
+ * 내용이 화면보다 길어지면 남는 높이가 없어 가운데 정렬은 저절로 없던 일이 되고,
+ * 평소처럼 위에서부터 흐른다.
+ *
+ * 두 칸으로 갈리는 지점(720px)과 같은 선에서 켠다.
+ */
+@media (min-width: 721px) {
+  .room-page {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-height: var(--app-height, 100dvh);
+    padding-bottom: 28px;
+  }
+
+  .room-body {
+    align-items: stretch;
+    /*
+     * 가운데는 화면에 비례해 자란다. 200px 은 제목·버튼 줄·위아래 여백이 가져가는 몫이다.
+     * 「직접 고르기」로 카드를 다 펼치면 설정이 길어지는데, 그때 넘치는 만큼은 카드 안에서
+     * 스크롤된다 — 페이지가 늘어나면 버튼 줄이 화면 밖으로 밀려난다.
+     *
+     * 창이 아주 낮으면 max 가 min 보다 작아지는데, 그때는 min 이 이긴다(CSS 규칙).
+     * 가운데가 손바닥만 해지느니 페이지가 스크롤되는 편이 낫다.
+     */
+    min-height: 280px;
+    max-height: calc(var(--app-height, 100dvh) - 200px);
+  }
+
+  /* 넘치는 쪽만 자기 안에서 스크롤한다. min-height: 0 이 없으면 격자 칸이 줄지 않는다. */
+  .room-body > .panel {
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  /* 버튼 줄은 본문과 같은 폭을 쓴다. 왼쪽에 시작·나가기, 오른쪽 끝에 대화. */
+  .room-footer {
+    position: relative;
+    align-items: center;
+  }
+
+  /*
+   * 대화 단추는 이 줄의 한 칸이 된다. 화면 모서리에 띄우면 넓은 화면에서 본문과
+   * 멀어져 혼자 노는데, 줄 안에 있으면 오른쪽 끝이 본문 오른쪽 선과 맞는다.
+   */
+  .room-footer .chat-fab {
+    /* static 이 아니라 relative 다 — 안 읽은 수 배지가 이 단추를 기준으로 붙어야 한다. */
+    position: relative;
+    right: auto;
+    bottom: auto;
+    margin-left: auto;
+  }
+
+  /* 창과 미리보기도 화면이 아니라 그 단추를 기준으로 선다. */
+  .room-footer .chat {
+    position: absolute;
+    right: 64px;
+    bottom: 0;
+  }
+
+  .room-footer .chat-peek {
+    position: absolute;
+    right: 64px;
+    bottom: 6px;
   }
 }
 
@@ -688,6 +803,20 @@ select {
     margin: 0;
     flex-wrap: nowrap;
     padding: 10px 16px calc(max(10px, env(safe-area-inset-bottom)) + 22px);
+  }
+
+  /*
+   * 바탕과 흐림은 뒤 레이어가 진다.
+   *
+   * backdrop-filter 를 막대 자신에게 걸면 그 안의 fixed 자손이 화면이 아니라 막대를
+   * 기준으로 서게 된다 — 대화창과 미리보기가 엉뚱한 자리에 붙는다. 대화 단추가 이 줄
+   * 안에 들어와 있으므로 흐림만 따로 떼어 둔다.
+   */
+  .room-footer::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
     background: linear-gradient(180deg, rgba(var(--bg-rgb), 0), var(--bg) 35%);
     backdrop-filter: blur(8px);
   }

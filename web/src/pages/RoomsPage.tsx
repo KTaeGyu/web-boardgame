@@ -20,6 +20,8 @@ export function RoomsPage() {
   const [making, setMaking] = useState(false)
   // 서버가 잠들어 있으면 화면이 덮이지만, 키보드로는 그 아래에 닿는다. 손잡이 자체를 잠근다.
   const connected = useConnected()
+  /** 지금 몇 명이 붙어 있고 방은 몇 개인가. 서버가 바뀔 때마다 알려준다. */
+  const [stats, setStats] = useState<{ online: number; rooms: number } | null>(null)
 
   // 닉네임 없이 들어온 경우는 주소를 직접 친 것이다. 처음으로 돌려보낸다.
   useEffect(() => {
@@ -44,6 +46,11 @@ export function RoomsPage() {
   }, [])
 
   useServerEvent('rooms:changed', useCallback((next: RoomSummary[]) => setRooms(next), []))
+
+  useServerEvent(
+    'lobby:stats',
+    useCallback((next: { online: number; rooms: number }) => setStats(next), []),
+  )
 
   // 입장 확인창이 떠 있으면 Esc 는 그쪽 몫이다.
   useEscape(asking === null, useCallback(() => navigate('/'), [navigate]))
@@ -84,7 +91,13 @@ export function RoomsPage() {
       </Link>
 
       <div className="rooms-head">
-        <h1 className="section-title">열려 있는 방</h1>
+        <div>
+          <h1 className="section-title">열려 있는 방</h1>
+          {/* 방에 든 사람만이 아니라 화면을 열어둔 모두다. 기다리는 사람이 보여야 한다. */}
+          <p className="rooms-head__stats">
+            {stats ? `${stats.online}명 접속 중 · 방 ${stats.rooms}개` : ' '}
+          </p>
+        </div>
         <button
           type="button"
           className="btn btn--primary rooms-head__create"

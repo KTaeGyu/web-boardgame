@@ -277,6 +277,16 @@ export function RoomPage() {
         <button type="button" className="btn btn--danger" onClick={() => setConfirmLeave(true)}>
           방 나가기
         </button>
+
+        {/*
+          대화는 방에 속한다. 대기실에서 하던 말이 판으로, 판에서 하던 말이 다시 대기실로
+          이어진다 — 화면을 옮길 때마다 방에 다시 들어가고, 서버가 지난 말을 건네주기 때문이다.
+
+          단추를 버튼 줄 안에 두는 것은 넓은 화면 때문이다. 화면 모서리에 띄우면 가운데
+          구역에서 멀리 떨어져 혼자 노는데, 줄 안에 있으면 오른쪽 끝이 본문과 같은 선에 선다.
+          좁은 화면에서는 제자리에 떠 있는다(position: fixed).
+        */}
+        <Chat code={code} />
       </div>
 
       {confirmLeave && (
@@ -291,11 +301,6 @@ export function RoomPage() {
         </ConfirmModal>
       )}
 
-      {/*
-        대화는 방에 속한다. 대기실에서 하던 말이 판으로, 판에서 하던 말이 다시 대기실로
-        이어진다 — 화면을 옮길 때마다 방에 다시 들어가고, 서버가 지난 말을 건네주기 때문이다.
-      */}
-      <Chat code={code} />
     </main>
   )
 }

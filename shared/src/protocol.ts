@@ -184,6 +184,13 @@ export interface ServerToClientEvents {
   /** 서버가 감당할 수 있는 인원을 넘겼다. 곧 연결이 끊긴다. */
   'server:full': (payload: { message: string }) => void
   'rooms:changed': (rooms: RoomSummary[]) => void
+  /**
+   * 지금 몇 명이 붙어 있고 방은 몇 개인가. 목록을 보고 있는 사람에게만 간다.
+   *
+   * 사람 수는 방에 든 사람만이 아니라 **화면을 열어둔 모두**다 — 목록에서 누군가를
+   * 기다리는 사람이 보이지 않으면 「아무도 없다」로 읽힌다.
+   */
+  'lobby:stats': (payload: { online: number; rooms: number }) => void
 
   /** 모두가 보는 상태. 누구의 홀카드도 들어 있지 않다. */
   'game:state': (game: GameView) => void
