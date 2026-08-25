@@ -174,10 +174,13 @@ export function GamePage() {
     }
 
     void enter()
-    socket.on('connect', () => void enter())
+    // 인자 없는 off 는 'connect' 를 듣던 모두를 떼어낸다 — 연결 표시등까지 귀가 먹어
+    // 서버가 돌아와도 화면이 영영 「끊김」인 채로 남는다. 내 것만 떼어낸다.
+    const onConnect = () => void enter()
+    socket.on('connect', onConnect)
     return () => {
       alive = false
-      socket.off('connect')
+      socket.off('connect', onConnect)
     }
   }, [code, nickname, playerId, navigate])
 

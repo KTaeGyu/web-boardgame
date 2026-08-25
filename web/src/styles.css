@@ -1030,6 +1030,11 @@ select {
   color: var(--ink);
 }
 
+.gate__retry {
+  margin-top: 16px;
+  width: 100%;
+}
+
 .gate__hint {
   margin: 12px 0 0;
   font-size: 12px;

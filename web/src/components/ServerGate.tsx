@@ -55,6 +55,10 @@ export function ServerGate() {
           <>
             <p className="gate__title">문제가 발생한 것 같습니다</p>
             <p className="gate__body">관리자에게 연락해 주세요.</p>
+            {/* 이미 붙어 있는데 화면만 모르고 있을 수도 있다. 한 번 새로 여는 것이 가장 싸다. */}
+            <button type="button" className="btn gate__retry" onClick={() => window.location.reload()}>
+              새로고침
+            </button>
           </>
         ) : (
           <>
