@@ -20,16 +20,13 @@ const MARK = 'theGangBackGuard'
 
 interface Guard {
   onBack: () => void
-  /** 처리한 뒤에도 계속 지키는가. 확인창처럼 화면이 그대로 남는 경우다. */
-  keep: boolean
   /**
-   * 지금 이 가드 몫으로 쌓여 있는 칸의 수. 늘 0 아니면 1이다.
+   * 지금 이 가드 몫으로 쌓여 있는 칸이 있는가.
    *
-   * 뒤로가기가 우리 칸을 먹으면 0이 되고, 계속 지키는 가드면 그 자리에서 다시 쌓아
-   * 1로 돌아온다. 이 셈이 없으면 뒷정리가 남의 칸을 걷어낸다 — 확인창이 닫히면서
-   * 그 아래 대기실이 쌓아둔 칸을 대신 걷어내는 식이다.
+   * 뒤로가기가 우리 칸을 먹으면 없어진다. 이 셈이 없으면 뒷정리가 남의 칸을 걷어낸다 —
+   * 확인창이 닫히면서 그 아래 화면이 쌓아둔 칸을 대신 걷어내는 식이다.
    */
-  depth: number
+  held: boolean
 }
 
 /** 지금 지키고 있는 것들. 마지막 것이 가장 안쪽이다. */
@@ -57,29 +54,24 @@ function onPop(): void {
   }
   const top = guards[guards.length - 1]
   if (!top) return
-  // 방금 이 가드의 칸 하나가 소비됐다.
-  top.depth = Math.max(0, top.depth - 1)
-  // 화면이 그대로 남는다면 칸을 다시 쌓는다. 그러지 않으면 다음 뒤로가기에 그냥 나간다.
-  if (top.keep) {
-    push()
-    top.depth += 1
-  }
+  // 방금 이 가드의 칸이 소비됐다.
+  top.held = false
   top.onBack()
 }
 
 /**
- * @param active 지금 지키고 있는가.
+ * @param active 지금 지키고 있는가. 처리한 뒤에도 계속 지켜야 하면 이 값을 껐다 켠다 —
+ *               확인창이 뜬 동안에는 창이 지키고, 창이 닫히면 다시 이쪽이 지킨다.
  * @param onBack 뒤로가기가 눌렸다. 무엇을 할지는 부르는 쪽이 정한다.
- * @param keep   처리한 뒤에도 계속 지킬 것인가.
  */
-export function useBackIntercept(active: boolean, onBack: () => void, keep = false): void {
+export function useBackIntercept(active: boolean, onBack: () => void): void {
   const handler = useRef(onBack)
   handler.current = onBack
 
   useEffect(() => {
     if (!active) return
 
-    const guard: Guard = { onBack: () => handler.current(), keep, depth: 1 }
+    const guard: Guard = { onBack: () => handler.current(), held: true }
     guards.push(guard)
     push()
     if (!listening) {
@@ -97,12 +89,12 @@ export function useBackIntercept(active: boolean, onBack: () => void, keep = fal
        * 건드리지 않는다 — 여기서 back 을 부르면 방금 한 이동이 취소된다.
        */
       const state = window.history.state as Record<string, unknown> | null
-      if (guard.depth > 0 && state?.[MARK]) {
+      if (guard.held && state?.[MARK]) {
         unwinding += 1
         window.history.back()
       }
     }
-  }, [active, keep])
+  }, [active])
 }
 
 /** 덮개용. 열려 있는 동안만 지키고, 뒤로가기는 닫기가 된다. */
