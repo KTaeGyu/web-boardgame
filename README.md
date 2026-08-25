@@ -142,6 +142,26 @@ curl localhost:3001/healthz     # {"ok":true,"rooms":0}
 
 ---
 
+## 소리
+
+효과음은 파일이 아니다. `web/src/lib/sfx.ts` 가 그 자리에서 파형을 만든다 — 칩 딸깍·딩·사이렌은
+노이즈와 사인파에 엔벨로프를 씌운 것이라, 녹음을 구해 오는 것보다 숫자 몇 개를 만지는 편이 빠르다.
+번들이 늘지 않고 출처를 따질 것도 없다.
+
+배경음악은 받아 온 파일이고 셋 다 **CC0**(퍼블릭 도메인)다. 표기할 의무는 없지만 적어 둔다.
+
+| 화면에 보이는 이름 | 곡 | 만든 사람 |
+|---|---|---|
+| 잠입 | Covert Operations | [artisticdude](https://opengameart.org/content/covert-operations) |
+| 추리 | Acid Detective | [obscure music](https://opengameart.org/content/acid-detective) |
+| 재즈 | Jazz n' brass loop | [Emma_MA](https://opengameart.org/content/jazz-n-brass-loop) |
+
+곡을 더 넣으려면 `web/public/music` 에 파일을 두고 `web/src/lib/audio.ts` 의 `TRACKS` 에 한 줄을
+더한다. 화면의 이름을 곡 제목이 아니라 분위기로 부르는 것은, 고르는 사람이 곡을 아는 것이 아니라
+분위기를 고르기 때문이다.
+
+---
+
 ## 정해진 것
 
 되짚을 때마다 다시 논의하지 않으려고 적어 둔다. 결론과 **그 이유**가 함께 있다.

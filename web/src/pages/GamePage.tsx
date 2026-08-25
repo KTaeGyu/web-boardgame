@@ -117,6 +117,8 @@ export function GamePage({ spectating = false }: { spectating?: boolean } = {}) 
    */
   const [toasts, setToasts] = useState<{ id: number; text: string; tone: 'info' | 'warn' }[]>([])
   const toastSeq = useRef(0)
+  /** 손패를 받은 마지막 판. 재접속과 새 판을 가른다. */
+  const dealtHeist = useRef<number | null>(null)
   /** 튜토리얼 안내. 떠 있는 동안 서버가 봇을 멈춰 두므로 스스로 사라지지 않는다. */
   const [tip, setTip] = useState<TipPayload | null>(null)
 
@@ -264,10 +266,14 @@ export function GamePage({ spectating = false }: { spectating?: boolean } = {}) 
 
   useServerEvent(
     'game:hand',
-    useCallback((payload: { hole: Card[] }) => {
+    useCallback((payload: { heist: number; hole: Card[] }) => {
       setHand(payload.hole)
       setNotes([]) // 새 판이면 지난 판의 쪽지도 지운다
       setFresh(null)
+      // 재접속에도 손패가 다시 온다. 그때 판이 열리는 소리가 나면 거짓말이다.
+      if (dealtHeist.current === payload.heist) return
+      dealtHeist.current = payload.heist
+      sfx('dealHand')
     }, []),
   )
 
@@ -276,6 +282,7 @@ export function GamePage({ spectating = false }: { spectating?: boolean } = {}) 
     useCallback((payload: CardNote) => {
       setNotes((current) => [...current.filter((n) => n.specialist !== payload.specialist), payload])
       setFresh(payload) // 도착하자마자 한 번은 보여준다
+      sfx('note')
     }, []),
   )
 
@@ -445,6 +452,48 @@ export function GamePage({ spectating = false }: { spectating?: boolean } = {}) 
     if (before !== null && communityCount > before) sfx('deal', communityCount - before)
   }, [communityCount])
 
+  /*
+   * 해결사를 쓴 순간.
+   *
+   * 판이 바뀌면 「썼는가」가 false 로 돌아오므로 거짓에서 참으로 넘어갈 때만 잡으면 된다.
+   */
+  const specialistUsed = game?.specialistUsed ?? false
+  const usedBefore = useRef(specialistUsed)
+  useEffect(() => {
+    if (specialistUsed && !usedBefore.current) sfx('specialist')
+    usedBefore.current = specialistUsed
+  }, [specialistUsed])
+
+  /* 스캔이 열린다. 마지막 사람 차례에 한 번 열리고 판이 바뀌면 사라진다. */
+  const scanOpen = Boolean(game?.scan)
+  const scanBefore = useRef(false)
+  useEffect(() => {
+    if (scanOpen && !scanBefore.current) sfx('scanStart')
+    scanBefore.current = scanOpen
+  }, [scanOpen])
+
+  /*
+   * 스캔의 답이 정해진다.
+   *
+   * 물음이 둘일 수 있어(망막과 지문이 함께 걸린 판) 정해진 것만 순서대로 세어 두고,
+   * 늘어난 만큼만 울린다. 한꺼번에 정해지면 사이를 두어 두 소리가 겹치지 않게 한다.
+   */
+  const decided = (game?.scan?.questions ?? [])
+    .filter((question) => question.correct !== null)
+    .map((question) => question.correct)
+    .join(',')
+  const decidedBefore = useRef('')
+  useEffect(() => {
+    const before = decidedBefore.current
+    decidedBefore.current = decided
+    if (!decided || decided === before) return
+    const fresh = decided.split(',').slice(before ? before.split(',').length : 0)
+    fresh.forEach((verdict, index) => {
+      if (!verdict) return
+      setTimeout(() => sfx(verdict === 'true' ? 'scanRight' : 'scanWrong'), index * 420)
+    })
+  }, [decided])
+
   /** 쇼다운에 들어서면 한 명씩 뒤집는다. 다음 판이 시작되면 처음으로 되돌린다. */
   const phase = game?.phase
   const showdownKey = `${game?.heist ?? 0}:${phase}`
@@ -458,6 +507,9 @@ export function GamePage({ spectating = false }: { spectating?: boolean } = {}) 
   revealsRef.current = game?.showdown?.reveals ?? []
   const successRef = useRef(false)
   successRef.current = game?.showdown?.success ?? false
+  /** 이 판으로 게임까지 끝났는가. 금고가 열린 것과 게임을 이긴 것은 다르다. */
+  const outcomeRef = useRef<'win' | 'lose' | null>(null)
+  outcomeRef.current = game?.outcome ?? null
   /** 스캔을 틀렸는지. 순서가 맞았는데도 실패했다면 이유가 여기에 있다. */
   const missedScanRef = useRef<('rank' | 'category')[]>([])
   missedScanRef.current = (game?.scan?.questions ?? [])
@@ -497,6 +549,9 @@ export function GamePage({ spectating = false }: { spectating?: boolean } = {}) 
       const success = successRef.current
       setFinished(true)
       sfx(success ? 'vault' : 'alarm')
+      // 금고·경보가 지나간 뒤에 한 번 더 못박는다. 판이 아니라 게임이 끝난 것이다.
+      const ending = outcomeRef.current
+      if (ending) at(1500, () => sfx(ending === 'win' ? 'win' : 'lose'))
       setFlash({
         key: 'final',
         // 스캔에 걸린 것이면 순서는 맞았을 수 있다. 무엇에 걸렸는지 짚어 준다.

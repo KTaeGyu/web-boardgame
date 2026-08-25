@@ -4,18 +4,22 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { DensityToggle } from './components/DensityToggle.tsx'
 import { ReportLink } from './components/ReportLink.tsx'
 import { ServerGate } from './components/ServerGate.tsx'
-import { SoundToggle } from './components/SoundToggle.tsx'
+import { SoundPanel } from './components/SoundPanel.tsx'
 import { ThemeToggle } from './components/ThemeToggle.tsx'
 import { HomePage } from './pages/HomePage.tsx'
 import { RoomPage } from './pages/RoomPage.tsx'
 import { RoomsPage } from './pages/RoomsPage.tsx'
 import { GamePage } from './pages/GamePage.tsx'
 import { HistoryPage } from './pages/HistoryPage.tsx'
+import { useBackgroundMusic } from './lib/music.ts'
+import { useClickSound } from './lib/sfx.ts'
 import { useServerEvent } from './lib/socket.ts'
 import { useViewportHeight } from './lib/useViewportHeight.ts'
 
 export function App() {
   useViewportHeight()
+  useClickSound()
+  useBackgroundMusic()
 
   /** 서버가 감당할 인원을 넘겼다. 연결이 끊기기 전에 이유를 남긴다. */
   const [full, setFull] = useState('')
@@ -70,7 +74,7 @@ function Tools() {
   return (
     <div className="tools">
       <ReportLink />
-      <SoundToggle />
+      <SoundPanel />
       <DensityToggle />
       <ThemeToggle />
     </div>

@@ -12,7 +12,9 @@
  * 소리를 못 내는 것으로 판이 멈추면 안 된다. 여기서 나는 예외는 전부 삼킨다.
  */
 
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
+
+import { sfxGain } from './audio.ts'
 
 export type Sound =
   /** 토큰을 집었다. 중앙에서든 남의 손에서든 내 쪽에서는 같은 동작이다. */
@@ -31,22 +33,42 @@ export type Sound =
   | 'vault'
   /** 경보가 울렸다. */
   | 'alarm'
-
-const KEY = 'the-gang:sound'
-
-function savedMuted(): boolean {
-  try {
-    return localStorage.getItem(KEY) === 'off'
-  } catch {
-    return false
-  }
-}
-
-let muted = savedMuted()
-
-export function isMuted(): boolean {
-  return muted
-}
+  /** 남이 토큰을 쥐었다. 중앙에서 집었든 남의 손에서 뺏었든 옆에서는 같은 일이다. */
+  | 'otherTake'
+  /** 남이 쥐고 있던 것을 중앙으로 되돌렸다. */
+  | 'otherDrop'
+  /** 감지기가 누군가의 손을 갈아엎었다. */
+  | 'sensor'
+  /** 단추를 눌렀다. 판이 아니라 화면을 만진 것이라 가장 작다. */
+  | 'click'
+  /** 확정·시작처럼 앞으로 가는 단추. */
+  | 'clickGo'
+  /** 나가기처럼 되돌릴 수 없는 단추. */
+  | 'clickBack'
+  /** 취소처럼 물러나는 단추. */
+  | 'clickSoft'
+  /** 켜는 쪽으로 넘긴 토글. */
+  | 'toggleOn'
+  /** 끄는 쪽으로 넘긴 토글. */
+  | 'toggleOff'
+  /** 게임이 끝났다 — 이겼다. 금고 하나가 열린 것과는 다르다. */
+  | 'win'
+  /** 게임이 끝났다 — 졌다. */
+  | 'lose'
+  /** 남이 한 마디 했다. */
+  | 'chat'
+  /** 내 손패가 왔다. 판이 열린다. */
+  | 'dealHand'
+  /** 카드가 나에게만 알려준 것이 도착했다. */
+  | 'note'
+  /** 해결사를 썼다. */
+  | 'specialist'
+  /** 스캔이 열렸다. */
+  | 'scanStart'
+  /** 스캔을 맞혔다. */
+  | 'scanRight'
+  /** 스캔을 틀렸다. */
+  | 'scanWrong'
 
 let ctx: AudioContext | null = null
 let master: GainNode | null = null
@@ -56,17 +78,16 @@ let noiseBuffer: AudioBuffer | null = null
 /**
  * 소리를 낼 준비가 됐으면 지금 시각을, 아니면 null 을.
  *
- * 음소거일 때 아예 만들지 않는 것은 아끼려는 것이 아니라, 꺼둔 사람의 브라우저에
+ * 크기가 0 일 때 아예 만들지 않는 것은 아끼려는 것이 아니라, 꺼둔 사람의 브라우저에
  * 오디오 장치를 잡아두지 않기 위해서다.
  */
 function ready(): number | null {
-  if (muted) return null
+  const gain = sfxGain()
+  if (gain <= 0) return null
   try {
     if (!ctx) {
       ctx = new AudioContext()
       master = ctx.createGain()
-      // 여러 소리가 겹쳐도 찢어지지 않을 만큼. 판 전체의 크기를 여기 하나로 잡는다.
-      master.gain.value = 0.32
       master.connect(ctx.destination)
 
       const length = Math.floor(ctx.sampleRate * 0.5)
@@ -74,6 +95,8 @@ function ready(): number | null {
       const data = noiseBuffer.getChannelData(0)
       for (let i = 0; i < length; i++) data[i] = Math.random() * 2 - 1
     }
+    // 슬라이더를 옮긴 것이 다음 소리부터 바로 듣긴다.
+    master!.gain.value = gain
     // 처음 몇 번은 아직 잠겨 있을 수 있다. 열릴 때까지 눌러 본다.
     if (ctx.state === 'suspended') void ctx.resume()
     return ctx.currentTime
@@ -161,6 +184,112 @@ export function sfx(name: Sound, step = 0): void {
   if (now === null) return
 
   switch (name) {
+    /*
+     * 단추. 여기 있는 것 중 가장 작고 가장 짧다.
+     *
+     * 판에서 벌어진 일이 아니라 화면을 만진 것이라, 들린다기보다 손끝에 닿는 정도여야
+     * 한다. 이것이 칩만큼 나면 목록을 훑는 동안 판이 도는 것처럼 들린다.
+     */
+    case 'click':
+      noise(now, 0.018, { type: 'highpass', freq: 3200, gain: 0.16 })
+      tone(now, 520, 0.025, { type: 'triangle', gain: 0.05, to: 380 })
+      break
+
+    // 앞으로 가는 단추. 딸깍 위에 높은 음 하나를 얹는 것만으로 방향이 생긴다.
+    case 'clickGo':
+      noise(now, 0.018, { type: 'highpass', freq: 3200, gain: 0.16 })
+      tone(now, 660, 0.07, { type: 'triangle', gain: 0.07 })
+      break
+
+    // 되돌릴 수 없는 단추. 낮고 둔해서 손이 한 번 멈칫한다.
+    case 'clickBack':
+      noise(now, 0.022, { type: 'lowpass', freq: 900, gain: 0.14 })
+      tone(now, 200, 0.09, { type: 'triangle', gain: 0.08, to: 140 })
+      break
+
+    // 물러나는 단추. 음 없이 숨소리만 남긴다.
+    case 'clickSoft':
+      noise(now, 0.014, { type: 'highpass', freq: 2600, gain: 0.1 })
+      break
+
+    /*
+     * 토글. 올라가는가 내려가는가가 이 둘의 전부다.
+     *
+     * 배치표처럼 같은 격자를 여러 번 누르는 자리에서는 화면을 보지 않고도
+     * 방금 켠 것인지 끈 것인지 알 수 있어야 한다.
+     */
+    case 'toggleOn':
+      noise(now, 0.014, { type: 'highpass', freq: 3000, gain: 0.1 })
+      tone(now, 480, 0.06, { type: 'triangle', gain: 0.07, to: 720 })
+      break
+
+    case 'toggleOff':
+      noise(now, 0.014, { type: 'highpass', freq: 3000, gain: 0.1 })
+      tone(now, 620, 0.06, { type: 'triangle', gain: 0.07, to: 400 })
+      break
+
+    /*
+     * 게임이 끝났다.
+     *
+     * 금고(vault)·경보(alarm)와 따로 두는 이유는 층위가 달라서다 — 저쪽은 판 하나의
+     * 결말이고 이쪽은 여기서 자리를 뜬다는 뜻이다. 금고가 세 번 열려야 이 소리가 난다.
+     */
+    case 'win': {
+      const chord = [523, 659, 784, 1047]
+      chord.forEach((freq, index) => tone(now + index * 0.11, freq, 0.5, { gain: 0.2 }))
+      break
+    }
+
+    case 'lose': {
+      const fall = [392, 330, 262, 196]
+      fall.forEach((freq, index) =>
+        tone(now + index * 0.14, freq, 0.6, { type: 'triangle', gain: 0.18 }),
+      )
+      break
+    }
+
+    // 남의 한마디. 판을 보는 중에 대화창을 안 보므로 있는 것만 알리고 비켜선다.
+    case 'chat':
+      tone(now, 880, 0.05, { gain: 0.08 })
+      tone(now + 0.05, 1170, 0.07, { gain: 0.06 })
+      break
+
+    // 내 손패가 온다. 보드에 깔리는 카드보다 낮게 — 저쪽은 모두의 것이고 이쪽은 내 것이다.
+    case 'dealHand':
+      for (let i = 0; i < 3; i++) {
+        noise(now + i * 0.085, 0.055, { type: 'highpass', freq: 1800, gain: 0.34, to: 4200 })
+      }
+      break
+
+    // 쪽지. 종이가 스치고 작은 종이 하나 울린다.
+    case 'note':
+      noise(now, 0.09, { type: 'highpass', freq: 4000, gain: 0.14, to: 7000 })
+      tone(now + 0.05, 1320, 0.25, { gain: 0.07 })
+      break
+
+    // 해결사. 전자 잠금이 풀리는 소리라 사람이 낸 소리와 갈린다.
+    case 'specialist':
+      tone(now, 700, 0.06, { type: 'square', gain: 0.09 })
+      noise(now + 0.08, 0.06, { freq: 2600, q: 2, gain: 0.2 })
+      tone(now + 0.08, 1050, 0.1, { type: 'square', gain: 0.08 })
+      break
+
+    // 스캐너가 훑고 지나간다. 올라가는 스윕 하나면 「지금 검사 중」이 선다.
+    case 'scanStart':
+      noise(now, 0.5, { freq: 1200, q: 4, gain: 0.08, to: 3000 })
+      tone(now, 400, 0.5, { type: 'sawtooth', gain: 0.09, to: 1400 })
+      break
+
+    case 'scanRight':
+      tone(now, 880, 0.1, { gain: 0.16 })
+      tone(now + 0.1, 1320, 0.22, { gain: 0.16 })
+      break
+
+    case 'scanWrong':
+      tone(now, 300, 0.12, { type: 'square', gain: 0.1 })
+      tone(now + 0.16, 220, 0.2, { type: 'square', gain: 0.1 })
+      break
+
     // 칩이 펠트에 닿는다. 짧고 건조해야 연달아 집어도 뭉치지 않는다.
     case 'take':
       noise(now, 0.035, { freq: 2600, q: 1.2, gain: 0.5 })
@@ -171,6 +300,24 @@ export function sfx(name: Sound, step = 0): void {
     case 'steal':
       noise(now, 0.09, { freq: 1500, q: 0.8, gain: 0.55, to: 700 })
       tone(now, 220, 0.12, { type: 'triangle', gain: 0.22, to: 110 })
+      break
+
+    /*
+     * 남의 칩. 내 것과 같은 동작이지만 한참 작고 어둡다.
+     *
+     * 크기를 이렇게 벌려 둔 이유는 열 명이 앉은 판 때문이다 — 내 것과 같은 크기로
+     * 울리면 한 라운드에 열 번 넘게 나면서 정작 내 손이 묻힌다. 들리되 앞에 서지
+     * 않을 만큼만 남긴다.
+     */
+    case 'otherTake':
+      noise(now, 0.03, { freq: 1900, q: 1.4, gain: 0.22 })
+      tone(now, 260, 0.045, { type: 'triangle', gain: 0.08, to: 160 })
+      break
+
+    // 되돌려 놓는 쪽은 더 낮게. 집는 것과 놓는 것이 같게 들리면 방향을 알 수 없다.
+    case 'otherDrop':
+      noise(now, 0.045, { freq: 1200, q: 1.2, gain: 0.16 })
+      tone(now, 180, 0.07, { type: 'triangle', gain: 0.07, to: 120 })
       break
 
     // 막힌 소리. 음이라기보다 벽에 닿는 느낌이라 낮고 짧다.
@@ -221,6 +368,20 @@ export function sfx(name: Sound, step = 0): void {
       break
     }
 
+    /*
+     * 감지기. 두 음을 삼전음으로 겹쳐 둔다 — 어느 쪽으로도 풀리지 않는 간격이라
+     * 「무언가 잘못됐다」가 화음만으로 선다. 경보(alarm)와는 달라야 한다.
+     * 저쪽은 판이 끝난 것이고 이쪽은 판이 도는 중에 내 손이 뒤집힌 것이다.
+     */
+    case 'sensor':
+      noise(now, 0.4, { type: 'lowpass', freq: 700, gain: 0.12 })
+      for (let i = 0; i < 2; i++) {
+        const at = now + i * 0.26
+        tone(at, 180, 0.2, { type: 'sawtooth', gain: 0.16 })
+        tone(at, 254, 0.2, { type: 'sawtooth', gain: 0.1 })
+      }
+      break
+
     // 사이렌. 사각파라 날카로워서 크기를 많이 낮춰 두었다.
     case 'alarm':
       for (let i = 0; i < 3; i++) {
@@ -233,36 +394,56 @@ export function sfx(name: Sound, step = 0): void {
 }
 
 /**
- * 소리를 켜고 끈다.
+ * 어떤 단추를 누르든 작게 딸깍.
  *
- * 테마·화면 크기와 같은 방식으로 기억하되, 화면이 그려지기 전에 정할 것이 없어서
- * index.html 이 미리 손댈 일은 없다 — 첫 칠에 보이는 것이 아니라 첫 소리에 쓰인다.
+ * 단추마다 손으로 붙이면 새로 만들 때마다 빠뜨리고, 빠진 자리는 「이 단추만 안 눌리나」로
+ * 읽힌다. 그래서 문서에서 한 번만 듣고 눌린 것이 단추인지 본다.
+ *
+ * click 이 아니라 pointerdown 인 것은 누른 그 순간에 나야 손끝과 붙기 때문이고,
+ * capture 로 듣는 것은 그 클릭에 화면이 사라져도 소리는 나야 하기 때문이다 —
+ * 모달의 닫기 단추가 그렇다.
  */
-export function useSound(): { on: boolean; toggle: () => void } {
-  const [on, setOn] = useState(!muted)
-
-  // 같은 사람이 두 창을 띄워 놓는 일이 흔하다. 한쪽에서 끄면 다른 쪽도 조용해진다.
+export function useClickSound(): void {
   useEffect(() => {
-    const follow = (event: StorageEvent) => {
-      if (event.key !== KEY) return
-      muted = event.newValue === 'off'
-      setOn(!muted)
+    const hear = (event: PointerEvent) => {
+      if (!(event.target instanceof Element)) return
+      const hit = event.target.closest('button, a, [role="button"], label')
+      if (!hit) return
+      // 토큰은 자기 소리가 따로 있다. 딸깍이 겹치면 칩을 두 번 놓은 것처럼 들린다.
+      if (hit.classList.contains('token')) return
+      // 잠긴 단추는 눌러도 아무 일이 없다. 소리가 나면 눌린 줄 안다.
+      if (hit instanceof HTMLButtonElement && hit.disabled) return
+
+      /*
+       * 단추가 무슨 단추인지는 이미 클래스에 적혀 있다. 그래서 소리를 가르는 데
+       * 컴포넌트를 하나도 고치지 않는다 — 새로 만드는 단추도 클래스만 맞으면 따라온다.
+       *
+       * 토글은 aria-pressed 를 본다. 눌리기 **전** 값이라 true 면 지금 끄는 중이다.
+       * 곡 고르기처럼 골라 두는 것(다시 눌러도 꺼지지 않는 것)은 이 셈에서 살짝
+       * 어긋나지만, 이미 켜진 것을 다시 누르는 일이 드물어 그대로 둔다.
+       */
+      const pressed = hit.getAttribute('aria-pressed')
+      if (pressed === 'true') sfx('toggleOff')
+      else if (pressed === 'false') sfx('toggleOn')
+      else if (hit.classList.contains('btn--primary')) sfx('clickGo')
+      else if (hit.classList.contains('btn--danger')) sfx('clickBack')
+      else if (hit.classList.contains('btn--ghost')) sfx('clickSoft')
+      else sfx('click')
     }
-    window.addEventListener('storage', follow)
-    return () => window.removeEventListener('storage', follow)
+    document.addEventListener('pointerdown', hear, true)
+    return () => document.removeEventListener('pointerdown', hear, true)
   }, [])
+}
 
-  const toggle = () => {
-    muted = !muted
-    try {
-      localStorage.setItem(KEY, muted ? 'off' : 'on')
-    } catch {
-      /* 기억하지 못할 뿐이다 */
-    }
-    setOn(!muted)
-    // 켜는 순간 한 번 들려준다. 켰는데 아무 소리도 안 나면 고장으로 읽힌다.
-    if (!muted) sfx('take')
-  }
-
-  return { on, toggle }
+/*
+ * 개발 중에만 창에 걸어 둔다.
+ *
+ * 여덟 개를 판을 돌려 가며 다 듣기는 번거롭다. 콘솔에서 하나씩 불러 크기와 음정을
+ * 잡을 수 있어야 고치는 자리와 듣는 자리가 붙는다. import.meta.env.DEV 가 배포본에서
+ * 이 블록을 통째로 걷어내므로 나가는 짐은 늘지 않는다.
+ *
+ * 음소거일 때는 여기서 불러도 조용하다 — 켜 두고 들어야 한다.
+ */
+if (import.meta.env.DEV) {
+  ;(window as unknown as { __sfx: typeof sfx }).__sfx = sfx
 }
