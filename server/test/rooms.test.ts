@@ -652,6 +652,20 @@ describe('관전', () => {
     assert.equal(result.value.hostId, 'p2')
   })
 
+  it('구경을 마치면 관전 목록에서 빠진다 — 자리처럼 지켜주지 않는다', () => {
+    // 화면이 목록으로 나가면서 이것을 부르지 않으면, 방에 있는 사람들에게는
+    // 아직 보고 있는 것처럼 「관전 1명」이 남는다.
+    const { store } = makeStore()
+    const code = seed(store, ['p1', 'p2'])
+    store.spectate('w0', '구경', code)
+    assert.equal(store.view(code)?.spectators.length, 1)
+
+    const left = store.leaveRoom('w0')
+    assert.equal(left.closedCode, null, '구경꾼이 나갔다고 방이 닫히지는 않는다')
+    assert.deepEqual(left.room?.spectators, [])
+    assert.equal(store.view(code)?.players.length, 2, '자리는 그대로다')
+  })
+
   it('차단당한 사람은 보러 올 수도 없다', () => {
     const { store } = makeStore()
     const code = seed(store, ['p1', 'p2'])

@@ -299,6 +299,20 @@ export function GamePage({ spectating = false }: { spectating?: boolean } = {}) 
   useServerEvent('tutorial:tip', useCallback((payload: TipPayload) => setTip(payload), []))
 
   /*
+   * 구경을 마치고 목록으로 나간다.
+   *
+   * 화면만 옮기면 방 쪽에는 구경꾼이 그대로 남아, 대기실에 있는 사람들에게는 아직 보고
+   * 있는 것처럼 「관전 1/5」이 뜬다. 자리는 끊겨도 지켜주지만 구경 자리는 지킬 것이 없다.
+   */
+  const leaveAsWatcher = useCallback(
+    (notice: string) => {
+      void call<null>('room:leave')
+      navigate('/rooms', { replace: true, state: { notice } })
+    },
+    [navigate],
+  )
+
+  /*
    * 판이 접혔다는 말을 잠깐 보여주고 옮긴다. 그 사이에 화면을 벗어나면 시계도 함께 접는다 —
    * 남겨두면 이미 목록으로 나간 사람을 뒤늦게 방으로 끌고 온다.
    */
@@ -325,13 +339,14 @@ export function GamePage({ spectating = false }: { spectating?: boolean } = {}) 
            * (RoomPage 는 ?watch=1 이 없으면 room:join 을 부른다). 보던 사람이 판이
            * 접혔다는 이유로 선수가 되면 안 된다.
            */
-          navigate(spectating ? '/rooms' : `/rooms/${code}`, {
-            replace: true,
-            ...(spectating ? { state: { notice: '판이 끝났습니다.' } } : {}),
-          })
+          if (spectating) {
+            leaveAsWatcher('판이 끝났습니다.')
+            return
+          }
+          navigate(`/rooms/${code}`, { replace: true })
         }, 2200)
       },
-      [code, navigate, spectating],
+      [code, navigate, spectating, leaveAsWatcher],
     ),
   )
 
@@ -344,13 +359,14 @@ export function GamePage({ spectating = false }: { spectating?: boolean } = {}) 
         setTutorial(room.tutorial)
         // 판이 접혔거나 아직 시작 전이면 이 화면에 있을 이유가 없다.
         if (room.phase === 'lobby') {
-          navigate(spectating ? '/rooms' : `/rooms/${code}`, {
-            replace: true,
-            ...(spectating ? { state: { notice: '판이 끝났습니다.' } } : {}),
-          })
+          if (spectating) {
+            leaveAsWatcher('판이 끝났습니다.')
+            return
+          }
+          navigate(`/rooms/${code}`, { replace: true })
         }
       },
-      [code, navigate, spectating],
+      [code, navigate, spectating, leaveAsWatcher],
     ),
   )
 
