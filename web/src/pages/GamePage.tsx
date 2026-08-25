@@ -494,6 +494,20 @@ export function GamePage({ spectating = false }: { spectating?: boolean } = {}) 
 
   const me = game.players.find((player) => player.id === playerId)
   const others = game.players.filter((player) => player.id !== playerId)
+  /*
+   * 뒤의 자리도 모달과 같은 순서로 열린다.
+   *
+   * 서버는 판이 끝나는 순간 모두의 홀카드를 공개 상태에 싣는다. 그대로 그리면 덮개
+   * 뒤에서 전원의 카드가 한꺼번에 뒤집혀, 모달이 한 명씩 여는 연출이 시작부터 무너진다.
+   * 공개된 사람만 앞면으로 둔다 — 순서는 모달이 쓰는 것과 같은 배열(토큰 오름차순)이다.
+   *
+   * 스캔 중은 그대로 둔다. 그때는 지목된 사람 말고는 이미 다 공개된 자리이고,
+   * 그 사람의 카드는 서버가 아예 보내지 않는다.
+   */
+  const revealing = game.phase === 'showdown' || game.phase === 'gameOver'
+  const openSeats = new Set(
+    (game.showdown?.reveals ?? []).slice(0, revealed).map((reveal) => reveal.playerId),
+  )
   const picking = game.phase === 'picking'
   /*
    * 내 토큰이 날아가는 중이다.
@@ -588,6 +602,7 @@ export function GamePage({ spectating = false }: { spectating?: boolean } = {}) 
               player={player}
               round={game.round}
               phase={game.phase}
+              hideCards={revealing && !openSeats.has(player.id)}
               lockedTokens={game.lockedTokens}
               stuckTokens={game.stuckTokens}
               rejected={rejected}
@@ -855,12 +870,14 @@ interface SeatProps {
   busy: boolean
   /** 내 자리인가. 내 토큰은 누르면 가져오는 것이 아니라 내려놓는 것이다. */
   mine?: boolean
+  /** 아직 차례가 오지 않은 자리. 공개 상태에는 카드가 실려 있어도 뒷면으로 둔다. */
+  hideCards?: boolean
   tokenRef: (token: number) => (node: HTMLElement | null) => void
   onTakeToken: (token: number) => void
 }
 
 function PlayerSeat(props: SeatProps) {
-  const { player, phase } = props
+  const { player, phase, hideCards = false } = props
   return (
     <div className={`seat ${player.connected ? '' : 'seat--offline'} ${player.ready ? 'seat--ready' : ''}`}>
       <div className="seat__cards">
@@ -868,7 +885,7 @@ function PlayerSeat(props: SeatProps) {
           <PlayingCard
             key={card ?? `back-${index}`}
             card={card}
-            faceDown={phase === 'picking'}
+            faceDown={phase === 'picking' || hideCards}
             size="sm"
             delay={index * 120}
           />
