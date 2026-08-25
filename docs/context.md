@@ -120,19 +120,18 @@ tsconfig 의 `erasableSyntaxOnly` 가 실수를 잡는다.
 
 ## 남은 일
 
-**1. 배포 (제일 큰 건, 아직 시작 안 함)**
+**1. 배포 — 준비는 끝, 계정 쪽 작업만 남음**
 
-Render(소켓) + Vercel(화면). 준비는 대부분 돼 있다.
+절차와 함정은 `docs/배포.md` 가 정본이다. 여기서는 상태만 적는다.
 
-- `web/vercel.json` — 새로고침 404 방지 (전 경로 → index.html)
-- 환경변수: `PORT`(Render 가 넣음), `CORS_ORIGINS`(콤마 구분, `*.vercel.app` 접미사 허용),
-  `MAX_CONNECTIONS`(기본 40), `MAX_ROOMS`(기본 8)
-- `/healthz` — Render 상태 확인, 잠든 인스턴스 깨우기
-- 웹 쪽 `VITE_SOCKET_URL` (`web/.env.example` 참고)
+- `render.yaml` · `vercel.json`(뿌리) · `.node-version` 다 있고, 두 배포 명령을
+  로컬에서 그대로 돌려 확인했다.
+- **아직 안 한 것: GitHub 저장소 만들고 push.** remote 가 없다. 브랜치는 `master` 다.
+- 그 뒤 Render → Vercel → 다시 Render(CORS_ORIGINS) 순서. 서로의 주소를 알아야 해서
+  한 바퀴 돌아온다.
 
-배포하면 두 가지가 달라진다. **무료 티어는 15분 무트래픽이면 잠들고 깨어날 때 방이 전부
-사라진다.** 그리고 **리전은 싱가포르**로 잡아야 한국에서 쓸 만하다(다른 리전은 왕복 150ms↑).
-Render·Vercel 계정 쪽 작업은 사용자가 직접 해야 하는 부분이 있다.
+띄우고 나면 둘이 달라진다. **무료 요금제는 15분 무트래픽이면 잠들고 깨어날 때 방이
+전부 사라진다.** 그리고 **리전은 싱가포르**여야 한국에서 쓸 만하다.
 
 **2. 눈으로 확인되지 않은 것**
 
