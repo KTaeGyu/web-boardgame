@@ -7,11 +7,12 @@
  * 소켓은 앱 전체가 쓰는 그 하나다. 방 코드로 이미 갈라져 있어 대화도 같은 길로 간다.
  */
 
-import { Fragment, useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
+import { Fragment, useCallback, useEffect, useRef, useState, type FormEvent, type TouchEvent } from 'react'
 import { CHAT_MAX, type ChatMessage } from '@the-gang/shared'
 
 import { useBackIntercept } from '../lib/back.ts'
 import { getPlayerId } from '../lib/identity.ts'
+import { sfx } from '../lib/sfx.ts'
 import { call, useServerEvent } from '../lib/socket.ts'
 
 /** 접힌 채로 새 말이 왔을 때, 마지막 한 줄이 붙어 있는 시간. */
@@ -101,6 +102,41 @@ export function Chat({ code }: { code: string }) {
   const [unread, setUnread] = useState(0)
 
   const listRef = useRef<HTMLDivElement | null>(null)
+  const sheetRef = useRef<HTMLElement | null>(null)
+  /*
+   * 아래로 밀어 닫기.
+   *
+   * 시트를 손가락 따라 내리고, 충분히 내려갔으면 닫는다. 목록을 위아래로 훑는 것과
+   * 겹치지 않도록 머리 쪽을 잡았을 때만 받는다 — 대화를 읽어 올리다 창이 닫히면
+   * 그다음부터는 아무도 목록을 만지지 않는다.
+   */
+  const grab = useRef<{ y: number; moved: number } | null>(null)
+
+  function onGrab(event: TouchEvent<HTMLElement>) {
+    const from = event.target as Element
+    if (!from.closest('.chat__head')) return
+    grab.current = { y: event.touches[0].clientY, moved: 0 }
+  }
+
+  function onDrag(event: TouchEvent<HTMLElement>) {
+    if (!grab.current || !sheetRef.current) return
+    const moved = Math.max(0, event.touches[0].clientY - grab.current.y)
+    grab.current.moved = moved
+    sheetRef.current.style.transform = `translateY(${moved}px)`
+    sheetRef.current.style.transition = 'none'
+  }
+
+  function onRelease() {
+    const sheet = sheetRef.current
+    const held = grab.current
+    grab.current = null
+    if (!sheet || !held) return
+
+    sheet.style.transition = ''
+    sheet.style.transform = ''
+    // 손가락이 닿은 자리에서 조금 흔들린 것은 미는 것이 아니다.
+    if (held.moved > 90) setOpen(false)
+  }
   const inputRef = useRef<HTMLInputElement | null>(null)
   /** 콜백은 한 번만 등록되므로, 그 안에서 최신 열림 상태를 읽으려면 상자가 필요하다. */
   const openRef = useRef(open)
@@ -121,6 +157,9 @@ export function Chat({ code }: { code: string }) {
     useCallback(
       (message: ChatMessage) => {
         setMessages((current) => [...current, message])
+        // 내가 한 말에 내가 놀랄 이유는 없다. 창이 열려 있어도 판을 보는 중일 수 있어
+        // 접힘 여부는 따지지 않는다.
+        if (message.playerId !== me) sfx('chat')
         // 내가 한 말은 알림이 아니다. 접혀 있을 때만 왼쪽에 잠깐 붙인다.
         if (message.playerId === me || openRef.current) return
         setPeek(message)
@@ -178,8 +217,18 @@ export function Chat({ code }: { code: string }) {
   return (
     <>
       {open && (
-        <section className="chat" aria-label="대화">
+        <section
+          className="chat"
+          aria-label="대화"
+          ref={sheetRef}
+          onTouchStart={onGrab}
+          onTouchMove={onDrag}
+          onTouchEnd={onRelease}
+          onTouchCancel={onRelease}
+        >
           <header className="chat__head">
+            {/* 손잡이. 아래로 밀면 닫힌다 — 시트는 그렇게 닫는 것이 몸에 익다. */}
+            <span className="chat__grip" aria-hidden="true" />
             <span className="chat__title">대화</span>
             <button type="button" className="chat__close" onClick={toggle} aria-label="접기">
               ×

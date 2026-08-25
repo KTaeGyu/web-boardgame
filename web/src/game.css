@@ -505,7 +505,13 @@
   bottom: 24px;
   z-index: 12;
   width: min(calc(100vw - 96px), 320px);
+  /*
+   * 높이를 아래위로 묶는다. 말이 몇 줄뿐일 때 창이 손바닥만 해지면 어디를 눌러야
+   * 쓰는 자리인지 알기 어렵다 — 적어도 이만큼은 열려 있는다.
+   */
+  min-height: min(320px, 52vh);
   max-height: min(56vh, 420px);
+  transition: transform 0.18s ease-out;
   display: flex;
   flex-direction: column;
   border: 1px solid var(--line);
@@ -516,11 +522,17 @@
 }
 
 .chat__head {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 10px 14px;
   border-bottom: 1px solid var(--line);
+}
+
+/* 손잡이는 작은 화면에서만. 마우스로는 미는 동작이 없다. */
+.chat__grip {
+  display: none;
 }
 
 .chat__title {
@@ -1812,16 +1824,42 @@ button.token:hover:not(:disabled) {
  * 같은 규칙이다 — 폭은 화면 끝까지, 단추는 엄지 자리로, 위에 남은 틈으로 판이 보인다.
  */
 @media (max-width: 640px) {
+  /*
+   * 대화는 도구 줄(테마·축소) 아래부터 바닥까지 다 쓴다.
+   *
+   * 키보드가 올라오면 그만큼 화면이 줄어드는데(index.html 의 interactive-widget),
+   * 바닥에 붙여 두었으므로 입력칸이 키보드 위로 따라 올라온다.
+   */
   .chat {
+    top: max(56px, calc(env(safe-area-inset-top) + 44px));
     left: 0;
     right: 0;
     bottom: 0;
     width: auto;
-    max-height: calc(var(--app-height, 100dvh) * 0.72);
+    min-height: 0;
+    max-height: none;
     border-width: 1px 0 0;
     border-radius: 16px 16px 0 0;
     padding-bottom: env(safe-area-inset-bottom);
     animation: sheet-up 0.22s ease-out;
+  }
+
+  /* 미는 자리. 머리를 잡고 아래로 내리면 닫힌다. */
+  .chat__grip {
+    position: absolute;
+    top: 5px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: block;
+    width: 38px;
+    height: 4px;
+    border-radius: 999px;
+    background: var(--line);
+  }
+
+  .chat__head {
+    padding-top: 16px;
+    touch-action: none;
   }
 
   /*
