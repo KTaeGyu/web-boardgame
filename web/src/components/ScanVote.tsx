@@ -1,4 +1,7 @@
-import { CATEGORY_LABEL, RANKS, rankLabel, type GameView, type ScanQuestion } from '@the-gang/shared'
+import { CATEGORY_LABEL, RANKS, ROUNDS, rankLabel, type GameView, type ScanQuestion } from '@the-gang/shared'
+
+import { PlayingCard } from './PlayingCard.tsx'
+import { Token, TokenBlank } from './Token.tsx'
 
 interface Props {
   game: GameView
@@ -57,6 +60,44 @@ export function ScanVote({ game, playerId, onVote }: Props) {
             고르면 확정됩니다.
           </p>
         )}
+
+        {/*
+          답을 맞히려면 판이 보여야 한다.
+
+          이 창이 테이블을 덮으므로 여기에 다시 그린다 — 공용 카드 다섯 장과, 누가 어느
+          번호를 거쳐 지금 자리에 섰는지. 지목된 사람의 손을 어림하는 단서가 그 둘뿐이다.
+        */}
+        <div className="scan-board">
+          <div className="scan-board__cards">
+            {game.community.map((card, index) => (
+              <PlayingCard key={card} card={card} size="sm" delay={index * 50} />
+            ))}
+          </div>
+
+          <ul className="scan-board__tracks">
+            {game.players.map((player) => (
+              <li
+                key={player.id}
+                className={`scan-track ${player.id === scan.targetId ? 'scan-track--target' : ''}`}
+              >
+                <span className="scan-track__name">
+                  {player.displayName}
+                  {player.id === scan.targetId && <span className="scan-track__badge">스캔 대상</span>}
+                </span>
+                <span className="scan-track__tokens">
+                  {ROUNDS.map((round) => {
+                    const token = player.history[round - 1]
+                    return token === null || token === undefined ? (
+                      <TokenBlank key={round} round={round} />
+                    ) : (
+                      <Token key={round} value={token} round={round} settled />
+                    )
+                  })}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
 
         {scan.questions.map((question) => (
           <Question

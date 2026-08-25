@@ -1275,7 +1275,79 @@ button.token:hover:not(:disabled) {
  * 남이 무엇을 골랐는지 보면서 옮겨가야 만장일치에 닿는다.
  */
 /* 물음 하나. 둘이면 위아래로 쌓인다. */
+/*
+ * 스캔 창 안에 다시 그리는 판.
+ *
+ * 창이 테이블을 덮으므로 답의 근거를 여기 옮겨 둔다 — 공용 카드와 선언 이력.
+ * 카드는 작게, 이력은 한 줄에 한 사람. 지목된 사람 줄만 금색으로 세운다.
+ */
+.scan-board {
+  margin: 14px 0 4px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(var(--ink-rgb), 0.03);
+}
+
+.scan-board__cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: center;
+}
+
+.scan-board__tracks {
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 6px;
+}
+
+.scan-track {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 5px 8px;
+  border-radius: 8px;
+}
+
+.scan-track--target {
+  background: rgba(var(--gold-rgb), 0.12);
+  box-shadow: inset 0 0 0 1px var(--gold-dim);
+}
+
+.scan-track__name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scan-track__badge {
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--gold);
+  color: var(--card);
+  font-size: 10px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.scan-track__tokens {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
 .scan-block + .scan-block {
+
   margin-top: 18px;
   padding-top: 16px;
   border-top: 1px solid var(--line);
