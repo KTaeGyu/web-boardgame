@@ -59,6 +59,9 @@ describe('방 만들기', () => {
       mode: 'basic',
       pickedChallenges: [],
       specialistRounds: [null, null, null, null, null],
+      randomChallenges: 0,
+      vaultsToWin: 3,
+      alarmsToLose: 3,
       maxPlayers: 6,
     })
   })
@@ -399,6 +402,48 @@ describe('방 설정', () => {
     if (!result.ok) return
     result.value.settings.pickedChallenges.push(5)
     assert.deepEqual(ctx.store.view(code)?.settings.pickedChallenges, [2])
+  })
+
+  it('금고와 경보는 1~5 사이다', () => {
+    for (const bad of [0, 6, 2.5]) {
+      assert.equal(ctx.store.updateSettings('p1', { vaultsToWin: bad }).ok, false, `금고 ${bad}`)
+      assert.equal(ctx.store.updateSettings('p1', { alarmsToLose: bad }).ok, false, `경보 ${bad}`)
+    }
+    assert.equal(ctx.store.updateSettings('p1', { vaultsToWin: 1, alarmsToLose: 5 }).ok, true)
+  })
+
+  it('무작위 도전자는 0~3장이다', () => {
+    for (const bad of [-1, 4, 1.5]) {
+      assert.equal(ctx.store.updateSettings('p1', { randomChallenges: bad }).ok, false, `${bad}장`)
+    }
+    assert.equal(ctx.store.updateSettings('p1', { randomChallenges: 3 }).ok, true)
+  })
+
+  it('승·패 수를 늘리면 해결사 자리도 함께 늘어난다', () => {
+    // 자리 수는 승 + 패 - 1 이다. 표를 다시 보내라고 하는 대신 서버가 길이를 맞춘다.
+    const result = ctx.store.updateSettings('p1', { mode: 'custom', vaultsToWin: 4 })
+    assert.equal(result.ok, true)
+    if (!result.ok) return
+    assert.equal(result.value.settings.specialistRounds.length, 6)
+    assert.deepEqual(result.value.settings.specialistRounds, [null, null, null, null, null, null])
+  })
+
+  it('승·패 수를 줄이면 없어질 판에 서 있던 해결사가 사라진다', () => {
+    ctx.store.updateSettings('p1', { mode: 'custom', specialistRounds: [null, null, null, null, 10] })
+    const result = ctx.store.updateSettings('p1', { vaultsToWin: 2 })
+    assert.equal(result.ok, true)
+    if (!result.ok) return
+    assert.deepEqual(result.value.settings.specialistRounds, [null, null, null, null], '다섯째 판 자체가 없다')
+  })
+
+  it('배치표는 그때의 자리 수로만 보낼 수 있다', () => {
+    ctx.store.updateSettings('p1', { mode: 'custom', vaultsToWin: 4 })
+    const stale = ctx.store.updateSettings('p1', { specialistRounds: [null, null, null, null, 10] })
+    assert.equal(stale.ok, false, '다섯 칸짜리 옛 표')
+    assert.equal(
+      ctx.store.updateSettings('p1', { specialistRounds: [null, null, null, null, null, 10] }).ok,
+      true,
+    )
   })
 })
 

@@ -469,8 +469,10 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
         })
       }
       // 고르는 중에는 설정을 저장할 수 있게 두고, 시작하는 순간에 막는다.
+      // 무작위로 얹기만 해도 걸릴 카드가 있는 것이라 「고른 것이 없다」에 들지 않는다.
       const pickedNothing =
         room.settings.pickedChallenges.length === 0 &&
+        room.settings.randomChallenges === 0 &&
         room.settings.specialistRounds.every((id) => id === null)
       if (room.settings.mode === 'custom' && pickedNothing) {
         return ack({
@@ -495,6 +497,19 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
           mode: room.settings.mode,
           pickedChallenges: room.settings.pickedChallenges,
           specialistRounds: room.settings.specialistRounds,
+          /*
+           * 승·패 수와 무작위 도전자는 「직접 고르기」의 것이다.
+           *
+           * 다른 모드는 원작 그대로 간다 — 설정은 모드를 바꿔도 남아 있으므로,
+           * 직접 고르기에서 만져둔 값이 고급 모드로 따라 나가면 안 된다.
+           */
+          ...(room.settings.mode === 'custom'
+            ? {
+                randomChallenges: room.settings.randomChallenges,
+                vaultsToWin: room.settings.vaultsToWin,
+                alarmsToLose: room.settings.alarmsToLose,
+              }
+            : {}),
         },
       )
       games.set(code, game)

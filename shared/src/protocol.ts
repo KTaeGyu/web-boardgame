@@ -7,7 +7,7 @@
 
 import type { Card } from './cards.ts'
 import type { ChallengeId, SpecialistId } from './extraCards.ts'
-import { SPECIALIST_ROUNDS } from './game.ts'
+import { ALARMS_TO_LOSE, SPECIALIST_ROUNDS, VAULTS_TO_WIN } from './game.ts'
 import type { GameOverReason, GameView } from './game.ts'
 
 /** 방 설정. 지금은 기본값 고정으로 시작하고, UI 는 자리만 잡아둔다. */
@@ -53,18 +53,35 @@ export interface RoomSettings {
    * 설 수는 있다 — 「썼는가」는 판마다 새로 시작한다. 길이는 늘 SPECIALIST_ROUNDS 다.
    */
   specialistRounds: (SpecialistId | null)[]
+  /**
+   * 「직접 고르기」에서 고른 것 위에 무작위로 더 얹을 도전자 수(0~3).
+   *
+   * 게임을 시작할 때 한 번 뽑아 끝까지 그대로 걸린다. 고른 것과 겹치지 않게 뽑으므로,
+   * 고른 장수와 이 수를 더한 만큼이 매 판 걸린다.
+   */
+  randomChallenges: number
+  /** 몇 개를 열면 이기는가. 「직접 고르기」에서만 3이 아닐 수 있다. */
+  vaultsToWin: number
+  /** 몇 번 울리면 지는가. 「직접 고르기」에서만 3이 아닐 수 있다. */
+  alarmsToLose: number
   maxPlayers: number
 }
 
-/** 빈 자리 다섯. 설정을 새로 만들 때마다 새 배열이어야 방끼리 섞이지 않는다. */
-export function emptyRounds(): (SpecialistId | null)[] {
-  return Array.from({ length: SPECIALIST_ROUNDS }, () => null)
+/**
+ * 빈 자리. 설정을 새로 만들 때마다 새 배열이어야 방끼리 섞이지 않는다.
+ * 길이는 최대 판수를 따른다 — 승·패 수를 바꾸면 자리 수도 함께 바뀐다.
+ */
+export function emptyRounds(count: number = SPECIALIST_ROUNDS): (SpecialistId | null)[] {
+  return Array.from({ length: count }, () => null)
 }
 
 export const DEFAULT_SETTINGS: RoomSettings = {
   mode: 'basic',
   pickedChallenges: [],
   specialistRounds: emptyRounds(),
+  randomChallenges: 0,
+  vaultsToWin: VAULTS_TO_WIN,
+  alarmsToLose: ALARMS_TO_LOSE,
   maxPlayers: 6,
 }
 

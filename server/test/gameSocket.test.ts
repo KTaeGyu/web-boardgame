@@ -179,6 +179,56 @@ describe('직접 고르기', () => {
     assert.equal(started.ok, true)
     if (started.ok) assert.deepEqual(started.value.challenges, [8])
   })
+
+  it('무작위로 얹기만 해도 시작할 수 있다', async () => {
+    const { host } = await seatThree()
+    unwrap(
+      await call<unknown>(host.socket, 'room:settings', {
+        mode: 'custom',
+        pickedChallenges: [],
+        randomChallenges: 2,
+      }),
+    )
+    const started = unwrap(await call<GameView>(host.socket, 'game:start'))
+    assert.equal(started.challenges.length, 2, '고른 것이 없어도 무작위 둘이 걸린다')
+  })
+
+  it('방장이 정한 금고·경보 수가 판으로 넘어간다', async () => {
+    const { host, people } = await seatThree()
+    unwrap(
+      await call<unknown>(host.socket, 'room:settings', {
+        mode: 'custom',
+        pickedChallenges: [8],
+        vaultsToWin: 2,
+        alarmsToLose: 4,
+      }),
+    )
+    const started = unwrap(await call<GameView>(host.socket, 'game:start'))
+    assert.equal(started.vaultsToWin, 2)
+    assert.equal(started.alarmsToLose, 4)
+
+    // 남들 화면에도 같은 수가 가야 한다. 눈금을 그 수만큼 그리는 것이 화면이다.
+    const seen = await waitState(people[1], (view) => view.heist === 1)
+    assert.equal(seen.vaultsToWin, 2)
+    assert.equal(seen.alarmsToLose, 4)
+  })
+
+  it('다른 모드는 직접 고르기에서 만져둔 수를 물려받지 않는다', async () => {
+    const { host } = await seatThree()
+    unwrap(
+      await call<unknown>(host.socket, 'room:settings', {
+        mode: 'custom',
+        pickedChallenges: [8],
+        vaultsToWin: 1,
+        alarmsToLose: 5,
+      }),
+    )
+    unwrap(await call<unknown>(host.socket, 'room:settings', { mode: 'advanced' }))
+
+    const started = unwrap(await call<GameView>(host.socket, 'game:start'))
+    assert.equal(started.vaultsToWin, 3, '고급 모드는 원작 그대로')
+    assert.equal(started.alarmsToLose, 3)
+  })
 })
 
 describe('은닉 정보', () => {

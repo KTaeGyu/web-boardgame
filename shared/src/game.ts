@@ -18,12 +18,35 @@ export const ALARMS_TO_LOSE = 3
 export const ALARMS_TO_LOSE_MASTER = 2
 
 /**
- * 「직접 고르기」에서 해결사를 앉힐 수 있는 자리의 수 = 한 게임의 최대 판수.
+ * 「직접 고르기」에서는 몇 개를 열고 몇 번을 울리면 끝인지를 방장이 정한다.
  *
- * 금고 2개와 경보 2번까지는 게임이 이어지고, 다섯째 판에서 어느 쪽이든 결판난다.
- * 그래서 여섯째 자리는 있어도 쓰이지 않는다.
+ * 하나 밑으로는 게임이 성립하지 않는다 — 첫 판이 곧 마지막 판이다. 위쪽은 다섯에서
+ * 끊는다. 승과 패가 함께 커지면 판수가 둘의 합만큼 늘어, 배치표가 화면 밖으로 나간다.
+ * 다른 모드는 원작 그대로 3 · 3 이고 마스터 시프만 경보가 2다.
  */
-export const SPECIALIST_ROUNDS = VAULTS_TO_WIN + ALARMS_TO_LOSE - 1
+export const MIN_MARKS = 1
+export const MAX_MARKS = 5
+
+/**
+ * 「직접 고르기」에서 무작위로 얹을 수 있는 도전자 수.
+ *
+ * 게임을 시작할 때 한 번 뽑아 끝까지 그대로 걸린다. 셋을 넘기면 고른 것과 합쳐
+ * 한 판에 대여섯 장이 겹치는데, 그때부터는 카드끼리 서로 부딪힌다.
+ */
+export const MAX_RANDOM_CHALLENGES = 3
+
+/**
+ * 한 게임의 최대 판수 = 해결사를 앉힐 수 있는 자리의 수.
+ *
+ * 금고와 경보가 하나씩 모자란 채로 맞서면 그다음 판에서 어느 쪽이든 결판난다.
+ * 그래서 자리는 딱 「승 + 패 - 1」이고, 그보다 뒤의 자리는 있어도 쓰이지 않는다.
+ */
+export function maxHeists(vaultsToWin: number, alarmsToLose: number): number {
+  return vaultsToWin + alarmsToLose - 1
+}
+
+/** 기본 3 · 3 일 때의 자리 수(5). 설정의 기본값이 이 길이로 시작한다. */
+export const SPECIALIST_ROUNDS = maxHeists(VAULTS_TO_WIN, ALARMS_TO_LOSE)
 
 /** 라운드는 넷. 프리플롭 → 플롭 → 턴 → 리버. */
 export const ROUNDS = [1, 2, 3, 4] as const
@@ -115,6 +138,8 @@ export interface Announcement {
 export interface GameView {
   roomCode: string
   mode: GameMode
+  /** 몇 개를 열면 이기는가. 「직접 고르기」에서는 방장이 정하고, 나머지 모드는 3이다. */
+  vaultsToWin: number
   /** 모드에 따라 다르다. 마스터 시프는 2다. */
   alarmsToLose: number
   /** 이번 판에 걸려 있는 도전자 카드. 프로 모드는 판 내내 유지되는 것이 하나 더 있다. */

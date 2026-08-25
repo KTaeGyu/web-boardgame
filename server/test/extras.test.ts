@@ -914,3 +914,104 @@ describe('해결사 카드 효과', () => {
     assert.equal(game.view().specialist, null)
   })
 })
+
+describe('직접 고르기 — 무작위 도전자', () => {
+  it('고른 것 위에 얹히고, 게임 내내 같은 카드다', () => {
+    const dealer = new ExtraDealer('custom', mulberry32(5), [2], [], { random: 2 })
+    const first = dealer.next(null).challenges
+    assert.equal(first.length, 3, '고른 하나 + 무작위 둘')
+    assert.ok(first.includes(2), '고른 것은 그대로 있다')
+
+    for (const result of [true, false, true] as const) {
+      assert.deepEqual(dealer.next(result).challenges, first, '판이 바뀌어도 다시 뽑지 않는다')
+    }
+  })
+
+  it('고른 카드와 겹치지 않고, 무작위끼리도 겹치지 않는다', () => {
+    // 겹치면 두 장이 한 장으로 합쳐지는 셈이라 얹은 만큼 안 얹힌다. 씨앗을 바꿔가며 본다.
+    for (let seed = 1; seed <= 30; seed += 1) {
+      const picked: ChallengeId[] = [2, 8]
+      const rolled = new ExtraDealer('custom', mulberry32(seed), picked, [], { random: 3 })
+        .next(null)
+        .challenges
+      assert.equal(rolled.length, 5, `씨앗 ${seed}`)
+      assert.equal(new Set(rolled).size, 5, `씨앗 ${seed} — 같은 카드가 두 번 걸렸다`)
+    }
+  })
+
+  it('남은 카드보다 많이 달라고 해도 있는 만큼만 얹는다', () => {
+    const picked = READY_CHALLENGES.slice(0, READY_CHALLENGES.length - 1)
+    const dealer = new ExtraDealer('custom', mulberry32(1), picked, [], { random: 3 })
+    assert.equal(dealer.next(null).challenges.length, READY_CHALLENGES.length, '더미가 바닥나면 거기까지')
+  })
+
+  it('무작위 0장이면 고른 것만 걸린다', () => {
+    const dealer = new ExtraDealer('custom', mulberry32(1), [2], [], { random: 0 })
+    assert.deepEqual(dealer.next(null).challenges, [2])
+  })
+
+  it('다른 모드는 무작위 몫을 받지 않는다', () => {
+    const dealer = new ExtraDealer('advanced', mulberry32(1), [], [], { random: 3 })
+    assert.deepEqual(dealer.next(null), { challenges: [], specialist: null })
+  })
+})
+
+describe('직접 고르기 — 승·패 수', () => {
+  /**
+   * 판을 끝까지 돌린다. 결과가 무엇이든 금고나 경보가 하나씩 쌓인다.
+   *
+   * 성공하느냐 실패하느냐는 나눠진 카드에 달렸으므로 씨앗으로 고른다 —
+   * 11 은 첫 판이 성공하는 패, 1 은 실패하는 패다.
+   */
+  function playUntilOver(options: { vaultsToWin?: number; alarmsToLose?: number; seed?: number }) {
+    const { seed = 11, ...rules } = options
+    let clock = 1_000_000
+    const game = new Game('TEST', players, {
+      now: () => clock,
+      rng: mulberry32(seed),
+      mode: 'custom',
+      pickedChallenges: [],
+      ...rules,
+    })
+    const ctx = { game, advance: (ms: number) => (clock += ms) }
+    let guard = 0
+    while (!game.isOver && guard++ < 20) {
+      for (let round = 0; round < 4; round += 1) passRound(ctx)
+      if (game.isOver) break
+      for (const player of players) game.continueAfterHeist(player.id)
+    }
+    return game.view()
+  }
+
+  it('금고 하나면 첫 성공에서 끝난다', () => {
+    const view = playUntilOver({ vaultsToWin: 1, alarmsToLose: 5 })
+    assert.equal(view.phase, 'gameOver')
+    assert.equal(view.vaults, 1)
+    assert.equal(view.outcome, 'win')
+    assert.equal(view.heist, 1, '첫 판에서 갈린다')
+  })
+
+  it('경보 하나면 첫 실패에서 끝난다', () => {
+    const view = playUntilOver({ vaultsToWin: 5, alarmsToLose: 1, seed: 1 })
+    assert.equal(view.phase, 'gameOver')
+    assert.equal(view.alarms, 1)
+    assert.equal(view.outcome, 'lose')
+    assert.equal(view.heist, 1)
+  })
+
+  it('정한 수가 화면으로 그대로 나간다 — 눈금을 그 수만큼 그려야 한다', () => {
+    const game = new Game('TEST', players, {
+      mode: 'custom',
+      rng: mulberry32(1),
+      vaultsToWin: 4,
+      alarmsToLose: 2,
+    })
+    assert.equal(game.view().vaultsToWin, 4)
+    assert.equal(game.view().alarmsToLose, 2)
+  })
+
+  it('마스터 시프의 경보 2는 설정보다 앞선다', () => {
+    const game = new Game('TEST', players, { mode: 'masterThief', rng: mulberry32(1), alarmsToLose: 5 })
+    assert.equal(game.view().alarmsToLose, 2)
+  })
+})

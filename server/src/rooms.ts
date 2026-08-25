@@ -10,14 +10,17 @@ import {
   CHAT_MAX,
   DEFAULT_SETTINGS,
   GAME_MODES,
+  MAX_MARKS,
   MAX_PLAYERS_LIMIT,
+  MAX_RANDOM_CHALLENGES,
   MAX_SPECTATORS,
+  MIN_MARKS,
   MIN_PLAYERS,
   READY_CHALLENGES,
   READY_SPECIALISTS,
-  SPECIALIST_ROUNDS,
   displayNames,
   emptyRounds,
+  maxHeists,
   nextHost as pickNextHost,
   type ErrorCode,
   type GameMode,
@@ -92,6 +95,16 @@ function err<T>(code: ErrorCode, message: string): Result<T> {
 
 function ok<T>(value: T): Result<T> {
   return { ok: true, value }
+}
+
+/** 화면이 보내온 수. 정수가 아니면 범위를 볼 것도 없다. */
+function inRange(value: number, min: number, max: number): boolean {
+  return Number.isInteger(value) && value >= min && value <= max
+}
+
+/** 배치표를 자리 수에 맞춘다. 모자라면 빈칸으로 채우고, 남으면 뒤를 버린다. */
+function fitRounds(rounds: readonly (SpecialistId | null)[], slots: number): (SpecialistId | null)[] {
+  return Array.from({ length: slots }, (_, index) => rounds[index] ?? null)
 }
 
 export interface RoomStoreOptions {
@@ -439,11 +452,26 @@ export class RoomStore {
     if (next.pickedChallenges.some((id) => !READY_CHALLENGES.includes(id as ChallengeId))) {
       return err('INVALID_SETTINGS', '고를 수 없는 도전자 카드입니다.')
     }
-    // 자리 하나가 판 하나다. 길이가 어긋나면 몇 번째 판인지가 통째로 밀린다.
-    if (next.specialistRounds.length !== SPECIALIST_ROUNDS) {
+    if (!inRange(next.randomChallenges, 0, MAX_RANDOM_CHALLENGES)) {
+      return err('INVALID_SETTINGS', `무작위 도전자는 0~${MAX_RANDOM_CHALLENGES}장입니다.`)
+    }
+    if (!inRange(next.vaultsToWin, MIN_MARKS, MAX_MARKS) || !inRange(next.alarmsToLose, MIN_MARKS, MAX_MARKS)) {
+      return err('INVALID_SETTINGS', `금고와 경보는 ${MIN_MARKS}~${MAX_MARKS} 사이입니다.`)
+    }
+
+    /*
+     * 해결사 자리 수는 승·패 수에서 나온다(승 + 패 - 1).
+     *
+     * 그래서 금고나 경보를 바꾸면 자리 수도 함께 바뀐다 — 그때는 표를 다시 보내라고
+     * 하는 대신 여기서 길이를 맞춘다. 늘어난 자리는 비어 있고, 줄어든 자리에 서 있던
+     * 해결사는 사라진다. 없어질 판에 서 있던 카드라 남겨둘 자리가 없다.
+     */
+    const slots = maxHeists(next.vaultsToWin, next.alarmsToLose)
+    if (patch.specialistRounds !== undefined && patch.specialistRounds.length !== slots) {
       return err('INVALID_SETTINGS', '해결사 자리는 판마다 하나씩입니다.')
     }
-    const placed = next.specialistRounds.filter((id): id is SpecialistId => id !== null)
+    const rounds = fitRounds(next.specialistRounds, slots)
+    const placed = rounds.filter((id): id is SpecialistId => id !== null)
     if (placed.some((id) => !READY_SPECIALISTS.includes(id))) {
       return err('INVALID_SETTINGS', '고를 수 없는 해결사 카드입니다.')
     }
@@ -453,7 +481,7 @@ export class RoomStore {
       ...next,
       pickedChallenges: [...new Set(next.pickedChallenges)].sort((a, b) => a - b),
       // 정렬하지 않는다 — 여기서는 자리가 곧 뜻이다.
-      specialistRounds: [...next.specialistRounds],
+      specialistRounds: rounds,
     }
     return ok(toView(room))
   }

@@ -77,6 +77,14 @@ export interface GameOptions {
   pickedChallenges?: readonly ChallengeId[]
   /** 「직접 고르기」에서 방장이 고른 해결사 카드. */
   specialistRounds?: readonly (SpecialistId | null)[]
+  /** 「직접 고르기」에서 고른 것 위에 무작위로 더 얹을 도전자 수. */
+  randomChallenges?: number
+  /**
+   * 몇 개를 열면 이기고 몇 번 울리면 지는가. 「직접 고르기」에서만 넘어온다.
+   * 다른 모드는 원작 그대로이고, 마스터 시프의 경보 2는 모드가 정하므로 여기서 받지 않는다.
+   */
+  vaultsToWin?: number
+  alarmsToLose?: number
 }
 
 /** 카드가 특정 한 사람에게만 알려주는 것. 드로어의 그 카드에 적힌다. */
@@ -113,6 +121,7 @@ export class Game {
   private readonly rng: () => number
   private readonly lockMs: number
   private readonly mode: GameMode
+  private readonly vaultsToWin: number
   private readonly alarmsToLose: number
   private readonly picked: readonly ChallengeId[]
   private readonly specialistRounds: readonly (SpecialistId | null)[]
@@ -180,10 +189,15 @@ export class Game {
     this.rng = options.rng ?? Math.random
     this.lockMs = options.lockMs ?? TOKEN_LOCK_MS
     this.mode = options.mode ?? 'basic'
-    this.alarmsToLose = this.mode === 'masterThief' ? ALARMS_TO_LOSE_MASTER : ALARMS_TO_LOSE
+    this.vaultsToWin = options.vaultsToWin ?? VAULTS_TO_WIN
+    // 마스터 시프의 경보 2는 모드의 정의라 설정보다 앞선다.
+    this.alarmsToLose =
+      this.mode === 'masterThief' ? ALARMS_TO_LOSE_MASTER : (options.alarmsToLose ?? ALARMS_TO_LOSE)
     this.picked = options.pickedChallenges ?? []
     this.specialistRounds = options.specialistRounds ?? []
-    this.dealer = new ExtraDealer(this.mode, this.rng, this.picked, this.specialistRounds)
+    this.dealer = new ExtraDealer(this.mode, this.rng, this.picked, this.specialistRounds, {
+      random: options.randomChallenges ?? 0,
+    })
     this.seats = players.map((player) => ({
       id: player.id,
       nickname: player.nickname,
@@ -793,7 +807,7 @@ export class Game {
     else this.alarms += 1
 
     this.phase =
-      this.vaults >= VAULTS_TO_WIN || this.alarms >= this.alarmsToLose ? 'gameOver' : 'showdown'
+      this.vaults >= this.vaultsToWin || this.alarms >= this.alarmsToLose ? 'gameOver' : 'showdown'
   }
 
   // ── 상태 읽기 ───────────────────────────────────────────
@@ -832,7 +846,7 @@ export class Game {
   }
 
   get outcome(): 'win' | 'lose' | null {
-    if (this.vaults >= VAULTS_TO_WIN) return 'win'
+    if (this.vaults >= this.vaultsToWin) return 'win'
     if (this.alarms >= this.alarmsToLose) return 'lose'
     return null
   }
@@ -871,6 +885,7 @@ export class Game {
     return {
       roomCode: this.roomCode,
       mode: this.mode,
+      vaultsToWin: this.vaultsToWin,
       alarmsToLose: this.alarmsToLose,
       challenges: [...this.challenges],
       specialist: this.specialist,

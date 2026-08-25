@@ -64,6 +64,14 @@ export class ExtraDealer {
   /** 「직접 고르기」에서 방장이 고른 도전자. 모든 판에 그대로 걸린다. */
   private readonly picked: ChallengeId[]
   /**
+   * 「직접 고르기」에서 무작위로 얹힌 도전자.
+   *
+   * 게임을 시작할 때 한 번 뽑고 그대로 둔다 — 판마다 다시 뽑으면 무엇이 걸릴지
+   * 매번 달라져, 방장이 짜 둔 판의 모양이 뽑기에 묻힌다. 고른 것과 겹치지 않게 뽑는다.
+   * 겹치면 두 장이 한 장으로 합쳐지는 셈이라 얹은 만큼 안 얹힌다.
+   */
+  private readonly rolled: ChallengeId[] = []
+  /**
    * 「직접 고르기」에서 방장이 짠 배치. 자리 하나가 판 하나다.
    * 비어 있는 판은 해결사 없이 지나간다 — 빈칸도 뜻이 있다.
    */
@@ -76,6 +84,7 @@ export class ExtraDealer {
     rng: () => number,
     picked: readonly ChallengeId[] = [],
     specialistRounds: readonly (SpecialistId | null)[] = [],
+    options: { random?: number } = {},
   ) {
     this.mode = mode
     this.rng = rng
@@ -90,6 +99,16 @@ export class ExtraDealer {
         : READY_CHALLENGES
     this.challenges = new Stack(pool)
     this.specialists = new Stack(READY_SPECIALISTS)
+
+    // 무작위로 얹을 몫은 여기서 다 뽑아 둔다. 남은 더미에서 골라야 고른 것과 겹치지 않는다.
+    if (mode === 'custom') {
+      const rest = READY_CHALLENGES.filter((id) => !this.picked.includes(id))
+      const count = Math.min(options.random ?? 0, rest.length)
+      for (let i = 0; i < count; i += 1) {
+        const [drawn] = rest.splice(Math.floor(rng() * rest.length), 1)
+        this.rolled.push(drawn)
+      }
+    }
 
     if (mode === 'professional') this.permanent = this.challenges.drawRandom(rng)
     if (mode === 'masterThief') {
@@ -108,11 +127,11 @@ export class ExtraDealer {
     this.heist += 1
     if (this.mode === 'basic') return { challenges: [], specialist: null }
 
-    // 직접 고르기는 뽑기가 없다. 도전자는 고른 것이 처음부터 끝까지 그대로 걸리고,
-    // 해결사는 방장이 짠 배치표에서 이번 판 자리를 그대로 읽는다.
+    // 직접 고르기는 판마다 뽑지 않는다. 도전자는 고른 것과 시작할 때 뽑아 둔 것이
+    // 처음부터 끝까지 함께 걸리고, 해결사는 방장이 짠 배치표에서 이번 판 자리를 읽는다.
     if (this.mode === 'custom') {
       return {
-        challenges: [...this.picked],
+        challenges: [...this.picked, ...this.rolled],
         specialist: this.specialistRounds[this.heist - 1] ?? null,
       }
     }

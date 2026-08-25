@@ -5,9 +5,13 @@ import {
   GAME_MODES,
   GAME_MODE_HINT,
   GAME_MODE_LABEL,
+  MAX_MARKS,
+  MAX_RANDOM_CHALLENGES,
   MAX_SPECTATORS,
+  MIN_MARKS,
   MIN_PLAYERS,
   READY_CHALLENGES,
+  maxHeists,
   nextHost,
   type ChallengeId,
   type SpecialistId,
@@ -72,6 +76,18 @@ export function RoomPage() {
   function toggleChallenge(id: ChallengeId, picked: ChallengeId[]) {
     const next = picked.includes(id) ? picked.filter((x) => x !== id) : [...picked, id]
     void change({ pickedChallenges: next })
+  }
+
+  /*
+   * 숫자 칸은 지우는 도중에 빈 값이 되고, 그때 0 을 보내면 서버가 거절해 붉은 줄이 뜬다.
+   * 고치는 중일 뿐이므로 범위를 벗어난 값은 보내지 않고 흘린다 — 칸은 방의 값으로 돌아온다.
+   */
+  function changeNumber(key: 'vaultsToWin' | 'alarmsToLose' | 'randomChallenges', raw: string) {
+    const value = Number(raw)
+    const min = key === 'randomChallenges' ? 0 : MIN_MARKS
+    const max = key === 'randomChallenges' ? MAX_RANDOM_CHALLENGES : MAX_MARKS
+    if (!Number.isInteger(value) || value < min || value > max) return
+    void change({ [key]: value })
   }
 
 
@@ -182,6 +198,7 @@ export function RoomPage() {
   const needsCards =
     room.settings.mode === 'custom' &&
     room.settings.pickedChallenges.length === 0 &&
+    room.settings.randomChallenges === 0 &&
     room.settings.specialistRounds.every((id) => id === null)
   // 내가 빠진 뒤의 인원으로 다음 방장을 미리 구한다. 서버가 실제로 쓰는 규칙과 같은 함수다.
   const successor = iAmHost ? nextHost(room.players.filter((player) => player.id !== playerId)) : null
@@ -280,6 +297,41 @@ export function RoomPage() {
 
           {room.settings.mode === 'custom' && (
             <>
+              <div className="setting">
+                <span className="setting__label">금고와 경보</span>
+                <span className="pick-hint">
+                  금고를 다 열면 이기고, 경보가 다 울리면 집니다. 한 게임은 최대{' '}
+                  {maxHeists(room.settings.vaultsToWin, room.settings.alarmsToLose)}판입니다.
+                  수를 줄이면 없어지는 판에 둔 해결사도 함께 지워집니다.
+                </span>
+                <div className="number-row">
+                  <label className="number-field">
+                    <span>금고</span>
+                    <input
+                      className="number-input"
+                      type="number"
+                      min={MIN_MARKS}
+                      max={MAX_MARKS}
+                      value={room.settings.vaultsToWin}
+                      disabled={!iAmHost}
+                      onChange={(event) => changeNumber('vaultsToWin', event.target.value)}
+                    />
+                  </label>
+                  <label className="number-field">
+                    <span>경보</span>
+                    <input
+                      className="number-input"
+                      type="number"
+                      min={MIN_MARKS}
+                      max={MAX_MARKS}
+                      value={room.settings.alarmsToLose}
+                      disabled={!iAmHost}
+                      onChange={(event) => changeNumber('alarmsToLose', event.target.value)}
+                    />
+                  </label>
+                </div>
+              </div>
+
               <CardPicker
                 label={`도전자 카드 (${room.settings.pickedChallenges.length}장)`}
                 hint="고른 것이 모든 판에 함께 걸립니다."
@@ -292,6 +344,28 @@ export function RoomPage() {
                 disabled={!iAmHost}
                 onToggle={(id) => toggleChallenge(id as ChallengeId, room.settings.pickedChallenges)}
               />
+
+              <div className="setting">
+                <span className="setting__label">무작위 도전자</span>
+                <span className="pick-hint">
+                  고른 것 위에 이만큼을 무작위로 더 얹습니다. 시작할 때 한 번 뽑아 게임 내내
+                  그대로 걸리고, 고른 카드와 겹치지 않습니다. 무엇이 나올지는 첫 판에 알게 됩니다.
+                </span>
+                <div className="number-row">
+                  <label className="number-field">
+                    <span>장수</span>
+                    <input
+                      className="number-input"
+                      type="number"
+                      min={0}
+                      max={MAX_RANDOM_CHALLENGES}
+                      value={room.settings.randomChallenges}
+                      disabled={!iAmHost}
+                      onChange={(event) => changeNumber('randomChallenges', event.target.value)}
+                    />
+                  </label>
+                </div>
+              </div>
 
               <SpecialistGrid
                 rounds={room.settings.specialistRounds}

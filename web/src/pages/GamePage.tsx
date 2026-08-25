@@ -5,7 +5,6 @@ import {
   ROUNDS,
   ROUND_LABEL,
   TOKEN_LOCK_MS,
-  VAULTS_TO_WIN,
   bestHolding,
   type Card,
   type GamePlayerView,
@@ -485,7 +484,7 @@ export function GamePage({ spectating = false }: { spectating?: boolean } = {}) 
         {/* 금고와 경보를 두 줄로 나눈다. 좁은 화면에서 한 줄로 늘어놓으면 나가기가 밀려난다. */}
         <span className="game-bar__marks" title={`금고 ${game.vaults} / 경보 ${game.alarms}`}>
           <span className="mark-row">
-            {Array.from({ length: VAULTS_TO_WIN }, (_, i) => (
+            {Array.from({ length: game.vaultsToWin }, (_, i) => (
               <i key={`v${i}`} className={`mark mark--vault ${i < game.vaults ? 'mark--on' : ''}`} />
             ))}
           </span>
@@ -1075,7 +1074,9 @@ function Showdown({ game, revealed, finished, playerId, iAmHost, tutorial, onLea
         {done && over && (
           <>
             <p className={`outcome outcome--${game.outcome}`}>
-              {game.outcome === 'win' ? '금고 3개 — 강도 성공!' : '경보 3번 — 모두 붙잡혔습니다'}
+              {game.outcome === 'win'
+                ? `금고 ${game.vaultsToWin}개 — 강도 성공!`
+                : `경보 ${game.alarmsToLose}번 — 모두 붙잡혔습니다`}
             </p>
             <div className="btn-row">
               <button type="button" className="btn" onClick={() => void leave(navigate)}>
