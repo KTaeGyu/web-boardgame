@@ -594,8 +594,32 @@ select {
   margin-bottom: 24px;
 }
 
+/* 제목 옆의 나가는 길. 아래 단추와 같은 동작이라 확인창도 같은 것을 쓴다. */
+.room-header__back {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  align-self: center;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--card);
+  color: var(--ink-dim);
+  font-size: 16px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.room-header__back:hover,
+.room-header__back:focus-visible {
+  border-color: var(--gold-dim);
+  color: var(--gold);
+}
+
 .room-header__host {
   margin: 0;
+  margin-right: auto;
   font-size: 26px;
   font-weight: 700;
 }
@@ -1878,4 +1902,47 @@ select {
     box-shadow: 0 -14px 44px rgba(var(--shadow-rgb), 0.5);
     animation: sheet-up 0.22s ease-out;
   }
+}
+
+/*
+ * 체크 한 줄.
+ *
+ * 설정 안에서 「켤까 말까」를 묻는 자리다. 이름 아래에 왜 켜는지를 작게 붙인다 —
+ * 켠 뒤에 무엇이 달라지는지 모르면 대개 그냥 지나친다.
+ */
+.check {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.check input {
+  margin: 2px 0 0;
+  width: 16px;
+  height: 16px;
+  accent-color: var(--gold);
+  flex-shrink: 0;
+}
+
+.check input:disabled {
+  cursor: default;
+}
+
+.check__hint {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ink-dim);
+  word-break: keep-all;
+}
+
+/* 배치표 맨 윗줄. 카드가 아니라 뽑기라 이름을 기울여 갈라 둔다. */
+.slot-row--random .slot-row__name {
+  font-style: italic;
+  color: var(--gold);
 }

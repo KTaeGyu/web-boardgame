@@ -219,7 +219,8 @@ export function RoomPage() {
     room.settings.mode === 'custom' &&
     room.settings.pickedChallenges.length === 0 &&
     room.settings.randomChallenges === 0 &&
-    room.settings.specialistRounds.every((id) => id === null)
+    room.settings.specialistRounds.every((id) => id === null) &&
+    room.settings.specialistRandomRounds.every((on) => !on)
   // 내가 빠진 뒤의 인원으로 다음 방장을 미리 구한다. 서버가 실제로 쓰는 규칙과 같은 함수다.
   const successor = iAmHost ? nextHost(room.players.filter((player) => player.id !== playerId)) : null
 
@@ -233,6 +234,16 @@ export function RoomPage() {
   return (
     <main className="page room-page">
       <div className="room-header">
+        {/* 나가는 길이 화면 아래에만 있으면 설정을 다 지나쳐 내려가야 한다. 제목 옆에도 둔다. */}
+        <button
+          type="button"
+          className="room-header__back"
+          onClick={() => setConfirmLeave(true)}
+          aria-label="방 나가기"
+          title="방 나가기"
+        >
+          ←
+        </button>
         <h1 className="room-header__host">{host?.displayName ?? '?'}님의 방</h1>
         <span className="room-header__code">{room.code}</span>
       </div>
@@ -378,8 +389,8 @@ export function RoomPage() {
               <div className="setting">
                 <span className="setting__label">무작위 도전자</span>
                 <span className="pick-hint">
-                  고른 것 위에 이만큼을 무작위로 더 얹습니다. 시작할 때 한 번 뽑아 게임 내내
-                  그대로 걸리고, 고른 카드와 겹치지 않습니다. 무엇이 나올지는 첫 판에 알게 됩니다.
+                  <strong>판마다</strong> 이만큼을 무작위로 새로 뽑아 얹습니다. 위에서 고른 카드와는
+                  겹치지 않고, 지난 판에 나왔던 카드는 다시 나올 수 있습니다.
                 </span>
                 <div className="number-row">
                   <label className="number-field">
@@ -395,12 +406,44 @@ export function RoomPage() {
                     />
                   </label>
                 </div>
+
+                <label className="check">
+                  <input
+                    type="checkbox"
+                    checked={room.settings.randomChallengesOnWin}
+                    disabled={!iAmHost}
+                    onChange={(event) => void change({ randomChallengesOnWin: event.target.checked })}
+                  />
+                  <span>
+                    이긴 다음 판에만 얹기
+                    <span className="check__hint">
+                      켜면 첫 판에는 나오지 않습니다. 위에서 고른 카드는 이것과 상관없이 늘 걸립니다.
+                    </span>
+                  </span>
+                </label>
+
+                <label className="check">
+                  <input
+                    type="checkbox"
+                    checked={room.settings.randomChallengesStay}
+                    disabled={!iAmHost}
+                    onChange={(event) => void change({ randomChallengesStay: event.target.checked })}
+                  />
+                  <span>
+                    한 번 나온 카드는 계속 걸어두기
+                    <span className="check__hint">판이 갈수록 쌓입니다. 이미 걸린 카드는 다시 뽑지 않습니다.</span>
+                  </span>
+                </label>
               </div>
 
               <SpecialistGrid
                 rounds={room.settings.specialistRounds}
+                randomRounds={room.settings.specialistRandomRounds}
+                onLoss={room.settings.specialistOnLoss}
                 disabled={!iAmHost}
                 onChange={(specialistRounds) => void change({ specialistRounds })}
+                onRandomChange={(specialistRandomRounds) => void change({ specialistRandomRounds })}
+                onLossChange={(specialistOnLoss) => void change({ specialistOnLoss })}
               />
             </>
           )}
