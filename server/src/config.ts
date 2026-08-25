@@ -16,11 +16,17 @@ export const CORS_ORIGINS = RAW_ORIGINS.split(',')
 export const SWEEP_INTERVAL_MS = 5_000
 
 /**
- * 한 서버가 감당할 양. 무료 요금제의 이용량을 넘기지 않으려는 한도다.
- * 게임 규칙이 아니라 운영 한도이므로 환경변수로 조절한다.
+ * 한 서버가 감당할 양. 게임 규칙이 아니라 운영 한도이므로 환경변수로 조절한다.
+ *
+ * 2026-08-25 에 40/8 에서 올렸다. 실측해 보니 접속 40·방 8·판 7 을 동시에 올려도
+ * 메모리는 2.4MB 늘고(접속당 60KB 남짓) 상태 한 벌이 1.3KB 였다. 무료 인스턴스의
+ * 512MB 로는 메모리가 먼저 막히지 않고, 0.1 CPU 도 이 규모에서는 한참 한가하다.
+ *
+ * 그래도 한도를 두는 것은 무료 요금제를 넘기지 않기 위해서다 — 없앨 값이 아니라
+ * 실제 무게에 맞춰 잡을 값이다.
  */
-export const MAX_CONNECTIONS = Number(process.env.MAX_CONNECTIONS ?? 40)
-export const MAX_ROOMS = Number(process.env.MAX_ROOMS ?? 8)
+export const MAX_CONNECTIONS = Number(process.env.MAX_CONNECTIONS ?? 100)
+export const MAX_ROOMS = Number(process.env.MAX_ROOMS ?? 20)
 
 /**
  * 아무도 아무것도 하지 않은 채 이만큼 지나면 방을 지운다.

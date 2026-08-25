@@ -26,7 +26,8 @@ services:
       - key: CORS_ORIGINS
         sync: false
       # 무료 요금제의 이용량을 넘기지 않으려는 한도다. 게임 규칙이 아니다.
+      # 실측(접속 40·방 8)에서 메모리 +2.4MB·상태 한 벌 1.3KB 였다. 여유를 두고 잡는다.
       - key: MAX_CONNECTIONS
-        value: 40
+        value: 100
       - key: MAX_ROOMS
-        value: 8
+        value: 20

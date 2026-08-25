@@ -51,8 +51,8 @@ curl localhost:3001/healthz     # {"ok":true,"rooms":0}
 |------|--------|------|
 | `PORT` | `3001` | 배포처(Render)가 넣어준다 |
 | `CORS_ORIGINS` | `http://localhost:5173` | 화면이 어디에 있는가. 콤마로 여럿. `*.vercel.app` 처럼 접미사로 열 수 있고, `*` 하나면 전체 허용 |
-| `MAX_CONNECTIONS` | `40` | 동시 접속 한도 |
-| `MAX_ROOMS` | `8` | 동시에 열려 있을 수 있는 방 |
+| `MAX_CONNECTIONS` | `100` | 동시 접속 한도 |
+| `MAX_ROOMS` | `20` | 동시에 열려 있을 수 있는 방 |
 
 한도는 **게임 규칙이 아니라 운영 한도**다. 무료 요금제의 이용량을 넘기지 않으려는 값이라
 환경변수로 조절한다. 한도에 걸린 사람에게는 `server:full` 로 이유를 먼저 보내고 끊는다.
