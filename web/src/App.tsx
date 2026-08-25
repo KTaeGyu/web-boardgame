@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 
+import { ReportLink } from './components/ReportLink.tsx'
 import { ServerGate } from './components/ServerGate.tsx'
 import { ThemeToggle } from './components/ThemeToggle.tsx'
 import { HomePage } from './pages/HomePage.tsx'
@@ -28,6 +29,7 @@ export function App() {
           <div className="brand__rule" />
         </header>
         <p className="error">{full}</p>
+        <ReportLink />
         <ThemeToggle />
       </main>
     )
@@ -42,6 +44,7 @@ export function App() {
         <Route path="/rooms/:code/game" element={<GamePage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      <ReportLink />
       <ThemeToggle />
       {/*
         서버가 없을 때. 어디에 있느냐에 따라 화면을 덮기도 하고 한 줄만 남기기도 한다 —
