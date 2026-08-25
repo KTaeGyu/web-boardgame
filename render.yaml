@@ -6,7 +6,8 @@
 
 services:
   - type: web
-    name: the-gang-server
+    # 서비스 이름이 그대로 공개 주소가 된다.
+    name: web-boardgame-server
     runtime: node
     # 한국에서 하는 게임이다. 다른 리전은 왕복이 150ms 를 넘겨 토큰이 굼떠 보인다.
     region: singapore
