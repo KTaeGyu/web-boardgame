@@ -417,6 +417,28 @@ describe('관전', () => {
     return { socket, playerId, hands, states, chats, view }
   }
 
+  it('방장이 판을 접어도 구경꾼은 구경꾼이다', async () => {
+    // 화면이 구경꾼을 방 주소로 되돌리면 대기실이 자리에 앉혀 버린다. 방 쪽은 그대로여야
+    // 그 실수가 서버까지 번지지 않는다.
+    const { host, code } = await seatThree()
+    const watcher = await watcherFor(code, 'watch9')
+    unwrap(await call<GameView>(host.socket, 'game:start'))
+
+    const aborted = new Promise<void>((resolve) => host.socket.once('game:aborted', () => resolve()))
+    unwrap(await call<null>(host.socket, 'game:toLobby'))
+    await aborted
+
+    const room = app.store.view(code)
+    assert.equal(room?.phase, 'lobby')
+    assert.deepEqual(room?.spectators.map((one) => one.id), [watcher.playerId], '구경꾼은 그대로다')
+    assert.equal(room?.players.length, 3, '자리 수도 그대로다')
+    assert.equal(
+      room?.players.some((player) => player.id === watcher.playerId),
+      false,
+      '구경꾼이 자리에 앉으면 안 된다',
+    )
+  })
+
   it('공개 상태는 받지만 손패는 받지 않는다', async () => {
     const { host, code } = await seatThree()
     unwrap(await call<GameView>(host.socket, 'game:start'))

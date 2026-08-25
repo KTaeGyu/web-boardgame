@@ -293,15 +293,40 @@ export function GamePage({ spectating = false }: { spectating?: boolean } = {}) 
 
   useServerEvent('tutorial:tip', useCallback((payload: TipPayload) => setTip(payload), []))
 
+  /*
+   * 판이 접혔다는 말을 잠깐 보여주고 옮긴다. 그 사이에 화면을 벗어나면 시계도 함께 접는다 —
+   * 남겨두면 이미 목록으로 나간 사람을 뒤늦게 방으로 끌고 온다.
+   */
+  const abortTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(
+    () => () => {
+      if (abortTimer.current) clearTimeout(abortTimer.current)
+    },
+    [],
+  )
+
   useServerEvent(
     'game:aborted',
     useCallback(
       (payload: { message: string }) => {
         setNotice(payload.message)
         setGame(null)
-        setTimeout(() => navigate(`/rooms/${code}`, { replace: true }), 2200)
+        if (abortTimer.current) clearTimeout(abortTimer.current)
+        abortTimer.current = setTimeout(() => {
+          /*
+           * 구경꾼에게는 돌아갈 자리가 없다.
+           *
+           * 방 주소로 보내면 대기실이 그 주소를 「앉으러 왔다」로 읽어 자리에 앉혀 버린다
+           * (RoomPage 는 ?watch=1 이 없으면 room:join 을 부른다). 보던 사람이 판이
+           * 접혔다는 이유로 선수가 되면 안 된다.
+           */
+          navigate(spectating ? '/rooms' : `/rooms/${code}`, {
+            replace: true,
+            ...(spectating ? { state: { notice: '판이 끝났습니다.' } } : {}),
+          })
+        }, 2200)
       },
-      [code, navigate],
+      [code, navigate, spectating],
     ),
   )
 
