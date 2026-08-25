@@ -1069,7 +1069,8 @@ function Showdown({
   const iContinued = continued.includes(playerId)
   // 끊긴 사람은 기다려주지 않으므로 분모도 접속 중인 사람 수다.
   const waitingOn = game.players.filter((player) => player.connected).length
-  const askedToRematch = over && game.rematch.proposed && !iAgreed
+  // 재경기는 같은 사람들이 다시 하는 것이라 앉은 사람들이 정한다. 구경꾼에게는 묻지 않는다.
+  const askedToRematch = over && game.rematch.proposed && !iAgreed && !spectating
 
   /*
    * 짚고 있는 사람이 실제로 쓴 다섯 장. 공개된 홀카드와 공용 카드로 다시 구해도
@@ -1236,10 +1237,14 @@ function Showdown({
               <button
                 type="button"
                 className="btn btn--primary"
-                disabled={iAgreed}
+                disabled={iAgreed || spectating}
                 onClick={() => void call('game:rematch', { agree: true })}
               >
-                {iAgreed ? `재경기 대기 ${game.rematch.agreed.length}/${game.players.length}` : '재경기 제안'}
+                {spectating
+                  ? `재경기 ${game.rematch.agreed.length}/${game.players.length}`
+                  : iAgreed
+                    ? `재경기 대기 ${game.rematch.agreed.length}/${game.players.length}`
+                    : '재경기 제안'}
               </button>
             </div>
           </>
