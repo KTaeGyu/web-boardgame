@@ -1785,3 +1785,64 @@ select {
     font-size: 12px;
   }
 }
+
+/*
+ * 작은 화면에서 뜨는 것들은 아래에서 올라오는 시트가 된다.
+ *
+ * 가운데 뜬 380px 짜리 창은 폰에서 화면의 절반쯤을 남기고 멈춘다 — 글자는 작고
+ * 단추는 손이 닿기 먼 가운데에 선다. 폭을 화면에 맞추고 아래에 붙이면 단추가
+ * 엄지 자리로 내려오고, 위에 남은 틈으로 판이 그대로 보인다.
+ *
+ * 높이는 --app-height 를 쓴다. 키보드가 올라온 만큼 줄어들어야 입력칸이 가려지지 않는다.
+ */
+@media (max-width: 640px) {
+  .modal-backdrop {
+    padding: 0;
+    place-items: end stretch;
+  }
+
+  .modal {
+    max-width: none;
+    max-height: calc(var(--app-height, 100dvh) * 0.92);
+    overflow-y: auto;
+    border-width: 1px 0 0;
+    border-radius: 16px 16px 0 0;
+    padding: 22px 18px calc(22px + env(safe-area-inset-bottom));
+    animation: sheet-up 0.22s ease-out;
+  }
+
+  /* 물음이 둘인 스캔 창도 같은 자리에서 같은 만큼 커진다. */
+  .modal--wide,
+  .modal--tall {
+    max-width: none;
+    max-height: calc(var(--app-height, 100dvh) * 0.92);
+  }
+
+  /*
+   * 연습 안내만 위에 남는다. 아래에 붙이면 정작 「토큰을 누르세요」가 가리키는
+   * 그 토큰을 덮는다. 대신 폭은 똑같이 화면 끝까지 쓴다.
+   */
+  .tip {
+    left: 0;
+    right: 0;
+    transform: none;
+    width: auto;
+    max-height: calc(var(--app-height, 100dvh) * 0.72);
+    overflow-y: auto;
+    border-width: 0 0 1px;
+    border-radius: 0 0 16px 16px;
+    padding: 16px 16px 18px;
+  }
+}
+
+@keyframes sheet-up {
+  from {
+    transform: translateY(12%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .modal {
+    animation: none;
+  }
+}

@@ -1806,3 +1806,49 @@ button.token:hover:not(:disabled) {
     max-height: 46vh;
   }
 }
+
+/*
+ * 화면 위에 뜨는 것들은 작은 화면에서 아래에 붙는 시트가 된다. styles.css 의 모달과
+ * 같은 규칙이다 — 폭은 화면 끝까지, 단추는 엄지 자리로, 위에 남은 틈으로 판이 보인다.
+ */
+@media (max-width: 640px) {
+  .chat {
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: auto;
+    max-height: calc(var(--app-height, 100dvh) * 0.72);
+    border-width: 1px 0 0;
+    border-radius: 16px 16px 0 0;
+    padding-bottom: env(safe-area-inset-bottom);
+    animation: sheet-up 0.22s ease-out;
+  }
+
+  /*
+   * 시트가 아래를 다 덮으므로 떠 있는 단추는 대화 위에 겹친다. 펼친 동안에는 감추고,
+   * 접는 것은 창 안의 × 로 한다 — 접으면 단추가 제자리로 돌아온다.
+   */
+  .chat-fab--open {
+    display: none;
+  }
+
+  .showdown {
+    padding: 0;
+    place-items: end stretch;
+  }
+
+  .showdown__panel {
+    max-width: none;
+    max-height: calc(var(--app-height, 100dvh) * 0.94);
+    overflow-y: auto;
+    border-width: 1px 0 0;
+    border-radius: 16px 16px 0 0;
+    padding: 22px 16px calc(22px + env(safe-area-inset-bottom));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat {
+    animation: none;
+  }
+}
