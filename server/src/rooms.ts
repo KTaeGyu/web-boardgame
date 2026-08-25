@@ -6,6 +6,8 @@
  */
 
 import {
+  CHAT_KEEP,
+  CHAT_MAX,
   DEFAULT_SETTINGS,
   GAME_MODES,
   MAX_PLAYERS_LIMIT,
@@ -23,6 +25,7 @@ import {
   type Result,
   type RoomPhase,
   type RoomSettings,
+  type ChatMessage,
   type RoomSummary,
   type RoomView,
 } from '@the-gang/shared'
@@ -53,6 +56,16 @@ interface Room {
   createdAt: number
   /** 마지막으로 누군가 무언가를 한 시각. 아무 일도 없는 방을 골라내는 기준이다. */
   lastActivityAt: number
+  /** 지난 말. 방과 함께 살고 방과 함께 사라진다. */
+  chat: ChatMessage[]
+  /**
+   * 이 방에서 몇 번째 말인가.
+   *
+   * 방마다 따로 센다. 저장소 전체에서 하나씩 올리면 옆 방 대화가 번호를 가져가,
+   * 한 방 안에서도 번호가 띄엄띄엄해진다. 그러면 화면이 「번호가 안 이어진다」를
+   * 「사이가 빠졌다」로 읽을 수 없다.
+   */
+  chatSeq: number
 }
 
 function err<T>(code: ErrorCode, message: string): Result<T> {
@@ -104,6 +117,8 @@ export class RoomStore {
       phase: 'lobby',
       createdAt: now,
       lastActivityAt: now,
+      chat: [],
+      chatSeq: 0,
     }
     this.rooms.set(code, room)
     this.whereIs.set(playerId, code)
@@ -157,6 +172,42 @@ export class RoomStore {
    * 끊김 유예와 달리 이쪽은 「사람이 실제로 하고 있는가」를 본다.
    * 접속만 걸어두고 떠나면 아무리 연결이 멀쩡해도 방이 정리된다.
    */
+  /**
+   * 한 줄을 방에 남긴다. 빈 말과 너무 긴 말은 여기서 걸러 낸다.
+   *
+   * 이름은 저장하지 않고 남길 때 붙인다 — 자리에 붙는 이름과 같은 규칙(동명이인 구분)으로
+   * 지어야 누가 한 말인지 이어지기 때문이다.
+   */
+  addChat(playerId: string, text: string): ChatMessage | null {
+    const code = this.whereIs.get(playerId)
+    const room = code ? this.rooms.get(code) : undefined
+    if (!room) return null
+
+    const index = room.players.findIndex((player) => player.id === playerId)
+    if (index < 0) return null
+
+    const trimmed = text.trim().slice(0, CHAT_MAX)
+    if (!trimmed) return null
+
+    const names = displayNames(room.players.map((player) => player.nickname))
+    const message: ChatMessage = {
+      id: (room.chatSeq += 1),
+      playerId,
+      name: names[index],
+      text: trimmed,
+      at: this.now(),
+    }
+    room.chat.push(message)
+    if (room.chat.length > CHAT_KEEP) room.chat.splice(0, room.chat.length - CHAT_KEEP)
+    return message
+  }
+
+  /** 방에 남아 있는 지난 말. 들어온 사람에게 한 번 건넨다. */
+  chatOf(code: string | null): ChatMessage[] {
+    const room = code ? this.rooms.get(code) : undefined
+    return room ? [...room.chat] : []
+  }
+
   touch(code: string | null): void {
     const room = code ? this.rooms.get(code.toUpperCase()) : undefined
     if (room) room.lastActivityAt = this.now()

@@ -171,6 +171,7 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
       bind(socket, playerId, result.value.code)
       ack(result)
       sendRoomList()
+      socket.emit('chat:history', { messages: store.chatOf(result.value.code) })
     })
 
     socket.on('room:join', (payload, ack) => {
@@ -191,6 +192,8 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
       bind(socket, playerId, code)
       ack(result)
       announce(result.value)
+      // 새로고침·재접속도 이 길로 온다. 앞의 흐름이 없으면 대화가 매번 끊긴다.
+      socket.emit('chat:history', { messages: store.chatOf(code) })
 
       // 판이 도는 중에 돌아온 것이라면 자리와 손패를 되돌려준다.
       const game = games.get(code)
@@ -199,6 +202,22 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
         sendGame(code)
         sendHand(code, playerId)
       }
+    })
+
+    socket.on('chat:send', ({ text }, ack) => {
+      const playerId = playerOfSocket.get(socket.id)
+      const code = playerId ? store.codeOf(playerId) : null
+      if (!playerId || !code) {
+        return ack({ ok: false, code: 'NOT_IN_ROOM', message: '방에 들어와 있지 않습니다.' })
+      }
+
+      const message = store.addChat(playerId, String(text ?? ''))
+      // 빈 말은 아무 일도 아니다. 오류로 만들면 화면이 붉어질 이유가 없는데 붉어진다.
+      if (!message) return ack({ ok: true, value: null })
+
+      store.touch(code)
+      io.to(code).emit('chat:message', message)
+      ack({ ok: true, value: null })
     })
 
     socket.on('room:leave', (ack) => {

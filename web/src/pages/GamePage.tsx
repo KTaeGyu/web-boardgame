@@ -13,6 +13,7 @@ import {
   type Round,
 } from '@the-gang/shared'
 
+import { Chat } from '../components/Chat.tsx'
 import { ExtrasDrawer, NoteCard, type CardNote } from '../components/ExtrasDrawer.tsx'
 import { ScanVote } from '../components/ScanVote.tsx'
 import { SetupStep } from '../components/SetupStep.tsx'
@@ -592,6 +593,9 @@ export function GamePage() {
         notes={notes}
         onUse={(input) => void call('game:useSpecialist', input)}
       />
+
+      {/* 대화. 접힌 채로도 새 말 한 줄은 단추 옆에 잠깐 붙는다. */}
+      <Chat code={code} />
 
       {fresh && <NoteCard note={fresh} onClose={() => setFresh(null)} />}
 

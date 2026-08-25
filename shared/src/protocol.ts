@@ -147,12 +147,35 @@ export interface ClientToServerEvents {
     payload: { kind: 'rank' | 'category'; value: number },
     ack: (result: Result<null>) => void,
   ) => void
+  /** 한 줄 보낸다. 방 안에서만 오간다. */
+  'chat:send': (payload: { text: string }, ack: (result: Result<null>) => void) => void
   /** 해결사 카드를 쓴다. 누른 사람이 쓰는 사람이고, 카드에 따라 대상·숫자·내 카드가 더 필요하다. */
   'game:useSpecialist': (
     payload: { targetId?: string; value?: number; cardIndex?: number },
     ack: (result: Result<null>) => void,
   ) => void
 }
+
+/**
+ * 한 줄의 말.
+ *
+ * 카드 이야기를 금지하는 게임이지만, 그것은 사람끼리 지키는 약속이지 화면이 막을 일이
+ * 아니다. 서버는 누가 언제 무엇을 말했는지만 옮긴다.
+ */
+export interface ChatMessage {
+  id: number
+  playerId: string
+  /** 동명이인이 갈린 이름. 자리에 붙는 이름과 같아야 누가 한 말인지 이어진다. */
+  name: string
+  text: string
+  at: number
+}
+
+/** 한 줄의 길이. 길어지면 화면이 아니라 대화가 무너진다. */
+export const CHAT_MAX = 200
+
+/** 방이 들고 있는 지난 말의 수. 새로고침한 사람이 흐름을 잡을 만큼만. */
+export const CHAT_KEEP = 50
 
 /** 서버 → 클라이언트. */
 export interface ServerToClientEvents {
@@ -189,6 +212,10 @@ export interface ServerToClientEvents {
    * 남이 내 토큰을 가져간 것과 내가 스스로 놓은 것이 구별되지 않아, 서버가 짚어 준다.
    */
   'game:toast': (payload: { text: string; tone?: 'info' | 'warn' }) => void
+  /** 누군가 한 말. 그 방 전체에 간다. */
+  'chat:message': (message: ChatMessage) => void
+  /** 방에 들어온 사람에게만. 새로고침해도 앞의 흐름이 남는다. */
+  'chat:history': (payload: { messages: ChatMessage[] }) => void
 }
 
 export const NICKNAME_MAX = 12

@@ -15,6 +15,7 @@ import {
 } from '@the-gang/shared'
 
 import { CardPicker } from '../components/CardPicker.tsx'
+import { Chat } from '../components/Chat.tsx'
 import { SpecialistGrid } from '../components/SpecialistGrid.tsx'
 import { ConfirmModal } from '../components/Modal.tsx'
 import { getNickname, getPlayerId } from '../lib/identity.ts'
@@ -289,6 +290,12 @@ export function RoomPage() {
           <LeaveMessage isHost={iAmHost} successorName={successor?.displayName} />
         </ConfirmModal>
       )}
+
+      {/*
+        대화는 방에 속한다. 대기실에서 하던 말이 판으로, 판에서 하던 말이 다시 대기실로
+        이어진다 — 화면을 옮길 때마다 방에 다시 들어가고, 서버가 지난 말을 건네주기 때문이다.
+      */}
+      <Chat code={code} />
     </main>
   )
 }
