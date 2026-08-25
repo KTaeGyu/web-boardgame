@@ -197,7 +197,10 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
       bind(socket, playerId, result.value.code)
       ack(result)
       sendRoomList()
-      socket.emit('chat:history', { messages: store.chatOf(result.value.code) })
+      socket.emit('chat:history', {
+        messages: store.chatOf(result.value.code),
+        since: store.openedAt(result.value.code),
+      })
     })
 
     socket.on('room:join', (payload, ack) => {
@@ -224,7 +227,7 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
       ack(result)
       announce(result.value)
       // 새로고침·재접속도 이 길로 온다. 앞의 흐름이 없으면 대화가 매번 끊긴다.
-      socket.emit('chat:history', { messages: store.chatOf(code) })
+      socket.emit('chat:history', { messages: store.chatOf(code), since: store.openedAt(code) })
 
       // 판이 도는 중에 돌아온 것이라면 자리와 손패를 되돌려준다.
       const game = games.get(code)
@@ -369,7 +372,7 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
       // 들어오자마자 지금 판과 지난 대화를 한 번 건넨다. 다음 동작을 기다릴 이유가 없다.
       const game = games.get(code)
       if (game) socket.emit('game:state', game.view())
-      socket.emit('chat:history', { messages: store.chatOf(code) })
+      socket.emit('chat:history', { messages: store.chatOf(code), since: store.openedAt(code) })
     })
 
     socket.on('room:leave', (ack) => {

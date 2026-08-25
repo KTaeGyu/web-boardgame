@@ -534,3 +534,22 @@ describe('내보내기', () => {
     assert.equal(store.joinRoom('p2', '민수', other).ok, true)
   })
 })
+
+describe('방이 열린 시각', () => {
+  it('번호가 같아도 다른 방이면 시각이 다르다', () => {
+    const ctx = makeStore()
+    const first = seed(ctx.store, ['p1'])
+    const openedFirst = ctx.store.openedAt(first)
+
+    // 마지막 사람이 나가면 방이 닫히고, 그 번호는 다시 쓰일 수 있다.
+    ctx.store.leaveRoom('p1')
+    assert.equal(ctx.store.openedAt(first), 0, '없는 방은 0 이다')
+
+    ctx.advance(60_000)
+    const created = ctx.store.createRoom('p2', '민수')
+    assert.equal(created.ok, true)
+
+    const second = created.ok ? created.value.code : ''
+    assert.notEqual(ctx.store.openedAt(second), openedFirst, '시각이 같으면 창이 두 방을 구별하지 못한다')
+  })
+})

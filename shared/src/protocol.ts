@@ -277,8 +277,13 @@ export interface ServerToClientEvents {
   'game:toast': (payload: { text: string; tone?: 'info' | 'warn' }) => void
   /** 누군가 한 말. 그 방 전체에 간다. */
   'chat:message': (message: ChatMessage) => void
-  /** 방에 들어온 사람에게만. 새로고침해도 앞의 흐름이 남는다. */
-  'chat:history': (payload: { messages: ChatMessage[] }) => void
+  /**
+   * 방에 들어온 사람에게만. 새로고침해도 앞의 흐름이 남는다.
+   *
+   * `since` 는 이 방이 열린 시각이다. 방 번호는 네 자리라 닫힌 방의 번호가 다시 쓰일 수
+   * 있는데, 번호만 보고 「같은 방」이라 여기면 창에 남은 옛 대화가 남의 새 방에 섞인다.
+   */
+  'chat:history': (payload: { messages: ChatMessage[]; since: number }) => void
   /**
    * 튜토리얼 안내. 스스로 사라지지 않는다 — 읽고 닫을 때까지 판이 멈춰 서 있다.
    *

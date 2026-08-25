@@ -359,6 +359,17 @@ export class RoomStore {
     return room ? [...room.chat] : []
   }
 
+  /**
+   * 이 방이 열린 시각.
+   *
+   * 번호가 같아도 다른 방일 수 있다 — 닫힌 방의 번호는 다시 쓰인다. 창이 들고 있는
+   * 옛 대화가 남의 방에 섞이지 않으려면 번호 말고 하나가 더 필요하다.
+   */
+  openedAt(code: string | null): number {
+    const room = code ? this.rooms.get(code) : undefined
+    return room ? room.createdAt : 0
+  }
+
   touch(code: string | null): void {
     const room = code ? this.rooms.get(code.toUpperCase()) : undefined
     if (room) room.lastActivityAt = this.now()

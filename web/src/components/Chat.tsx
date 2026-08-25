@@ -29,30 +29,49 @@ const LOCAL_KEEP = 300
  * 지난 것은 그 자리에서 밀어버린다. 창마다 따로여야 하므로 sessionStorage 다 —
  * 여러 창으로 여러 사람을 흉내 낼 때 서로 섞이면 안 된다.
  *
+ * 번호만으로는 같은 방인지 알 수 없다. 방 번호는 네 자리라 닫힌 방의 번호가 다시 쓰이는데,
+ * 그때 옛 대화가 남의 새 방에 섞인다. 그래서 방이 열린 시각(since)을 함께 적어 두고
+ * 둘 다 같아야 이어 붙인다.
+ *
  * 서버도 방마다 마지막 CHAT_KEEP 줄을 들고 있다가 들어올 때 건넨다. 이쪽은 그것이
  * 사라진 뒤(서버 재시작·방 닫힘)에도 내 화면에 남기려는 것이고, 둘은 id 로 합친다.
  */
 const STORE_KEY = 'the-gang:chat'
 
-function loadSaved(code: string): ChatMessage[] {
+interface Saved {
+  code: string
+  /** 방이 열린 시각. 서버가 건네주기 전에는 0 이다. */
+  since: number
+  messages: ChatMessage[]
+}
+
+function loadSaved(code: string): Saved {
+  const empty: Saved = { code, since: 0, messages: [] }
   try {
     const raw = sessionStorage.getItem(STORE_KEY)
-    if (!raw) return []
-    const saved = JSON.parse(raw) as { code?: string; messages?: ChatMessage[] }
+    if (!raw) return empty
+    const saved = JSON.parse(raw) as Partial<Saved>
     if (saved.code !== code) {
       sessionStorage.removeItem(STORE_KEY)
-      return []
+      return empty
     }
-    return Array.isArray(saved.messages) ? saved.messages : []
+    return {
+      code,
+      since: typeof saved.since === 'number' ? saved.since : 0,
+      messages: Array.isArray(saved.messages) ? saved.messages : [],
+    }
   } catch {
     // 저장이 막혔거나 형태가 깨졌다. 지난 대화가 없는 것으로 친다.
-    return []
+    return empty
   }
 }
 
-function save(code: string, messages: ChatMessage[]): void {
+function save(code: string, since: number, messages: ChatMessage[]): void {
   try {
-    sessionStorage.setItem(STORE_KEY, JSON.stringify({ code, messages: messages.slice(-LOCAL_KEEP) }))
+    sessionStorage.setItem(
+      STORE_KEY,
+      JSON.stringify({ code, since, messages: messages.slice(-LOCAL_KEEP) }),
+    )
   } catch {
     /* 기억하지 못할 뿐이다 */
   }
@@ -68,7 +87,9 @@ function mergeById(a: ChatMessage[], b: ChatMessage[]): ChatMessage[] {
 export function Chat({ code }: { code: string }) {
   const me = getPlayerId()
   const [open, setOpen] = useState(false)
-  const [messages, setMessages] = useState<ChatMessage[]>(() => loadSaved(code))
+  const [messages, setMessages] = useState<ChatMessage[]>(() => loadSaved(code).messages)
+  /** 창이 들고 있는 대화가 어느 방의 것인가. 서버가 건네주는 시각과 맞춰 본다. */
+  const sinceRef = useRef(loadSaved(code).since)
   const [draft, setDraft] = useState('')
   /** 서버가 거절한 이유. 도배로 막혔을 때가 거의 전부다. */
   const [notice, setNotice] = useState('')
@@ -84,11 +105,12 @@ export function Chat({ code }: { code: string }) {
 
   useServerEvent(
     'chat:history',
-    useCallback(
-      ({ messages: history }: { messages: ChatMessage[] }) =>
-        setMessages((current) => mergeById(current, history)),
-      [],
-    ),
+    useCallback(({ messages: history, since }: { messages: ChatMessage[]; since: number }) => {
+      // 번호는 같은데 열린 시각이 다르다 — 같은 자리에 선 다른 방이다. 옛 대화는 남의 것이다.
+      const stale = sinceRef.current !== 0 && since !== 0 && sinceRef.current !== since
+      sinceRef.current = since
+      setMessages((current) => (stale ? history : mergeById(current, history)))
+    }, []),
   )
 
   useServerEvent(
@@ -107,7 +129,7 @@ export function Chat({ code }: { code: string }) {
 
   // 오갈 때마다 적어 둔다. 화면을 옮기면 이 컴포넌트가 새로 서므로, 여기가 유일한 다리다.
   useEffect(() => {
-    save(code, messages)
+    save(code, sinceRef.current, messages)
   }, [code, messages])
 
   // 붙은 한 줄은 스스로 사라진다. 다음 말이 오면 시계도 다시 돈다.

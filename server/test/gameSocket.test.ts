@@ -340,3 +340,108 @@ describe('판이 도는 중의 이탈', () => {
     assert.deepEqual(backAgain.hands[0], before, '돌아왔는데 손패가 바뀌면 판이 무너진다')
   })
 })
+
+describe('관전', () => {
+  /** 자리 없이 붙는 사람. 손패와 대화가 어디까지 오는지 지켜본다. */
+  async function watcherFor(code: string, tag: string) {
+    const socket = connect(url, { transports: ['websocket'], forceNew: true })
+    open.push(socket)
+    await new Promise<void>((resolve, reject) => {
+      socket.once('connect', () => resolve())
+      socket.once('connect_error', reject)
+    })
+
+    const hands: Card[][] = []
+    const states: GameView[] = []
+    const chats: { name: string; text: string; spectator?: boolean }[] = []
+    socket.on('game:hand', (payload: { hole: Card[] }) => hands.push(payload.hole))
+    socket.on('game:state', (view: GameView) => states.push(view))
+    socket.on('chat:message', (message: { name: string; text: string; spectator?: boolean }) =>
+      chats.push(message),
+    )
+
+    const playerId = `${tag}`.padEnd(12, 'w')
+    const view = unwrap(
+      await call<RoomView>(socket, 'room:spectate', { playerId, nickname: '구경꾼', code }),
+    )
+    return { socket, playerId, hands, states, chats, view }
+  }
+
+  it('공개 상태는 받지만 손패는 받지 않는다', async () => {
+    const { host, code } = await seatThree()
+    unwrap(await call<GameView>(host.socket, 'game:start'))
+
+    const watcher = await watcherFor(code, 'watch1')
+    await until<GameView>(watcher.socket, 'game:state', (view) => view.heist === 1, 3000).catch(() => null)
+
+    const seen = watcher.states[watcher.states.length - 1]
+    assert.ok(seen, '공개 상태가 와야 판을 볼 수 있다')
+    assert.equal(watcher.hands.length, 0, '자리가 없는 사람에게 손패가 가면 안 된다')
+    assert.ok(
+      seen.players.every((player) => player.hole === null),
+      '쇼다운 전에는 누구의 홀카드도 공개 상태에 없다',
+    )
+  })
+
+  it('관전자의 말에는 관전 표시가 붙는다', async () => {
+    const { host, code } = await seatThree()
+    unwrap(await call<GameView>(host.socket, 'game:start'))
+
+    const watcher = await watcherFor(code, 'watch2')
+    const heard = until<{ text: string; spectator?: boolean }>(
+      host.socket,
+      'chat:message',
+      (message) => message.text === '재밌겠다',
+    )
+    unwrap(await call<null>(watcher.socket, 'chat:send', { text: '재밌겠다' }))
+
+    const message = await heard
+    assert.equal(message.spectator, true, '판 밖의 말은 선언과 무게가 다르다')
+  })
+
+  it('앉은 사람의 말에는 표시가 없다', async () => {
+    const { host, code } = await seatThree()
+    const watcher = await watcherFor(code, 'watch3')
+
+    const heard = until<{ text: string; spectator?: boolean }>(
+      watcher.socket,
+      'chat:message',
+      (message) => message.text === '시작할게',
+    )
+    unwrap(await call<null>(host.socket, 'chat:send', { text: '시작할게' }))
+
+    const message = await heard
+    assert.equal(message.spectator, undefined)
+  })
+})
+
+describe('내보내기', () => {
+  it('내보내진 사람에게만 이유가 간다', async () => {
+    const { host, guests } = await seatThree()
+
+    const kicked = until<{ message: string }>(guests[0].socket, 'room:kicked', () => true)
+    const others: unknown[] = []
+    guests[1].socket.on('room:kicked', (payload: unknown) => others.push(payload))
+
+    unwrap(await call<null>(host.socket, 'room:kick', { playerId: guests[0].playerId }))
+    const notice = await kicked
+    assert.match(notice.message, /내보냈습니다/)
+    assert.equal(others.length, 0, '남은 사람에게 갈 말이 아니다')
+  })
+
+  it('판이 도는 중에는 내보낼 수 없다', async () => {
+    const { host, guests } = await seatThree()
+    unwrap(await call<GameView>(host.socket, 'game:start'))
+
+    const result = await call<null>(host.socket, 'room:kick', { playerId: guests[0].playerId })
+    assert.equal(result.ok, false, '자리가 비면 라운드가 끝나지 않아 판이 통째로 접힌다')
+    if (!result.ok) assert.equal(result.code, 'WRONG_PHASE')
+  })
+
+  it('방장이 아니면 내보낼 수 없다', async () => {
+    const { guests } = await seatThree()
+    const result = await call<null>(guests[0].socket, 'room:kick', { playerId: guests[1].playerId })
+    assert.equal(result.ok, false)
+    if (!result.ok) assert.equal(result.code, 'NOT_HOST')
+  })
+})
