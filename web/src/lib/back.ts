@@ -14,6 +14,18 @@ import { useEffect, useRef } from 'react'
 /** 우리가 쌓은 칸인지 알아보는 표시. 라우터가 쌓은 칸과 갈라야 한다. */
 const MARK = 'theGangBackGuard'
 
+/*
+ * 우리가 스스로 부른 back 이 몇 번 돌아오고 있는가.
+ *
+ * 칸을 걷어내려고 back 을 부르면 그것도 popstate 로 돌아온다. 그 신호를 사용자가 누른
+ * 것으로 받으면 엉뚱한 일이 벌어진다 — 개발 모드는 효과를 두 번 실행하므로
+ * 「쌓기 → 걷어내기 → 다시 쌓기」가 일어나고, 걷어내며 부른 back 이 새로 쌓은 가드에
+ * 잡혀 방을 만들자마자 나가졌다.
+ *
+ * 훅 하나가 아니라 파일 하나에 둔다. 걷어내는 쪽과 받는 쪽이 서로 다른 가드일 수 있다.
+ */
+let unwinding = 0
+
 /**
  * @param active 지금 지키고 있는가.
  * @param onBack 뒤로가기가 눌렸다. 무엇을 할지는 부르는 쪽이 정한다.
@@ -31,6 +43,11 @@ export function useBackIntercept(active: boolean, onBack: () => void, keep = fal
     push()
 
     const onPop = () => {
+      // 우리가 걷어내려고 부른 back 이다. 사용자가 누른 것이 아니다.
+      if (unwinding > 0) {
+        unwinding -= 1
+        return
+      }
       if (!armed) return
       // 화면이 그대로 남는다면 칸을 다시 쌓는다. 그러지 않으면 다음 뒤로가기에 그냥 나간다.
       if (keep) push()
@@ -48,7 +65,10 @@ export function useBackIntercept(active: boolean, onBack: () => void, keep = fal
        * 건드리지 않는다 — 여기서 back 을 부르면 방금 한 이동이 취소된다.
        */
       const state = window.history.state as Record<string, unknown> | null
-      if (state?.[MARK]) window.history.back()
+      if (state?.[MARK]) {
+        unwinding += 1
+        window.history.back()
+      }
     }
   }, [active, keep])
 }
