@@ -11,6 +11,8 @@ interface Props {
    * 눌러 봐야 거절당한다. 흔들리는 것보다 잠긴 편이 낫다.
    */
   busy?: boolean
+  /** 내가 쥐고 있는 토큰. 누르면 가져오는 것이 아니라 내려놓는다. */
+  mine?: boolean
   onClick?: () => void
   /** 지난 라운드에 확정된 토큰. 눌리지 않고 작게 표시한다. */
   settled?: boolean
@@ -28,6 +30,7 @@ export function Token({
   locked = false,
   stuck = false,
   busy = false,
+  mine = false,
   onClick,
   settled = false,
   innerRef,
@@ -66,8 +69,16 @@ export function Token({
        * 답해 준다. 아무 반응도 없는 단추는 고장으로 보인다.
        */
       disabled={busy || (locked && !stuck)}
-      aria-label={`${value}번 토큰 가져오기${stuck ? ' — 한 번 정해지면 바뀌지 않습니다' : ''}`}
-      title={stuck ? '한 번 정해지면 바뀌지 않는 토큰입니다' : undefined}
+      aria-label={`${value}번 토큰 ${mine ? '내려놓기' : '가져오기'}${
+        stuck ? ' — 한 번 정해지면 바뀌지 않습니다' : ''
+      }`}
+      title={
+        stuck
+          ? '한 번 정해지면 바뀌지 않는 토큰입니다'
+          : mine
+            ? '누르면 가운데로 돌려놓습니다'
+            : undefined
+      }
     >
       {value}
     </button>

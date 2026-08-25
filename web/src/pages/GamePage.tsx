@@ -23,6 +23,7 @@ import { CardSlot, PlayingCard } from '../components/PlayingCard.tsx'
 import { Token, TokenBlank } from '../components/Token.tsx'
 import { record } from '../lib/history.ts'
 import { getNickname, getPlayerId } from '../lib/identity.ts'
+import { sfx } from '../lib/sfx.ts'
 import { call, socket, useServerEvent } from '../lib/socket.ts'
 import { useEscape } from '../lib/useEscape.ts'
 import { useTokenFlight } from '../lib/useTokenFlight.ts'
@@ -272,6 +273,12 @@ export function GamePage({ spectating = false }: { spectating?: boolean } = {}) 
     'game:toast',
     useCallback(
       (payload: { text: string; tone?: 'info' | 'warn' }) => {
+        /*
+         * 뺏긴 것과 「내려놓을 수 없다」는 둘 다 warn 이지만 성격이 다르다. 서버가
+         * 종류를 따로 보내지 않아 문구로 가른다 — server/src/game.ts 의 그 한 줄이
+         * 바뀌면 여기도 함께 본다. 어긋나도 소리 하나가 달라질 뿐이다.
+         */
+        if (payload.tone === 'warn') sfx(payload.text.includes('뺏겼') ? 'steal' : 'deny')
         const id = (toastSeq.current += 1)
         // 세 줄까지만 남긴다. 그 이상 쌓이면 판이 가려진다.
         setToasts((current) =>
@@ -325,6 +332,21 @@ export function GamePage({ spectating = false }: { spectating?: boolean } = {}) 
     ),
   )
 
+  /*
+   * 보드에 카드가 깔릴 때 소리를 낸다.
+   *
+   * 라운드 번호가 아니라 깔린 장수를 센다 — 플롭은 한 번에 세 장이라 세 번 울려야
+   * 눈에 보이는 것과 맞는다. 처음 받은 상태는 「지금 이만큼 깔려 있다」이지 방금
+   * 깔린 것이 아니므로 건너뛴다. 새로고침할 때마다 리버가 울리면 안 된다.
+   */
+  const communityCount = game?.community.length ?? 0
+  const dealtBefore = useRef<number | null>(null)
+  useEffect(() => {
+    const before = dealtBefore.current
+    dealtBefore.current = communityCount
+    if (before !== null && communityCount > before) sfx('deal', communityCount - before)
+  }, [communityCount])
+
   /** 쇼다운에 들어서면 한 명씩 뒤집는다. 다음 판이 시작되면 처음으로 되돌린다. */
   const phase = game?.phase
   const showdownKey = `${game?.heist ?? 0}:${phase}`
@@ -358,9 +380,15 @@ export function GamePage({ spectating = false }: { spectating?: boolean } = {}) 
       at(REVEAL_STEP_MS * index, () => {
         setRevealed(index)
         // 첫 사람은 비교할 상대가 없다. 두 번째부터 사슬이 이어졌는지 판정이 선다.
-        if (index < 2) return
+        if (index < 2) {
+          // 판정은 없지만 소리는 낸다. 여기가 계단의 첫 칸이다.
+          sfx('revealOk', 0)
+          return
+        }
         const ok = revealsRef.current[index - 1]?.ok ?? true
         const key = `p${index}`
+        // 한 사람마다 반음씩 오른다. 사슬이 이어지는 중임을 글자보다 먼저 알린다.
+        sfx(ok ? 'revealOk' : 'revealBad', index - 1)
         setFlash({ key, text: ok ? '성공' : '실패', tone: ok ? 'ok' : 'bad' })
         at(VERDICT_MS, () => setFlash((current) => (current?.key === key ? null : current)))
       })
@@ -370,6 +398,7 @@ export function GamePage({ spectating = false }: { spectating?: boolean } = {}) 
     at(REVEAL_STEP_MS * revealCount + VERDICT_MS + FINAL_GAP_MS, () => {
       const success = successRef.current
       setFinished(true)
+      sfx(success ? 'vault' : 'alarm')
       setFlash({
         key: 'final',
         // 스캔에 걸린 것이면 순서는 맞았을 수 있다. 무엇에 걸렸는지 짚어 준다.
@@ -435,8 +464,12 @@ export function GamePage({ spectating = false }: { spectating?: boolean } = {}) 
 
   async function take(token: number) {
     const result = await call<null>('game:take', { token })
-    if (result.ok) return
+    if (result.ok) {
+      sfx('take')
+      return
+    }
     // 거절은 조용히 씹지 않는다. 눌렀는데 아무 일도 안 일어나는 게 제일 나쁘다.
+    sfx('deny')
     setRejected(token)
     setTimeout(() => setRejected(null), 450)
   }
@@ -663,6 +696,7 @@ export function GamePage({ spectating = false }: { spectating?: boolean } = {}) 
               stuckTokens={game.stuckTokens}
               rejected={rejected}
               busy={flying}
+              mine
               tokenRef={tokenRef}
               onTakeToken={take}
             />
@@ -818,6 +852,8 @@ interface SeatProps {
   rejected: number | null
   /** 내 토큰이 날아가는 중. 도착할 때까지 아무것도 누를 수 없다. */
   busy: boolean
+  /** 내 자리인가. 내 토큰은 누르면 가져오는 것이 아니라 내려놓는 것이다. */
+  mine?: boolean
   tokenRef: (token: number) => (node: HTMLElement | null) => void
   onTakeToken: (token: number) => void
 }
@@ -856,6 +892,7 @@ function TokenTrack({
   stuckTokens,
   rejected,
   busy,
+  mine = false,
   tokenRef,
   onTakeToken,
 }: SeatProps) {
@@ -875,6 +912,7 @@ function TokenTrack({
               locked={lockedTokens.includes(player.currentToken)}
               stuck={stuckTokens.includes(player.currentToken)}
               busy={busy}
+              mine={mine}
               innerRef={tokenRef(player.currentToken)}
               onClick={() => onTakeToken(player.currentToken as number)}
             />

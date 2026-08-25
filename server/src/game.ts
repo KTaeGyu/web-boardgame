@@ -539,11 +539,23 @@ export class Game {
 
     const holder = this.holders.get(token)
     if (holder === playerId) {
-      // 쥔 것을 다시 누르는 것은 「내려놓겠다」는 뜻이다. 붙박이라면 그것이 막힌 이유다.
+      /*
+       * 쥔 것을 다시 누르는 것은 「내려놓겠다」는 뜻이다.
+       *
+       * 선언을 무르는 자리가 있어야 한다. 남의 것을 뺏어야만 내 것을 놓을 수 있으면,
+       * 생각이 바뀐 사람은 남의 자리를 흔들지 않고서는 물러설 수 없다.
+       * 붙박이는 한 번 정해지면 되돌릴 수 없으니 그것이 막힌 이유다.
+       */
       if (this.stuckTokens().includes(token)) {
         this.tell(playerId, `「${this.stuckCardName(token)}」 — 내려놓을 수 없습니다`, 'warn')
+        return err('TOKEN_LOCKED', '이 토큰은 한 번 정해지면 바꿀 수 없습니다.')
       }
-      return err('INVALID_TOKEN', '이미 쥐고 있는 토큰입니다.')
+      this.holders.delete(token)
+      // 중앙으로 돌아가는 동안에도 날아가는 중이라 아무도 만질 수 없다.
+      this.lockedUntil.set(token, now + this.lockMs)
+      // 한 사람이 선언을 무르면 남의 판단도 달라질 수 있다. 모두의 확정이 풀린다.
+      for (const s of this.seats) s.ready = false
+      return OK
     }
 
     // 붙박이 토큰은 한 번 주인이 정해지면 그 판단을 되돌릴 수 없다.

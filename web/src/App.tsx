@@ -4,6 +4,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { DensityToggle } from './components/DensityToggle.tsx'
 import { ReportLink } from './components/ReportLink.tsx'
 import { ServerGate } from './components/ServerGate.tsx'
+import { SoundToggle } from './components/SoundToggle.tsx'
 import { ThemeToggle } from './components/ThemeToggle.tsx'
 import { HomePage } from './pages/HomePage.tsx'
 import { RoomPage } from './pages/RoomPage.tsx'
@@ -69,6 +70,7 @@ function Tools() {
   return (
     <div className="tools">
       <ReportLink />
+      <SoundToggle />
       <DensityToggle />
       <ThemeToggle />
     </div>

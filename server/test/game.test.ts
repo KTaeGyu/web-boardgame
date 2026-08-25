@@ -106,11 +106,43 @@ describe('토큰 집기', () => {
     assert.ok(view.centerTokens.includes(1))
   })
 
-  it('이미 쥐고 있는 토큰은 다시 집을 수 없다', () => {
+  it('쥐고 있던 것을 다시 누르면 중앙으로 돌려놓는다', () => {
+    // 선언을 무르는 자리다. 남의 것을 뺏어야만 내 것을 놓을 수 있으면,
+    // 생각이 바뀐 사람은 남의 자리를 흔들지 않고서는 물러설 수 없다.
+    const ctx = makeGame(3)
+    assert.equal(ctx.game.takeToken('p1', 1).ok, true)
+    ctx.advance(TOKEN_LOCK_MS)
+
+    assert.equal(ctx.game.takeToken('p1', 1).ok, true, '다시 누르면 내려놓는다')
+    const view = ctx.game.view()
+    assert.equal(view.players.find((p) => p.id === 'p1')?.currentToken, null)
+    assert.deepEqual(view.centerTokens, [1, 2, 3], '중앙으로 돌아간다')
+  })
+
+  it('내려놓은 토큰도 날아가는 동안은 잠긴다', () => {
     const ctx = makeGame(3)
     ctx.game.takeToken('p1', 1)
     ctx.advance(TOKEN_LOCK_MS)
-    assert.equal(ctx.game.takeToken('p1', 1).ok, false)
+    ctx.game.takeToken('p1', 1)
+
+    assert.equal(ctx.game.view().lockedTokens.includes(1), true)
+    assert.equal(ctx.game.takeToken('p2', 1).ok, false, '비행 중인 토큰은 낚아챌 수 없다')
+    ctx.advance(TOKEN_LOCK_MS)
+    assert.equal(ctx.game.takeToken('p2', 1).ok, true, '도착하면 아무나 집을 수 있다')
+  })
+
+  it('내려놓으면 확정이 풀리고 다시 확정할 수 없다', () => {
+    const ctx = makeGame(3)
+    dealTokens(ctx)
+    for (const id of ctx.ids) assert.equal(ctx.game.setReady(id, true).ok, true, `${id} 확정`)
+    // 셋이 다 확정하면 라운드가 넘어가므로, 마지막 한 명은 확정을 물려 두고 시작한다.
+    assert.equal(ctx.game.setReady('p3', false).ok, true)
+
+    assert.equal(ctx.game.takeToken('p1', 1).ok, true, '내려놓기')
+    const view = ctx.game.view()
+    assert.equal(view.players.every((p) => !p.ready), true, '모두의 확정이 풀린다')
+    assert.equal(view.canConfirm, false, '한 자리가 비었으니 확정할 수 없다')
+    assert.equal(ctx.game.setReady('p2', true).ok, false)
   })
 
   it('판에 없는 사람은 집을 수 없다', () => {
