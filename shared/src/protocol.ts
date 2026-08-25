@@ -31,6 +31,14 @@ export const GAME_MODE_HINT: Record<GameMode, string> = {
 }
 
 export const MIN_PLAYERS = 3
+
+/**
+ * 한 방에서 보고만 있을 수 있는 사람 수.
+ *
+ * 자리에 앉은 사람보다 구경꾼이 많으면 방이 무엇을 하는 곳인지 흐려진다.
+ * 접속 한도와 다른 이야기다 — 저쪽은 서버가 감당할 양이고 이쪽은 방의 모양이다.
+ */
+export const MAX_SPECTATORS = 5
 export const MAX_PLAYERS_LIMIT = 10
 
 export interface RoomSettings {
@@ -79,6 +87,8 @@ export interface RoomSummary {
   playerCount: number
   maxPlayers: number
   phase: RoomPhase
+  /** 자리 없이 보고만 있는 사람 수. 판이 도는 방에만 붙는다. */
+  spectatorCount: number
 }
 
 /** 방 안에 있는 사람이 보는 전체 상태. */
@@ -88,6 +98,15 @@ export interface RoomView {
   players: PlayerView[]
   settings: RoomSettings
   phase: RoomPhase
+  /** 자리 없이 보고만 있는 사람들. 대기실에서도 판에서도 보인다. */
+  spectators: { id: string; nickname: string }[]
+  /**
+   * 혼자 해보는 방인가.
+   *
+   * 화면이 알아야 하는 것은 「방장이냐」가 아니라 「돌아갈 대기실이 있느냐」다.
+   * 튜토리얼은 만든 사람이 곧 방장이지만 그 방에 돌아갈 이유가 없다.
+   */
+  tutorial: boolean
 }
 
 /** 실패를 예외가 아니라 값으로 돌려준다. 화면이 사유별로 다르게 안내해야 하기 때문이다. */
@@ -108,6 +127,7 @@ export type ErrorCode =
   | 'WRONG_PHASE'
   | 'INVALID_TOKEN'
   | 'TOKEN_LOCKED'
+  | 'TOO_FAST'
 
 export type Result<T> = { ok: true; value: T } | { ok: false; code: ErrorCode; message: string }
 
@@ -148,6 +168,25 @@ export interface ClientToServerEvents {
     ack: (result: Result<null>) => void,
   ) => void
   /**
+   * 자리 없이 보기만 한다. 판이 도는 방에만 들어갈 수 있다.
+   *
+   * 공개 상태에는 쇼다운 전까지 누구의 홀카드도 없으므로, 그대로 흘려도 새는 것이 없다.
+   */
+  'room:spectate': (
+    payload: Identity & { code: string },
+    ack: (result: Result<RoomView>) => void,
+  ) => void
+  /**
+   * 방장이 한 사람을 내보낸다. 대기실에서만 할 수 있다.
+   *
+   * 판이 도는 중에는 열지 않는다 — 한 명이 빠지면 라운드가 끝나지 않아 판이 통째로
+   * 접힌다. 그건 내보내기가 아니라 판을 엎는 것이다.
+   */
+  'room:kick': (
+    payload: { playerId: string; ban?: boolean },
+    ack: (result: Result<null>) => void,
+  ) => void
+  /**
    * 혼자 해보는 판을 연다. 봇 둘이 함께 앉고, 곧바로 시작된다.
    *
    * 방을 만들고 시작하는 것이 한 동작인 이유는 대기실에서 기다릴 사람이 없기 때문이다.
@@ -177,6 +216,13 @@ export interface ChatMessage {
   name: string
   text: string
   at: number
+  /**
+   * 자리 없이 보고 있는 사람의 말인가.
+   *
+   * 표시해 두는 것은 규칙 때문이다 — 판 밖에 있는 사람의 말은 판 안의 선언과 무게가
+   * 다르다. 누가 한 말인지 모르면 관전자의 한마디가 선언처럼 읽힌다.
+   */
+  spectator?: boolean
 }
 
 /** 한 줄의 길이. 길어지면 화면이 아니라 대화가 무너진다. */
@@ -189,6 +235,8 @@ export const CHAT_KEEP = 50
 export interface ServerToClientEvents {
   'room:updated': (room: RoomView) => void
   'room:closed': (payload: { reason: 'empty' | 'hostClosed' | 'rematchDeclined' | 'idle' }) => void
+  /** 내보내진 사람에게만. 방이 닫힌 것과 구별해야 안내가 맞는다. */
+  'room:kicked': (payload: { message: string }) => void
   /** 서버가 감당할 수 있는 인원을 넘겼다. 곧 연결이 끊긴다. */
   'server:full': (payload: { message: string }) => void
   'rooms:changed': (rooms: RoomSummary[]) => void

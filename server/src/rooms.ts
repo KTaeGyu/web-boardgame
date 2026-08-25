@@ -11,6 +11,7 @@ import {
   DEFAULT_SETTINGS,
   GAME_MODES,
   MAX_PLAYERS_LIMIT,
+  MAX_SPECTATORS,
   MIN_PLAYERS,
   READY_CHALLENGES,
   READY_SPECIALISTS,
@@ -60,6 +61,16 @@ interface Room {
   lastActivityAt: number
   /** 지난 말. 방과 함께 살고 방과 함께 사라진다. */
   chat: ChatMessage[]
+  /**
+   * 자리 없이 보고만 있는 사람들. 방을 살려두지 못한다 —
+   * 자리에 앉은 사람이 하나도 없으면 관전자가 남아 있어도 방은 닫힌다.
+   */
+  spectators: { id: string; nickname: string }[]
+  /**
+   * 내보내진 사람들. 방이 사라지면 함께 사라진다 — 영구 차단이 아니라 이 방에서만이다.
+   * 이것이 없으면 내보내도 번호만 다시 치면 들어와, 내보내기가 뜻을 잃는다.
+   */
+  banned: Set<string>
   /**
    * 혼자 해보는 방인가. 목록에 뜨지 않고, 사람이 빠지면 그대로 닫힌다.
    * 봇만 남은 방은 아무도 없는 방이지만 인원이 0 이 아니라 저절로 닫히지 않는다.
@@ -127,6 +138,8 @@ export class RoomStore {
       chat: [],
       chatSeq: 0,
       tutorial: false,
+      banned: new Set(),
+      spectators: [],
     }
     this.rooms.set(code, room)
     this.whereIs.set(playerId, code)
@@ -155,6 +168,84 @@ export class RoomStore {
     return ok(toView(room))
   }
 
+  /**
+   * 자리 없이 보기만 한다.
+   *
+   * 판이 도는 방에만 들어간다 — 대기실은 볼 것이 없고, 들어갈 거면 자리에 앉으면 된다.
+   */
+  spectate(playerId: string, nickname: string, code: string): Result<RoomView> {
+    const room = this.rooms.get(code.toUpperCase())
+    if (!room) return err('ROOM_NOT_FOUND', '없는 방입니다. 방 번호를 다시 확인해 주세요.')
+    if (room.tutorial) return err('ROOM_NOT_FOUND', '없는 방입니다. 방 번호를 다시 확인해 주세요.')
+    if (room.banned.has(playerId)) return err('ROOM_NOT_FOUND', '이 방에는 다시 들어갈 수 없습니다.')
+
+    const seated = room.players.find((player) => player.id === playerId)
+    if (seated) {
+      /*
+       * 앉아 있던 사람이 스스로 물러나는 길. 대기실에서만 열어 둔다 —
+       * 판이 도는 중에 자리가 비면 라운드가 끝나지 않아 판이 통째로 접힌다.
+       */
+      if (room.phase !== 'lobby') {
+        return err('WRONG_PHASE', '판이 도는 중에는 관전으로 바꿀 수 없습니다.')
+      }
+      if (room.players.length <= 1) {
+        return err('INVALID_SETTINGS', '혼자 있는 방에서는 관전으로 바꿀 수 없습니다.')
+      }
+    }
+
+    const watching = room.spectators.some((watcher) => watcher.id === playerId)
+    if (!watching && room.spectators.length >= MAX_SPECTATORS) {
+      return err('ROOM_FULL', `관전은 ${MAX_SPECTATORS}명까지입니다.`)
+    }
+
+    // 다른 방에 앉아 있었다면 그 자리를 먼저 비운다. 한 사람은 한 번에 한 방에만 있는다.
+    if (this.whereIs.get(playerId) !== room.code) this.leaveRoom(playerId)
+
+    if (seated) {
+      room.players = room.players.filter((player) => player.id !== playerId)
+      // 방장이 물러났으면 자리에 앉아 있는 사람에게 넘긴다. 구경꾼은 방장이 될 수 없다.
+      if (room.hostId === playerId) room.hostId = nextHost(room)
+    }
+
+    const already = room.spectators.find((watcher) => watcher.id === playerId)
+    if (already) already.nickname = nickname
+    else room.spectators.push({ id: playerId, nickname })
+
+    this.whereIs.set(playerId, room.code)
+    room.lastActivityAt = this.now()
+    return ok(toView(room))
+  }
+
+  /** 자리 없이 보고 있는 중인가. 소켓 계층이 자리 처리와 갈라 쓴다. */
+  isSpectator(playerId: string): boolean {
+    const room = this.roomOf(playerId)
+    return room ? room.spectators.some((watcher) => watcher.id === playerId) : false
+  }
+
+  /**
+   * 방장이 한 사람을 내보낸다.
+   *
+   * 나가기와 같은 처리를 하되, 차단을 고르면 그 사람만 다시 못 들어오게 표시를 남긴다.
+   * 대기실에서만 허용하는 판단은 소켓 계층이 한다 — 여기서는 방의 규칙만 본다.
+   */
+  kick(hostId: string, targetId: string, ban = false): Result<RoomView> {
+    const code = this.whereIs.get(hostId)
+    const room = code ? this.rooms.get(code) : undefined
+    if (!room) return err('NOT_IN_ROOM', '방에 들어와 있지 않습니다.')
+    if (room.hostId !== hostId) return err('NOT_HOST', '방장만 내보낼 수 있습니다.')
+    if (targetId === hostId) return err('INVALID_SETTINGS', '자기 자신은 내보낼 수 없습니다.')
+
+    const target = room.players.find((player) => player.id === targetId)
+    if (!target) return err('NOT_IN_ROOM', '그 사람은 이 방에 없습니다.')
+
+    // 차단은 고른 사람만 받는다. 그냥 내보내면 번호를 알면 다시 들어올 수 있다.
+    if (ban) room.banned.add(targetId)
+    this.whereIs.delete(targetId)
+    room.players = room.players.filter((player) => player.id !== targetId)
+    room.lastActivityAt = this.now()
+    return ok(toView(room))
+  }
+
   /** 이 방이 혼자 해보는 방인가. 소켓 계층이 봇을 움직일지 판단한다. */
   isTutorial(code: string | null): boolean {
     return code ? (this.rooms.get(code)?.tutorial ?? false) : false
@@ -169,6 +260,12 @@ export class RoomStore {
   joinRoom(playerId: string, nickname: string, code: string): Result<RoomView> {
     const room = this.rooms.get(code.toUpperCase())
     if (!room) return err('ROOM_NOT_FOUND', '없는 방입니다. 방 번호를 다시 확인해 주세요.')
+    if (room.banned.has(playerId)) {
+      return err('ROOM_NOT_FOUND', '이 방에는 다시 들어갈 수 없습니다.')
+    }
+
+    // 보고 있던 사람이 자리에 앉으러 왔다. 두 곳에 동시에 있을 수는 없다.
+    room.spectators = room.spectators.filter((watcher) => watcher.id !== playerId)
 
     const existing = room.players.find((p) => p.id === playerId)
     if (existing) {
@@ -198,10 +295,17 @@ export class RoomStore {
     const room = this.rooms.get(code)
     if (!room) return { room: null, closedCode: null }
 
+    // 보고만 있던 사람은 자리를 비우는 것이 아니다. 방은 그대로 두고 목록에서만 뺀다.
+    const watching = room.spectators.some((watcher) => watcher.id === playerId)
+    if (watching) {
+      room.spectators = room.spectators.filter((watcher) => watcher.id !== playerId)
+      return { room: toView(room), closedCode: null }
+    }
+
     room.players = room.players.filter((p) => p.id !== playerId)
     // 봇만 남은 방은 아무도 없는 방이다. 인원이 0 이 아니라 저절로 닫히지 않으므로 여기서 닫는다.
     if (room.players.length === 0 || (room.tutorial && !room.players.some((p) => !p.bot))) {
-      for (const left of room.players) this.whereIs.delete(left.id)
+      for (const left of [...room.players, ...room.spectators]) this.whereIs.delete(left.id)
       this.rooms.delete(room.code)
       return { room: null, closedCode: room.code }
     }
@@ -227,18 +331,22 @@ export class RoomStore {
     if (!room) return null
 
     const index = room.players.findIndex((player) => player.id === playerId)
-    if (index < 0) return null
+    const watcher = index < 0 ? room.spectators.find((one) => one.id === playerId) : null
+    if (index < 0 && !watcher) return null
 
     const trimmed = text.trim().slice(0, CHAT_MAX)
     if (!trimmed) return null
 
+    // 앉은 사람의 이름은 자리에 붙는 것과 같은 규칙으로 짓는다. 관전자는 그 규칙 밖이라
+    // 자기 닉네임 그대로 쓰고, 대신 관전이라는 표시를 달아 보낸다.
     const names = displayNames(room.players.map((player) => player.nickname))
     const message: ChatMessage = {
       id: (room.chatSeq += 1),
       playerId,
-      name: names[index],
+      name: watcher ? watcher.nickname : names[index],
       text: trimmed,
       at: this.now(),
+      ...(watcher ? { spectator: true } : {}),
     }
     room.chat.push(message)
     if (room.chat.length > CHAT_KEEP) room.chat.splice(0, room.chat.length - CHAT_KEEP)
@@ -277,7 +385,7 @@ export class RoomStore {
     // 아무도 아무것도 하지 않은 방부터 접는다. 남은 사람이 있어도 접는다.
     for (const room of [...this.rooms.values()]) {
       if (now - room.lastActivityAt < this.idleMs) continue
-      for (const player of room.players) this.whereIs.delete(player.id)
+      for (const left of [...room.players, ...room.spectators]) this.whereIs.delete(left.id)
       this.rooms.delete(room.code)
       idleCodes.push(room.code)
     }
@@ -354,6 +462,7 @@ export class RoomStore {
         playerCount: connected.length,
         maxPlayers: room.settings.maxPlayers,
         phase: room.phase,
+        spectatorCount: room.spectators.length,
       })
     }
     return summaries.sort((a, b) => a.code.localeCompare(b.code))
@@ -416,5 +525,7 @@ function toView(room: Room): RoomView {
       specialistRounds: [...room.settings.specialistRounds],
     },
     phase: room.phase,
+    tutorial: room.tutorial,
+    spectators: room.spectators.map((watcher) => ({ ...watcher })),
   }
 }

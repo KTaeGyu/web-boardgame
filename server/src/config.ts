@@ -29,6 +29,16 @@ export const MAX_CONNECTIONS = Number(process.env.MAX_CONNECTIONS ?? 100)
 export const MAX_ROOMS = Number(process.env.MAX_ROOMS ?? 20)
 
 /**
+ * 대화 도배를 막는 한도.
+ *
+ * 1초에 열 줄을 넘기면 10초 동안 말할 수 없다. 사람이 손으로 칠 수 있는 속도가 아니므로,
+ * 여기에 걸리는 것은 붙여넣기나 장난이다. 규칙이 아니라 운영 한도다.
+ */
+export const CHAT_BURST = 10
+export const CHAT_WINDOW_MS = 1000
+export const CHAT_BLOCK_MS = 10_000
+
+/**
  * 아무도 아무것도 하지 않은 채 이만큼 지나면 방을 지운다.
  *
  * 끊김 유예(10분)와 다른 이야기다. 저쪽은 「연결이 살아 있는가」이고

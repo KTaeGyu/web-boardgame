@@ -19,7 +19,15 @@ import {
   normalizeNickname,
 } from '@the-gang/shared'
 
-import { IDLE_ROOM_MS, MAX_CONNECTIONS, MAX_ROOMS, SWEEP_INTERVAL_MS } from './config.ts'
+import {
+  CHAT_BLOCK_MS,
+  CHAT_BURST,
+  CHAT_WINDOW_MS,
+  IDLE_ROOM_MS,
+  MAX_CONNECTIONS,
+  MAX_ROOMS,
+  SWEEP_INTERVAL_MS,
+} from './config.ts'
 import { Game } from './game.ts'
 import { Tutorial } from './tutorial.ts'
 import { uniqueRoomCode } from './ids.ts'
@@ -69,6 +77,8 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
   const unlockTimers = new Map<string, NodeJS.Timeout>()
   /** 혼자 해보는 방의 진행자. 봇을 움직이고 안내를 띄운다. */
   const tutorials = new Map<string, Tutorial>()
+  /** 사람마다의 최근 말수. 도배를 막는 데만 쓴다. */
+  const chatRate = new Map<string, { times: number[]; blockedUntil: number }>()
 
   const sendRoom = (room: RoomView) => io.to(room.code).emit('room:updated', room)
   const sendLobbyStats = () =>
@@ -298,6 +308,31 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
         return ack({ ok: false, code: 'NOT_IN_ROOM', message: '방에 들어와 있지 않습니다.' })
       }
 
+      const now = Date.now()
+      const rate = chatRate.get(playerId) ?? { times: [], blockedUntil: 0 }
+      if (rate.blockedUntil > now) {
+        const left = Math.ceil((rate.blockedUntil - now) / 1000)
+        return ack({
+          ok: false,
+          code: 'TOO_FAST',
+          message: `너무 빠르게 보냈습니다. ${left}초 뒤에 다시 보낼 수 있습니다.`,
+        })
+      }
+      // 창 안에 남은 것만 세고 이번 것을 얹는다. 한도를 넘기면 그 순간부터 잠긴다.
+      rate.times = rate.times.filter((at) => now - at < CHAT_WINDOW_MS)
+      rate.times.push(now)
+      if (rate.times.length > CHAT_BURST) {
+        rate.blockedUntil = now + CHAT_BLOCK_MS
+        rate.times = []
+        chatRate.set(playerId, rate)
+        return ack({
+          ok: false,
+          code: 'TOO_FAST',
+          message: `너무 빠르게 보냈습니다. ${Math.round(CHAT_BLOCK_MS / 1000)}초 뒤에 다시 보낼 수 있습니다.`,
+        })
+      }
+      chatRate.set(playerId, rate)
+
       const message = store.addChat(playerId, String(text ?? ''))
       // 빈 말은 아무 일도 아니다. 오류로 만들면 화면이 붉어질 이유가 없는데 붉어진다.
       if (!message) return ack({ ok: true, value: null })
@@ -305,6 +340,36 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
       store.touch(code)
       io.to(code).emit('chat:message', message)
       ack({ ok: true, value: null })
+    })
+
+    /**
+     * 자리 없이 보기만 한다.
+     *
+     * 공개 상태에는 쇼다운 전까지 누구의 홀카드도 없다. 그래서 그대로 흘려도 새는 것이
+     * 없고, 관전자에게 따로 가리는 장치를 둘 필요도 없다. 손패(game:hand)만 안 가면 된다.
+     */
+    socket.on('room:spectate', (payload, ack) => {
+      const identity = readIdentity(payload)
+      if (!identity.ok) return ack(identity)
+      if (typeof payload.code !== 'string' || payload.code.trim() === '') {
+        return ack({ ok: false, code: 'ROOM_NOT_FOUND', message: '방 번호를 입력해 주세요.' })
+      }
+
+      const { playerId, nickname } = identity.value
+      const previous = store.codeOf(playerId)
+      const result = store.spectate(playerId, nickname, payload.code.trim())
+      if (!result.ok) return ack(result)
+
+      const code = result.value.code
+      if (previous && previous !== code) leftRoom(previous, playerId)
+      bind(socket, playerId, code)
+      ack(result)
+      announce(result.value)
+
+      // 들어오자마자 지금 판과 지난 대화를 한 번 건넨다. 다음 동작을 기다릴 이유가 없다.
+      const game = games.get(code)
+      if (game) socket.emit('game:state', game.view())
+      socket.emit('chat:history', { messages: store.chatOf(code) })
     })
 
     socket.on('room:leave', (ack) => {
@@ -320,6 +385,40 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
       if (code) leftRoom(code, playerId)
       if (closedCode) io.to(closedCode).emit('room:closed', { reason: 'empty' })
       announce(room)
+    })
+
+    /**
+     * 방장이 한 사람을 내보낸다.
+     *
+     * 대기실에서만 연다 — 판이 도는 중에 자리가 비면 라운드가 끝나지 않아 판이 통째로
+     * 접힌다. 그건 내보내기가 아니라 판을 엎는 것이라, 다른 단추로 있어야 한다.
+     */
+    socket.on('room:kick', ({ playerId: targetId, ban }, ack) => {
+      const hostId = playerOfSocket.get(socket.id)
+      const code = hostId ? store.codeOf(hostId) : null
+      const room = code ? store.view(code) : null
+      if (!hostId || !code || !room) {
+        return ack({ ok: false, code: 'NOT_IN_ROOM', message: '방에 들어와 있지 않습니다.' })
+      }
+      if (room.phase !== 'lobby') {
+        return ack({ ok: false, code: 'WRONG_PHASE', message: '판이 도는 중에는 내보낼 수 없습니다.' })
+      }
+
+      const result = store.kick(hostId, String(targetId ?? ''), Boolean(ban))
+      if (!result.ok) return ack(result)
+
+      // 내보내진 사람에게만 이유를 보낸다. 방이 닫힌 것과 구별되어야 안내가 맞는다.
+      const targetSocket = socketOfPlayer.get(String(targetId))
+      if (targetSocket) {
+        io.to(targetSocket).emit('room:kicked', {
+          message: ban ? '방장이 내보냈습니다. 이 방에는 다시 들어갈 수 없습니다.' : '방장이 내보냈습니다.',
+        })
+        io.sockets.sockets.get(targetSocket)?.leave(code)
+      }
+
+      store.touch(code)
+      ack({ ok: true, value: null })
+      announce(result.value)
     })
 
     socket.on('room:list', (ack) => ack({ ok: true, value: store.list() }))
@@ -531,12 +630,19 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
 
     socket.on('disconnect', () => {
       const playerId = playerOfSocket.get(socket.id)
+      if (playerId) chatRate.delete(playerId)
       unbind(socket.id, playerId)
       // 방에 들지 않은 사람이 나가도 「지금 몇 명」은 달라진다.
       setImmediate(sendLobbyStats)
       if (!playerId) return
 
       const code = store.codeOf(playerId)
+      // 보고만 있던 사람은 지켜줄 자리가 없다. 그 자리에서 목록에서 뺀다.
+      if (store.isSpectator(playerId)) {
+        const left = store.leaveRoom(playerId)
+        announce(left.room)
+        return
+      }
       // 나간 것이 아니라 끊긴 것이다. 자리는 유예 시간 동안 지켜준다.
       announce(store.markDisconnected(playerId))
       if (code) {

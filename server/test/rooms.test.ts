@@ -277,7 +277,7 @@ describe('방 목록', () => {
     const { store } = makeStore()
     const code = seed(store, ['p1', 'p2', 'p3'])
     assert.deepEqual(store.list(), [
-      { code, hostNickname: '태규', playerCount: 3, maxPlayers: 6, phase: 'lobby' },
+      { code, hostNickname: '태규', playerCount: 3, maxPlayers: 6, phase: 'lobby', spectatorCount: 0 },
     ])
   })
 
@@ -481,5 +481,56 @@ describe('대화', () => {
     ctx.store.sweep()
 
     assert.deepEqual(ctx.store.chatOf(code), [], '방이 없으면 지난 말도 없다')
+  })
+})
+
+describe('내보내기', () => {
+  it('방장만 내보낼 수 있다', () => {
+    const { store } = makeStore()
+    seed(store, ['p1', 'p2', 'p3'])
+    const notHost = store.kick('p2', 'p3')
+    assert.equal(notHost.ok, false)
+    if (!notHost.ok) assert.equal(notHost.code, 'NOT_HOST')
+  })
+
+  it('자기 자신은 내보낼 수 없다', () => {
+    const { store } = makeStore()
+    seed(store, ['p1', 'p2'])
+    assert.equal(store.kick('p1', 'p1').ok, false)
+  })
+
+  it('내보내면 자리가 비고 남은 사람은 그대로다', () => {
+    const { store } = makeStore()
+    const code = seed(store, ['p1', 'p2', 'p3'])
+    const result = store.kick('p1', 'p2')
+    assert.equal(result.ok, true)
+    assert.deepEqual(store.view(code)?.players.map((p) => p.id), ['p1', 'p3'])
+    assert.equal(store.codeOf('p2'), null, '어느 방에도 속하지 않는다')
+  })
+
+  it('그냥 내보내면 다시 들어올 수 있다', () => {
+    const { store } = makeStore()
+    const code = seed(store, ['p1', 'p2'])
+    store.kick('p1', 'p2')
+
+    assert.equal(store.joinRoom('p2', '민수', code).ok, true, '차단을 고르지 않았다')
+  })
+
+  it('차단하고 내보내면 번호를 알아도 다시 못 들어온다', () => {
+    const { store } = makeStore()
+    const code = seed(store, ['p1', 'p2'])
+    store.kick('p1', 'p2', true)
+
+    const again = store.joinRoom('p2', '민수', code)
+    assert.equal(again.ok, false, '차단이 뜻을 잃으면 고를 이유가 없다')
+  })
+
+  it('막는 것은 그 방뿐이다 — 다른 방에는 들어갈 수 있다', () => {
+    const { store } = makeStore()
+    seed(store, ['p1', 'p2'])
+    store.kick('p1', 'p2', true)
+
+    const other = seed(store, ['p3'])
+    assert.equal(store.joinRoom('p2', '민수', other).ok, true)
   })
 })
