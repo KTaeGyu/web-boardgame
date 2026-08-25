@@ -61,11 +61,11 @@ curl localhost:3001/healthz     # {"ok":true,"rooms":0}
 
 | 값 | 어디 | 무엇 |
 |----|------|------|
-| 30초 | `rooms.ts` `DISCONNECT_GRACE_MS` | 끊긴 사람의 자리를 지켜주는 시간 |
-| 10분 | `config.ts` `IDLE_ROOM_MS` | 아무 움직임 없는 방을 치우는 시간 |
+| 10분 | `rooms.ts` `DISCONNECT_GRACE_MS` | 끊긴 사람의 자리를 지켜주는 시간 |
+| 30분 | `config.ts` `IDLE_ROOM_MS` | 아무 움직임 없는 방을 치우는 시간 |
 | 5초 | `config.ts` `SWEEP_INTERVAL_MS` | 유예 넘긴 자리를 치우러 도는 주기 |
 
-**30초와 10분은 다른 이야기다.** 앞은 「연결이 살아 있는가」, 뒤는 「사람이 실제로 하고 있는가」다.
+**10분과 30분은 다른 이야기다.** 앞은 「연결이 살아 있는가」, 뒤는 「사람이 실제로 하고 있는가」다.
 
 ---
 

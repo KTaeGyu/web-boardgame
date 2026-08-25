@@ -27,8 +27,13 @@ import {
   type RoomView,
 } from '@the-gang/shared'
 
-/** 끊긴 사람의 자리를 지켜주는 시간. 새로고침이나 잠깐의 전파 끊김을 흡수한다. */
-export const DISCONNECT_GRACE_MS = 30_000
+/**
+ * 끊긴 사람의 자리를 지켜주는 시간. 새로고침이나 잠깐의 전파 끊김을 흡수한다.
+ *
+ * 넉넉한 것은 사람이 휴대폰을 잠그거나 지하철에 들어가도 판이 이어지게 하려는 것이다.
+ * 대신 그동안 판은 그 사람을 기다리며 멈춰 있다.
+ */
+export const DISCONNECT_GRACE_MS = 10 * 60_000
 
 interface Player {
   id: string

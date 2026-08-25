@@ -25,10 +25,12 @@ export const MAX_ROOMS = Number(process.env.MAX_ROOMS ?? 8)
 /**
  * 아무도 아무것도 하지 않은 채 이만큼 지나면 방을 지운다.
  *
- * 끊김 유예(30초)와 다른 이야기다. 저쪽은 「연결이 살아 있는가」이고
+ * 끊김 유예(10분)와 다른 이야기다. 저쪽은 「연결이 살아 있는가」이고
  * 이쪽은 「사람이 실제로 하고 있는가」다. 접속만 걸어두고 떠난 방이 자리를 먹는다.
+ *
+ * 유예보다 길어야 한다. 짧으면 돌아올 사람을 기다리는 방을 방치로 보고 먼저 치운다.
  */
-export const IDLE_ROOM_MS = 10 * 60_000
+export const IDLE_ROOM_MS = 30 * 60_000
 
 export function isAllowedOrigin(origin: string | undefined): boolean {
   if (ALLOW_ANY_ORIGIN) return true
