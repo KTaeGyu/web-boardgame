@@ -1804,6 +1804,49 @@ select {
   color: var(--ink-dim);
 }
 
+/*
+ * 체크 한 줄.
+ *
+ * 설정 안에서 「켤까 말까」를 묻는 자리다. 이름 아래에 왜 켜는지를 작게 붙인다 —
+ * 켠 뒤에 무엇이 달라지는지 모르면 대개 그냥 지나친다.
+ */
+.check {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.check input {
+  margin: 2px 0 0;
+  width: 16px;
+  height: 16px;
+  accent-color: var(--gold);
+  flex-shrink: 0;
+}
+
+.check input:disabled {
+  cursor: default;
+}
+
+.check__hint {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ink-dim);
+  word-break: keep-all;
+}
+
+/* 배치표 맨 윗줄. 카드가 아니라 뽑기라 이름을 기울여 갈라 둔다. */
+.slot-row--random .slot-row__name {
+  font-style: italic;
+  color: var(--gold);
+}
+
 /* 좁은 화면에서는 칸을 조여 카드 이름이 설 자리를 남긴다. */
 @media (max-width: 640px) {
   .slot-row {
@@ -1902,47 +1945,4 @@ select {
     box-shadow: 0 -14px 44px rgba(var(--shadow-rgb), 0.5);
     animation: sheet-up 0.22s ease-out;
   }
-}
-
-/*
- * 체크 한 줄.
- *
- * 설정 안에서 「켤까 말까」를 묻는 자리다. 이름 아래에 왜 켜는지를 작게 붙인다 —
- * 켠 뒤에 무엇이 달라지는지 모르면 대개 그냥 지나친다.
- */
-.check {
-  display: flex;
-  align-items: flex-start;
-  gap: 9px;
-  margin-top: 12px;
-  font-size: 13px;
-  color: var(--ink);
-  cursor: pointer;
-}
-
-.check input {
-  margin: 2px 0 0;
-  width: 16px;
-  height: 16px;
-  accent-color: var(--gold);
-  flex-shrink: 0;
-}
-
-.check input:disabled {
-  cursor: default;
-}
-
-.check__hint {
-  display: block;
-  margin-top: 2px;
-  font-size: 12px;
-  line-height: 1.5;
-  color: var(--ink-dim);
-  word-break: keep-all;
-}
-
-/* 배치표 맨 윗줄. 카드가 아니라 뽑기라 이름을 기울여 갈라 둔다. */
-.slot-row--random .slot-row__name {
-  font-style: italic;
-  color: var(--gold);
 }
