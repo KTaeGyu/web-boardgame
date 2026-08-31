@@ -165,6 +165,12 @@ export function RoomsPage() {
               제 방으로 돌아갈 길이 없어진다.
             */
             const mine = room.code === mySeat
+            /*
+              관전은 정원 밖이다. 정원이 찼어도 이 자리가 남아 있으면 들어와 볼 수 있으므로
+              줄을 잠그지 않는다 — 잠긴 줄은 「닫힌 문」으로 읽혀 아무도 두드리지 않는다.
+              들어가 앉을 수 없다는 것은 창 안에서 말한다.
+            */
+            const canWatch = room.spectatorCount < room.maxSpectators
             return (
               <li key={room.code}>
                 {/*
@@ -175,7 +181,7 @@ export function RoomsPage() {
                   type="button"
                   className="room-item"
                   onClick={() => (playing ? navigate(`/rooms/${room.code}/watch`) : setAsking(room))}
-                  disabled={(!playing && full && !mine) || !connected}
+                  disabled={(!playing && full && !mine && !canWatch) || !connected}
                 >
                   <span className="room-item__code">{room.code}</span>
                   <span className="room-item__main">
@@ -188,12 +194,19 @@ export function RoomsPage() {
                         왜 둘만 있나」가 설명되지 않는다.
                       */}
                       {room.awayCount > 0 && ` · 자리 비움 ${room.awayCount}`}
-                      {room.spectatorCount > 0 && ` · 관전 ${room.spectatorCount}명`}
+                      {/*
+                        관전은 정원이 찼을 때 「그래도 들어갈 수 있는가」의 답이 되므로,
+                        그때는 보는 사람이 없어도 자릿수를 보인다.
+                      */}
+                      {(room.spectatorCount > 0 || full) &&
+                        ` · 관전 ${room.spectatorCount} / ${room.maxSpectators}`}
                     </span>
                   </span>
                   {playing && <span className="badge badge--playing">게임 중 · 관전</span>}
                   {!playing && mine && <span className="badge badge--mine">돌아가기</span>}
-                  {!playing && !mine && full && <span className="badge">정원 참</span>}
+                  {!playing && !mine && full && (
+                    <span className="badge">{canWatch ? '정원 참 · 관전 가능' : '정원 참'}</span>
+                  )}
                 </button>
               </li>
             )
@@ -211,19 +224,28 @@ export function RoomsPage() {
             {
               label: busy ? '들어가는 중…' : '들어가기',
               tone: 'primary',
+              // 정원이 찼으면 앉을 수는 없다. 창을 열어둔 것은 관전이 남아 있어서다.
+              disabled: asking.playerCount >= asking.maxPlayers,
               onClick: () => void enter(asking),
             },
             {
               label: '관전하기',
+              disabled: asking.spectatorCount >= asking.maxSpectators,
               onClick: () => navigate(`/rooms/${asking.code}?watch=1`),
             },
           ]}
         >
-          {asking.playerCount}명이 자리에 있습니다.
+          {asking.playerCount >= asking.maxPlayers ? (
+            <strong>정원이 찼습니다. 보기만 할 수 있습니다.</strong>
+          ) : (
+            `${asking.playerCount}명이 자리에 있습니다.`
+          )}
           {asking.awayCount > 0 && ` 그중 ${asking.awayCount}명은 자리를 비웠고, 돌아올 때까지 자리가 남아 있습니다.`}
           <br />
           관전은 자리를 차지하지 않아 <strong>시작 인원에 들어가지 않습니다.</strong>
-          {asking.spectatorCount > 0 && ` 지금 ${asking.spectatorCount}명이 보고 있습니다.`}
+          {asking.maxSpectators === 0
+            ? ' 이 방은 관전을 받지 않습니다.'
+            : ` 관전 ${asking.spectatorCount} / ${asking.maxSpectators}.`}
         </ChoiceModal>
       )}
     </main>

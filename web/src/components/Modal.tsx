@@ -86,7 +86,13 @@ export function ChoiceModal({
 }: {
   title: string
   children: ReactNode
-  actions: { label: string; tone?: 'danger' | 'primary'; onClick: () => void }[]
+  actions: {
+    label: string
+    tone?: 'danger' | 'primary'
+    /** 지금은 고를 수 없는 길. 지우지 않고 잠근다 — 없어지면 왜 안 되는지도 함께 사라진다. */
+    disabled?: boolean
+    onClick: () => void
+  }[]
   onClose: () => void
 }) {
   useBackClose(onClose)
@@ -123,6 +129,7 @@ export function ChoiceModal({
               key={action.label}
               type="button"
               className={`btn ${action.tone ? `btn--${action.tone}` : ''}`}
+              disabled={action.disabled}
               onClick={action.onClick}
             >
               {action.label}

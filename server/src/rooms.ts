@@ -13,7 +13,7 @@ import {
   MAX_MARKS,
   MAX_PLAYERS_LIMIT,
   MAX_RANDOM_CHALLENGES,
-  MAX_SPECTATORS,
+  MAX_SPECTATORS_LIMIT,
   MIN_MARKS,
   MIN_PLAYERS,
   READY_CHALLENGES,
@@ -213,8 +213,14 @@ export class RoomStore {
     }
 
     const watching = room.spectators.some((watcher) => watcher.id === playerId)
-    if (!watching && room.spectators.length >= MAX_SPECTATORS) {
-      return err('ROOM_FULL', `관전은 ${MAX_SPECTATORS}명까지입니다.`)
+    // 몇 자리를 열어둘지는 방장이 정한다. 0 이면 아예 받지 않는다.
+    if (!watching && room.spectators.length >= room.settings.maxSpectators) {
+      return err(
+        'ROOM_FULL',
+        room.settings.maxSpectators === 0
+          ? '이 방은 관전을 받지 않습니다.'
+          : `관전은 ${room.settings.maxSpectators}명까지입니다.`,
+      )
     }
 
     // 다른 방에 앉아 있었다면 그 자리를 먼저 비운다. 한 사람은 한 번에 한 방에만 있는다.
@@ -478,6 +484,16 @@ export class RoomStore {
     if (next.maxPlayers < room.players.length) {
       return err('INVALID_SETTINGS', '이미 들어와 있는 인원보다 적게 줄일 수 없습니다.')
     }
+    if (!inRange(next.maxSpectators, 0, MAX_SPECTATORS_LIMIT)) {
+      return err('INVALID_SETTINGS', `관전은 0~${MAX_SPECTATORS_LIMIT}명입니다.`)
+    }
+    /*
+     * 이미 보고 있는 사람보다 적게 줄이지 않는다. 자리에 앉은 사람과 같은 규칙이다 —
+     * 줄이는 것이 곧 내보내는 것이 되면, 설정 한 칸이 사람을 쫓아내는 단추가 된다.
+     */
+    if (next.maxSpectators < room.spectators.length) {
+      return err('INVALID_SETTINGS', '이미 보고 있는 사람보다 적게 줄일 수 없습니다.')
+    }
     if (next.pickedChallenges.some((id) => !READY_CHALLENGES.includes(id as ChallengeId))) {
       return err('INVALID_SETTINGS', '고를 수 없는 도전자 카드입니다.')
     }
@@ -562,6 +578,7 @@ export class RoomStore {
         maxPlayers: room.settings.maxPlayers,
         phase: room.phase,
         spectatorCount: room.spectators.length,
+        maxSpectators: room.settings.maxSpectators,
       })
     }
     return summaries.sort((a, b) => a.code.localeCompare(b.code))

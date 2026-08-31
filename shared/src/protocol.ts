@@ -38,7 +38,13 @@ export const MIN_PLAYERS = 3
  * 자리에 앉은 사람보다 구경꾼이 많으면 방이 무엇을 하는 곳인지 흐려진다.
  * 접속 한도와 다른 이야기다 — 저쪽은 서버가 감당할 양이고 이쪽은 방의 모양이다.
  */
-export const MAX_SPECTATORS = 5
+/**
+ * 방장이 관전 자릿수로 고를 수 있는 가장 큰 값. 0 이면 관전을 받지 않는다.
+ *
+ * 상수에서 방 설정으로 옮겼다(2026-08-31). 자리는 정원 밖이라 정원이 찬 방에도
+ * 관전으로는 들어갈 수 있는데, 그렇다면 몇 자리를 열어둘지도 방장의 몫이다.
+ */
+export const MAX_SPECTATORS_LIMIT = 5
 export const MAX_PLAYERS_LIMIT = 10
 
 export interface RoomSettings {
@@ -93,6 +99,13 @@ export interface RoomSettings {
   /** 몇 번 울리면 지는가. 「직접 고르기」에서만 3이 아닐 수 있다. */
   alarmsToLose: number
   maxPlayers: number
+  /**
+   * 자리 없이 보기만 할 사람을 몇까지 받는가(0~MAX_SPECTATORS_LIMIT).
+   *
+   * **정원 밖이다.** 시작 인원에 들지 않으므로, 정원이 찬 방에도 이 자리가 남아 있으면
+   * 들어와 볼 수 있다. 0 은 「관전을 받지 않음」이다 — 아는 사람끼리만 하고 싶을 때 닫는다.
+   */
+  maxSpectators: number
 }
 
 /**
@@ -120,6 +133,7 @@ export const DEFAULT_SETTINGS: RoomSettings = {
   vaultsToWin: VAULTS_TO_WIN,
   alarmsToLose: ALARMS_TO_LOSE,
   maxPlayers: 6,
+  maxSpectators: MAX_SPECTATORS_LIMIT,
 }
 
 export type RoomPhase = 'lobby' | 'playing' | 'result'
@@ -150,8 +164,13 @@ export interface RoomSummary {
   awayCount: number
   maxPlayers: number
   phase: RoomPhase
-  /** 자리 없이 보고만 있는 사람 수. 판이 도는 방에만 붙는다. */
+  /** 자리 없이 보고만 있는 사람 수. */
   spectatorCount: number
+  /**
+   * 그 방이 받는 관전 자릿수. 목록이 「정원은 찼지만 보러는 갈 수 있는가」를
+   * 스스로 판단하려면 이 수가 있어야 한다.
+   */
+  maxSpectators: number
 }
 
 /** 방 안에 있는 사람이 보는 전체 상태. */

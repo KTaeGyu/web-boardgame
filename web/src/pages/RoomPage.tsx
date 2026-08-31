@@ -8,7 +8,7 @@ import {
   MAX_MARKS,
   MAX_PLAYERS_LIMIT,
   MAX_RANDOM_CHALLENGES,
-  MAX_SPECTATORS,
+  MAX_SPECTATORS_LIMIT,
   MIN_MARKS,
   MIN_PLAYERS,
   READY_CHALLENGES,
@@ -110,6 +110,7 @@ export function RoomPage() {
     alarmsToLose: [MIN_MARKS, MAX_MARKS],
     randomChallenges: [0, MAX_RANDOM_CHALLENGES],
     maxPlayers: [MIN_PLAYERS, MAX_PLAYERS_LIMIT],
+    maxSpectators: [0, MAX_SPECTATORS_LIMIT],
   } as const
 
   function changeNumber(key: keyof typeof NUMBER_RANGE, raw: string) {
@@ -340,7 +341,7 @@ export function RoomPage() {
           {room.spectators.length > 0 && (
             <>
               <h3 className="watchers__title">
-                관전 {room.spectators.length} / {MAX_SPECTATORS}
+                관전 {room.spectators.length} / {room.settings.maxSpectators}
               </h3>
               <ul className="watchers">
                 {room.spectators.map((watcher) => (
@@ -493,17 +494,42 @@ export function RoomPage() {
             </>
           )}
 
+          {/*
+            정원과 관전 자리는 나란히 선다. 관전은 정원 밖이라 정원이 찬 방에도
+            이 자리가 남아 있으면 들어와 볼 수 있다 — 두 수가 함께 보여야 그것이 읽힌다.
+          */}
           <div className="setting">
-            <span className="setting__label">최대 인원</span>
-            <input
-              className="number-input"
-              type="number"
-              min={MIN_PLAYERS}
-              max={MAX_PLAYERS_LIMIT}
-              value={room.settings.maxPlayers}
-              disabled={!iAmHost}
-              onChange={(event) => changeNumber('maxPlayers', event.target.value)}
-            />
+            <span className="setting__label">자리</span>
+            <span className="pick-hint">
+              관전은 시작 인원에 들지 않습니다. 정원이 차도 관전 자리가 남아 있으면
+              들어와 볼 수 있습니다. 0 으로 두면 관전을 받지 않습니다.
+            </span>
+            <div className="number-row">
+              <label className="number-field">
+                <span>최대 인원</span>
+                <input
+                  className="number-input"
+                  type="number"
+                  min={MIN_PLAYERS}
+                  max={MAX_PLAYERS_LIMIT}
+                  value={room.settings.maxPlayers}
+                  disabled={!iAmHost}
+                  onChange={(event) => changeNumber('maxPlayers', event.target.value)}
+                />
+              </label>
+              <label className="number-field">
+                <span>관전</span>
+                <input
+                  className="number-input"
+                  type="number"
+                  min={0}
+                  max={MAX_SPECTATORS_LIMIT}
+                  value={room.settings.maxSpectators}
+                  disabled={!iAmHost}
+                  onChange={(event) => changeNumber('maxSpectators', event.target.value)}
+                />
+              </label>
+            </div>
           </div>
 
           {!iAmHost && <p className="notice">설정은 방장만 바꿀 수 있습니다.</p>}

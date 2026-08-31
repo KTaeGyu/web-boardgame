@@ -67,6 +67,7 @@ describe('방 만들기', () => {
       vaultsToWin: 3,
       alarmsToLose: 3,
       maxPlayers: 6,
+      maxSpectators: 5,
     })
   })
 
@@ -284,7 +285,16 @@ describe('방 목록', () => {
     const { store } = makeStore()
     const code = seed(store, ['p1', 'p2', 'p3'])
     assert.deepEqual(store.list(), [
-      { code, hostNickname: '태규', playerCount: 3, awayCount: 0, maxPlayers: 6, phase: 'lobby', spectatorCount: 0 },
+      {
+        code,
+        hostNickname: '태규',
+        playerCount: 3,
+        awayCount: 0,
+        maxPlayers: 6,
+        phase: 'lobby',
+        spectatorCount: 0,
+        maxSpectators: 5,
+      },
     ])
   })
 
@@ -323,6 +333,69 @@ describe('방 목록', () => {
     // 자리를 지켜주는 뜻이 여기에 있다. 정원을 보기 전에 재접속으로 처리한다.
     assert.equal(store.joinRoom('p3', '지연', code).ok, true)
     assert.equal(store.list()[0].awayCount, 0, '돌아왔으니 비어 있지 않다')
+  })
+
+  it('관전 자리가 남아 있으면 정원이 찬 방에도 들어와 볼 수 있다', () => {
+    const { store } = makeStore()
+    const code = seed(store, ['p1', 'p2', 'p3'])
+    assert.equal(store.updateSettings('p1', { maxPlayers: 3 }).ok, true)
+
+    // 자리로는 못 들어간다.
+    const seat = store.joinRoom('p4', '하늘', code)
+    assert.equal(seat.ok, false)
+    if (!seat.ok) assert.equal(seat.code, 'ROOM_FULL')
+
+    // 관전은 정원 밖이라 열려 있다.
+    assert.equal(store.spectate('p4', '하늘', code).ok, true)
+    assert.equal(store.view(code)?.spectators.length, 1)
+  })
+
+  it('관전 자릿수는 방장이 정한다', () => {
+    const { store } = makeStore()
+    const code = seed(store, ['p1', 'p2'])
+    assert.equal(store.updateSettings('p1', { maxSpectators: 1 }).ok, true)
+
+    assert.equal(store.spectate('p8', '구경1', code).ok, true)
+    const second = store.spectate('p9', '구경2', code)
+    assert.equal(second.ok, false)
+    if (!second.ok) assert.equal(second.code, 'ROOM_FULL')
+  })
+
+  it('0 으로 두면 관전을 받지 않는다', () => {
+    const { store } = makeStore()
+    const code = seed(store, ['p1', 'p2'])
+    assert.equal(store.updateSettings('p1', { maxSpectators: 0 }).ok, true)
+
+    assert.equal(store.spectate('p9', '구경', code).ok, false)
+  })
+
+  it('관전 자릿수는 0~5 밖으로 나갈 수 없다', () => {
+    const { store } = makeStore()
+    seed(store, ['p1'])
+    assert.equal(store.updateSettings('p1', { maxSpectators: 6 }).ok, false)
+    assert.equal(store.updateSettings('p1', { maxSpectators: -1 }).ok, false)
+  })
+
+  /* 줄이는 것이 곧 내보내는 것이 되면, 설정 한 칸이 사람을 쫓아내는 단추가 된다. */
+  it('이미 보고 있는 사람보다 적게 줄일 수 없다', () => {
+    const { store } = makeStore()
+    const code = seed(store, ['p1', 'p2'])
+    assert.equal(store.spectate('p8', '구경1', code).ok, true)
+    assert.equal(store.spectate('p9', '구경2', code).ok, true)
+
+    assert.equal(store.updateSettings('p1', { maxSpectators: 1 }).ok, false)
+    assert.equal(store.updateSettings('p1', { maxSpectators: 2 }).ok, true)
+  })
+
+  it('목록이 관전 자릿수를 함께 알려준다', () => {
+    const { store } = makeStore()
+    const code = seed(store, ['p1'])
+    assert.equal(store.updateSettings('p1', { maxSpectators: 3 }).ok, true)
+    assert.equal(store.spectate('p9', '구경', code).ok, true)
+
+    // 화면이 「정원은 찼지만 보러는 갈 수 있는가」를 스스로 판단하는 근거다.
+    assert.equal(store.list()[0].spectatorCount, 1)
+    assert.equal(store.list()[0].maxSpectators, 3)
   })
 
   it('내 자리가 어느 방인지 알려준다', () => {
