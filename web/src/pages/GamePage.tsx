@@ -27,7 +27,9 @@ import { Token, TokenBlank, TokenHole } from '../components/Token.tsx'
 import { useBackIntercept } from '../lib/back.ts'
 import { getNickname, getPlayerId } from '../lib/identity.ts'
 import { sfx } from '../lib/sfx.ts'
-import { call, socket, useServerEvent } from '../lib/socket.ts'
+import { socket } from '../lib/socket.ts'
+// 사람들과 하는 판은 서버에서, 혼자 해보기는 화면 안에서 돈다. 이 화면은 그 차이를 모른다.
+import { call, useServerEvent } from '../lib/transport.ts'
 import { useEscape } from '../lib/useEscape.ts'
 import { useTokenFlight } from '../lib/useTokenFlight.ts'
 import { useScrollLock } from '../lib/useScrollLock.ts'
@@ -928,8 +930,11 @@ export function GamePage({ spectating = false }: { spectating?: boolean } = {}) 
         />
       )}
 
-      {/* 대화. 접힌 채로도 새 말 한 줄은 단추 옆에 잠깐 붙는다. */}
-      <Chat code={code} />
+      {/*
+        대화. 접힌 채로도 새 말 한 줄은 단추 옆에 잠깐 붙는다.
+        연습판에는 말할 상대가 없다 — 봇은 읽지 않는다.
+      */}
+      {!tutorial && <Chat code={code} />}
 
       {fresh && <NoteCard note={fresh} onClose={() => setFresh(null)} />}
 

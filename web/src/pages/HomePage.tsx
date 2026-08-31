@@ -31,7 +31,6 @@ export function HomePage() {
   const me = useSession()
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
-  const [solo, setSolo] = useState(false)
   const connected = useConnected()
 
   async function makeRoom() {
@@ -46,19 +45,15 @@ export function HomePage() {
     navigate(`/rooms/${result.value.code}`)
   }
 
-  /** 봇 둘이 함께 앉은 판이 곧바로 시작된다. 대기실을 거칠 이유가 없다. */
-  async function practice() {
+  /**
+   * 봇 둘이 함께 앉은 판이 곧바로 시작된다. 대기실을 거칠 이유가 없다.
+   *
+   * 서버를 부르지 않는다 — 판이 화면 안에서 돌기 때문이다. 서버가 자고 있어도 열린다.
+   */
+  function practice() {
     const name = me?.nickname || getNickname() || SOLO_NAME
     saveNickname(name)
-
-    setSolo(true)
-    const result = await startTutorial(name)
-    setSolo(false)
-    if (!result.ok) {
-      setError(result.message)
-      return
-    }
-    navigate(`/rooms/${result.value.code}/game`)
+    navigate(`/rooms/${startTutorial(name)}/game`)
   }
 
   return (
@@ -129,10 +124,9 @@ export function HomePage() {
           <button
             type="button"
             className="btn home-form__solo"
-            onClick={() => void practice()}
-            disabled={solo || !connected}
+            onClick={practice}
           >
-            {solo ? '자리를 차리는 중…' : '혼자 해보기 — 봇 2명과 연습'}
+            혼자 해보기 — 봇 2명과 연습
           </button>
         </div>
       </div>
