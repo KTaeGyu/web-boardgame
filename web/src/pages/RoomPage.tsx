@@ -6,6 +6,7 @@ import {
   GAME_MODE_HINT,
   GAME_MODE_LABEL,
   MAX_MARKS,
+  MAX_PLAYERS_LIMIT,
   MAX_RANDOM_CHALLENGES,
   MAX_SPECTATORS,
   MIN_MARKS,
@@ -50,7 +51,16 @@ export function RoomPage() {
   const nickname = getNickname()
 
   const [room, setRoom] = useState<RoomView | null>(null)
+  /**
+   * 거절당한 말. 이 자리에 한 줄로 뜬다 — 설정·시작·관전이 모두 여기로 온다.
+   *
+   * **들어오기 실패와 갈라 둔다.** 예전에는 한 상태였고, 그것이 뜨면 화면을 통째로
+   * 대체했다. 들어오지 못했을 때는 보여줄 방이 없으니 맞는 처리지만, 설정 한 칸이
+   * 거절당한 것은 방이 멀쩡히 있는데도 참여자와 설정이 함께 사라진다는 뜻이었다.
+   */
   const [error, setError] = useState('')
+  /** 방에 들어오지 못했다. 그릴 방이 없으므로 이쪽만 화면을 대체한다. */
+  const [fatal, setFatal] = useState('')
   const [starting, setStarting] = useState(false)
   const [confirmLeave, setConfirmLeave] = useState(false)
   /** 방장이 자리에서 물러나려 한다. 방장이 넘어가는 일이라 한 번 묻는다. */
@@ -91,11 +101,20 @@ export function RoomPage() {
   /*
    * 숫자 칸은 지우는 도중에 빈 값이 되고, 그때 0 을 보내면 서버가 거절해 붉은 줄이 뜬다.
    * 고치는 중일 뿐이므로 범위를 벗어난 값은 보내지 않고 흘린다 — 칸은 방의 값으로 돌아온다.
+   *
+   * **네 칸이 모두 여기를 지나야 한다.** 최대 인원만 날것으로 보내다가, 3 아래를 치는
+   * 순간 「최대 인원은 3~10명입니다」가 떴다.
    */
-  function changeNumber(key: 'vaultsToWin' | 'alarmsToLose' | 'randomChallenges', raw: string) {
+  const NUMBER_RANGE = {
+    vaultsToWin: [MIN_MARKS, MAX_MARKS],
+    alarmsToLose: [MIN_MARKS, MAX_MARKS],
+    randomChallenges: [0, MAX_RANDOM_CHALLENGES],
+    maxPlayers: [MIN_PLAYERS, MAX_PLAYERS_LIMIT],
+  } as const
+
+  function changeNumber(key: keyof typeof NUMBER_RANGE, raw: string) {
     const value = Number(raw)
-    const min = key === 'randomChallenges' ? 0 : MIN_MARKS
-    const max = key === 'randomChallenges' ? MAX_RANDOM_CHALLENGES : MAX_MARKS
+    const [min, max] = NUMBER_RANGE[key]
     if (!Number.isInteger(value) || value < min || value > max) return
     void change({ [key]: value })
   }
@@ -128,9 +147,9 @@ export function RoomPage() {
       if (!alive) return
       if (result.ok) {
         setRoom(result.value)
-        setError('')
+        setFatal('')
       } else {
-        setError(result.message)
+        setFatal(result.message)
       }
     }
 
@@ -196,13 +215,13 @@ export function RoomPage() {
     navigate('/rooms', { replace: true })
   })
 
-  if (error) {
+  if (fatal) {
     return (
       <main className="page page--narrow">
         <Link className="link-back" to="/rooms">
           ← 방 목록
         </Link>
-        <p className="error">{error}</p>
+        <p className="error">{fatal}</p>
       </main>
     )
   }
@@ -241,7 +260,8 @@ export function RoomPage() {
     setStarting(true)
     const result = await call<unknown>('game:start')
     setStarting(false)
-    if (!result.ok) setError(result.message)
+    // 성공하면 지운다. 남겨두면 지난번에 거절당한 줄이 판으로 넘어가는 순간까지 붙어 있다.
+    setError(result.ok ? '' : result.message)
   }
 
   return (
@@ -479,10 +499,10 @@ export function RoomPage() {
               className="number-input"
               type="number"
               min={MIN_PLAYERS}
-              max={10}
+              max={MAX_PLAYERS_LIMIT}
               value={room.settings.maxPlayers}
               disabled={!iAmHost}
-              onChange={(event) => void change({ maxPlayers: Number(event.target.value) })}
+              onChange={(event) => changeNumber('maxPlayers', event.target.value)}
             />
           </div>
 
@@ -490,6 +510,8 @@ export function RoomPage() {
         </section>
       </div>
 
+      {/* 거절당한 말은 안내들과 같은 자리에 선다. 방은 그대로 두고 이 줄만 붙는다. */}
+      {error && <p className="error">{error}</p>}
       {needsCards && (
         <p className="notice notice--warn">
           직접 고르기를 골랐습니다. 도전자든 해결사든 카드를 하나 이상 골라야 시작할 수 있습니다.
