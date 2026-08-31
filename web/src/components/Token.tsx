@@ -89,3 +89,14 @@ export function Token({
 export function TokenBlank({ round }: { round: Round }) {
   return <span className={`token token--blank token--${ROUND_COLOR[round]}`} aria-hidden="true" />
 }
+
+/**
+ * 누군가 가져간 자리.
+ *
+ * 가운데 더미에서 나간 토큰의 빈 구멍이다. 이력의 빈칸(TokenBlank)과 달리 **토큰과
+ * 똑같은 크기**여야 한다 — 이것은 「없음」을 보이는 것이 아니라 **남은 것들이 제자리에
+ * 서 있게 하는 것**이 일이라, 조금이라도 작으면 옆의 것들이 그만큼 밀린다.
+ */
+export function TokenHole() {
+  return <span className="token token--hole" aria-hidden="true" />
+}

@@ -22,7 +22,7 @@ import { TableChallenges, TableSpecialist } from '../components/TableExtras.tsx'
 import { TutorialTip, type TipPayload } from '../components/TutorialTip.tsx'
 import { ConfirmModal } from '../components/Modal.tsx'
 import { CardSlot, PlayingCard } from '../components/PlayingCard.tsx'
-import { Token, TokenBlank } from '../components/Token.tsx'
+import { Token, TokenBlank, TokenHole } from '../components/Token.tsx'
 import { useBackIntercept } from '../lib/back.ts'
 import { record } from '../lib/history.ts'
 import { getNickname, getPlayerId } from '../lib/identity.ts'
@@ -790,19 +790,30 @@ export function GamePage({ spectating = false }: { spectating?: boolean } = {}) 
           )}
         </div>
 
+        {/*
+          토큰 번호는 1..인원수이고, **그 자리를 늘 다 그린다.**
+
+          남은 것만 그리면 하나가 나갈 때마다 나머지가 가운데로 다시 모인다 —
+          누르려던 토큰이 손가락 밑에서 옆으로 미끄러져, 엉뚱한 수를 집게 된다.
+          나간 자리는 같은 크기의 빈 구멍으로 두어 옆의 것들이 움직이지 않게 한다.
+        */}
         <div className="table__tokens">
-          {game.centerTokens.map((token) => (
-            <Token
-              key={token}
-              value={token}
-              round={game.round}
-              locked={game.lockedTokens.includes(token)}
-              stuck={game.stuckTokens.includes(token)}
-              busy={flying}
-              innerRef={tokenRef(token)}
-              onClick={picking ? () => void take(token) : undefined}
-            />
-          ))}
+          {game.players.map((_, index) => {
+            const token = index + 1
+            if (!game.centerTokens.includes(token)) return <TokenHole key={token} />
+            return (
+              <Token
+                key={token}
+                value={token}
+                round={game.round}
+                locked={game.lockedTokens.includes(token)}
+                stuck={game.stuckTokens.includes(token)}
+                busy={flying}
+                innerRef={tokenRef(token)}
+                onClick={picking ? () => void take(token) : undefined}
+              />
+            )
+          })}
           {picking && game.centerTokens.length === 0 && (
             <span className="table__tokens-empty">토큰이 모두 나갔습니다</span>
           )}
