@@ -1,6 +1,7 @@
 import { CATEGORY_LABEL, RANKS, ROUNDS, rankLabel, type GameView, type ScanQuestion } from '@the-gang/shared'
 
 import { PlayingCard } from './PlayingCard.tsx'
+import { useScrollLock } from '../lib/useScrollLock.ts'
 import { Token, TokenBlank } from './Token.tsx'
 
 interface Props {
@@ -36,6 +37,8 @@ function label(kind: 'rank' | 'category', value: number): string {
  */
 export function ScanVote({ game, playerId, onVote }: Props) {
   const scan = game.scan
+  // 훅은 조건부로 부를 수 없다. 이른 return 앞에서 「지금 덮고 있는가」로 가른다.
+  useScrollLock(scan !== null && game.phase === 'scanning')
   if (!scan || game.phase !== 'scanning') return null
 
   const target = game.players.find((player) => player.id === scan.targetId)

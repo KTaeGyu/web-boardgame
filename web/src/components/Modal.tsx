@@ -1,6 +1,7 @@
 import { useEffect, type ReactNode } from 'react'
 
 import { useBackClose } from '../lib/back.ts'
+import { useScrollLock } from '../lib/useScrollLock.ts'
 
 interface Props {
   title: string
@@ -24,6 +25,8 @@ export function ConfirmModal({
 }: Props) {
   // 휴대폰의 뒤로가기는 화면을 떠나는 것이 아니라 이 창을 닫는 것이어야 한다.
   useBackClose(onCancel)
+  // 떠 있는 동안 뒤 페이지는 움직이지 않는다.
+  useScrollLock()
 
   // 손이 마우스로 가지 않아도 끝낼 수 있게. Esc 는 물러나기, Enter 는 밀고 나가기.
   useEffect(() => {
@@ -78,6 +81,7 @@ export function ChoiceModal({
   onClose: () => void
 }) {
   useBackClose(onClose)
+  useScrollLock()
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {

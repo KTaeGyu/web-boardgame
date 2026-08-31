@@ -29,6 +29,7 @@ import { sfx } from '../lib/sfx.ts'
 import { call, socket, useServerEvent } from '../lib/socket.ts'
 import { useEscape } from '../lib/useEscape.ts'
 import { useTokenFlight } from '../lib/useTokenFlight.ts'
+import { useScrollLock } from '../lib/useScrollLock.ts'
 
 /** 방이 닫힌 사유를 사람 말로. 아무 설명 없이 튕겨나가면 고장으로 느껴진다. */
 const CLOSED_MESSAGE: Record<string, string> = {
@@ -1125,6 +1126,8 @@ function Showdown({
   onLeave,
 }: ShowdownProps) {
   const navigate = useNavigate()
+  // 결과가 화면을 덮는 동안 뒤 판은 움직이지 않는다. 위에 겹치는 재경기 물음도 이 안이다.
+  useScrollLock()
   /**
    * 마우스를 올린 사람의 다섯 장.
    *

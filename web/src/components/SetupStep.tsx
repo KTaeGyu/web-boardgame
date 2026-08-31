@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { Card, GameView } from '@the-gang/shared'
 
 import { PlayingCard } from './PlayingCard.tsx'
+import { useScrollLock } from '../lib/useScrollLock.ts'
 
 interface Props {
   game: GameView
@@ -80,6 +81,7 @@ export function SetupStep({ game, playerId, hand, onSubmit, onDiscard }: Props) 
 }
 
 function Panel({ title, hint, children }: { title: string; hint: string; children: React.ReactNode }) {
+  useScrollLock()
   return (
     <div className="modal-backdrop">
       <div className="modal" role="dialog" aria-modal="true">

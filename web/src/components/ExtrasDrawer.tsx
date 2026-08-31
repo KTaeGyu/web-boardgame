@@ -11,6 +11,7 @@ import {
 } from '@the-gang/shared'
 
 import { useBackIntercept } from '../lib/back.ts'
+import { useScrollLock } from '../lib/useScrollLock.ts'
 import { tipPosition } from '../lib/tooltip.ts'
 import { PlayingCard } from './PlayingCard.tsx'
 
@@ -52,6 +53,8 @@ export function ExtrasDrawer({ game, playerId, hand, notes, onUse }: Props) {
   const specialist = game.specialist === null ? null : SPECIALISTS[game.specialist]
   const needs = game.specialist === null ? null : SPECIALIST_NEEDS[game.specialist]
   const count = game.challenges.length + (specialist ? 1 : 0)
+  // 물음이 떠 있는 동안 뒤 판은 움직이지 않는다. 서랍 자체는 옆에 붙는 것이라 잠그지 않는다.
+  useScrollLock(asking && specialist !== null)
   if (count === 0) return null
 
   const canUse = specialist !== null && !game.specialistUsed && game.phase === 'picking'
@@ -286,6 +289,7 @@ export function ExtraTile({ kind, card, status, note, onUse }: TileProps) {
 
 /** 카드가 나에게만 알려준 것. 처음 도착했을 때 한 번 뜨고, 뒤에는 드로어에서 본다. */
 export function NoteCard({ note, onClose }: { note: CardNote; onClose: () => void }) {
+  useScrollLock()
   return (
     <div className="modal-backdrop" onClick={onClose} role="presentation">
       <div className="modal" onClick={(event) => event.stopPropagation()} role="dialog" aria-modal="true">

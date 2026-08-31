@@ -13,6 +13,7 @@ import { useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 
 import { useConnected } from '../lib/socket.ts'
+import { useScrollLock } from '../lib/useScrollLock.ts'
 
 /** 이만큼 기다려도 안 붙으면 잠든 것이 아니라 무언가 잘못된 것이다. */
 const GIVE_UP_S = 300
@@ -29,6 +30,11 @@ export function ServerGate() {
   const connected = useConnected()
   const { pathname } = useLocation()
   const [seconds, setSeconds] = useState(0)
+  /*
+   * 화면을 덮을 때에만 잠근다. 방 안과 판 안에서는 덮지 않고 조용한 한 줄이므로,
+   * 그때까지 뒤를 잠그면 볼 수 있는 테이블을 못 보게 된다.
+   */
+  useScrollLock(!connected && BLOCKED.has(pathname))
 
   // 붙어 있는 동안에는 시계를 돌리지 않는다. 다시 끊기면 0 부터 센다.
   useEffect(() => {

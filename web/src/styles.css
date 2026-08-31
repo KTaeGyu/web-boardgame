@@ -1557,6 +1557,25 @@ select {
   overscroll-behavior: contain;
 }
 
+/*
+ * 덮개가 떠 있는 동안의 body. 짝은 `web/src/lib/useScrollLock.ts` 다.
+ *
+ * overflow: hidden 만으로는 iOS 사파리가 잠기지 않아 fixed 로 세운다. 그러면 내용이
+ * 맨 위로 올라오므로, 잠그기 직전에 내려와 있던 만큼(--locked-top) 위로 끌어올려
+ * 있던 자리 그대로처럼 보이게 한다.
+ *
+ * 덮개들은 fixed 라 이 아래에서도 화면 기준으로 그대로 선다 — position: fixed 는
+ * transform 과 달리 자손의 기준점을 만들지 않는다.
+ */
+body.scroll-locked {
+  position: fixed;
+  top: var(--locked-top, 0);
+  left: 0;
+  right: 0;
+  width: 100%;
+  overflow: hidden;
+}
+
 .modal--wide {
   max-width: 460px;
 }
