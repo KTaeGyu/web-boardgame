@@ -18,6 +18,9 @@ import { call, useServerEvent } from '../lib/socket.ts'
 /** 접힌 채로 새 말이 왔을 때, 마지막 한 줄이 붙어 있는 시간. */
 const PEEK_MS = 6000
 
+/** 바닥에서 이만큼 안쪽이면 「바닥에 있다」로 본다. 한 줄 높이쯤이다. */
+const NEAR_BOTTOM = 40
+
 /**
  * 창이 들고 있는 줄 수. 서버가 들고 있는 것(CHAT_KEEP)보다 넉넉하다 —
  * 자리를 비운 사이 서버 창 밖으로 밀려난 옛 대화가 내 화면에는 남아 있게 하려는 것이다.
@@ -103,6 +106,13 @@ export function Chat({ code }: { code: string }) {
 
   const listRef = useRef<HTMLDivElement | null>(null)
   const sheetRef = useRef<HTMLElement | null>(null)
+  /**
+   * 목록이 바닥에 붙어 있는가.
+   *
+   * 창 높이가 바뀔 때 다시 붙일지 정하는 값이다. 상태가 아니라 상자에 두는 것은
+   * 스크롤마다 다시 그릴 이유가 없어서다 — 대화 한 줄을 훑을 때마다 판이 다시 그려진다.
+   */
+  const pinned = useRef(true)
   /*
    * 아래로 밀어 닫기.
    *
@@ -187,6 +197,27 @@ export function Chat({ code }: { code: string }) {
     listRef.current.scrollTop = listRef.current.scrollHeight
   }, [open, messages])
 
+  /*
+   * 창이 짧아져도 마지막 말이 그대로 보여야 한다.
+   *
+   * 작은 화면의 대화는 바닥에 붙은 시트라, 입력칸을 누르면 키보드가 올라온 만큼
+   * 창이 통째로 짧아진다. 그런데 목록이 얼마나 내려가 있는지(scrollTop)는 그대로여서,
+   * 줄어든 높이만큼 아래쪽 말들이 화면 밖으로 밀려난다 — 정작 방금 읽던 줄이 사라진다.
+   * 말이 새로 온 것도 창을 연 것도 아니라 위의 효과는 이때 돌지 않는다.
+   *
+   * **바닥에 있었을 때만 다시 붙인다.** 옛 대화를 읽어 올린 사람을 끌어내리면,
+   * 키보드가 오르내릴 때마다 읽던 자리를 잃는다.
+   */
+  useEffect(() => {
+    const list = listRef.current
+    if (!open || !list) return
+    const watch = new ResizeObserver(() => {
+      if (pinned.current) list.scrollTop = list.scrollHeight
+    })
+    watch.observe(list)
+    return () => watch.disconnect()
+  }, [open])
+
   function toggle() {
     setOpen((on) => {
       if (!on) {
@@ -235,7 +266,14 @@ export function Chat({ code }: { code: string }) {
             </button>
           </header>
 
-          <div className="chat__list" ref={listRef}>
+          <div
+            className="chat__list"
+            ref={listRef}
+            onScroll={(event) => {
+              const list = event.currentTarget
+              pinned.current = list.scrollHeight - list.scrollTop - list.clientHeight < NEAR_BOTTOM
+            }}
+          >
             {messages.length === 0 ? (
               <p className="chat__empty">아직 아무 말도 없습니다.</p>
             ) : (
