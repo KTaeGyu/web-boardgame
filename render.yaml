@@ -29,6 +29,16 @@ services:
       # 콤마로 여럿, 프리뷰까지 열려면 *.vercel.app 를 함께 넣는다.
       - key: CORS_ORIGINS
         sync: false
+      # 계정을 서버 밖에 남겨 두는 자리(Contentful). 셋이 다 있어야 켜지고,
+      # 하나라도 비면 계정은 메모리에만 남는다 — 서버가 잠들면 함께 사라진다.
+      #
+      # 관리 API 토큰은 쓰기 전권이다. 저장소에 들어가면 안 되므로 대시보드에서 넣는다.
+      - key: CONTENTFUL_SPACE_ID
+        sync: false
+      - key: CONTENTFUL_ENVIRONMENT
+        sync: false
+      - key: CONTENTFUL_MANAGEMENT_TOKEN
+        sync: false
       # 무료 요금제의 이용량을 넘기지 않으려는 한도다. 게임 규칙이 아니다.
       # 실측(접속 40·방 8)에서 메모리 +2.4MB·상태 한 벌 1.3KB 였다. 여유를 두고 잡는다.
       - key: MAX_CONNECTIONS

@@ -1,3 +1,4 @@
+import { accountStore } from './accountStore.ts'
 import { createApp } from './app.ts'
 import { CORS_ORIGINS, PORT } from './config.ts'
 import { logLine, startFileLog } from './log.ts'
@@ -5,7 +6,11 @@ import { logLine, startFileLog } from './log.ts'
 // 방을 만들기 전에 켠다. 부팅에서 나는 것도 파일에 있어야 한다.
 const logFile = startFileLog()
 
-const app = createApp()
+/*
+ * 계정을 밖에 남겨 두는 자리는 여기서만 만든다. 환경변수가 다 있으면 Contentful,
+ * 하나라도 없으면 메모리만으로 돈다 — 테스트는 createApp 을 직접 쓰므로 이 길을 밟지 않는다.
+ */
+const app = createApp({ accounts: accountStore() })
 
 app.http.listen(PORT, () => {
   console.log(`[the-gang] 소켓 서버 :${PORT}`)

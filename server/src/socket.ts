@@ -29,6 +29,7 @@ import {
   SWEEP_INTERVAL_MS,
 } from './config.ts'
 import { Accounts } from './accounts.ts'
+import type { AccountStore } from './accountStore.ts'
 import { Game } from './game.ts'
 import { Tutorial } from './tutorial.ts'
 import { uniqueRoomCode } from './ids.ts'
@@ -60,6 +61,13 @@ export interface ServerLimits {
   maxConnections?: number
   maxRooms?: number
   idleMs?: number
+  /**
+   * 계정을 서버 밖에 남겨 두는 자리. 없으면 메모리만으로 돈다.
+   *
+   * 여기로 받는 것은 테스트 때문이다. 환경변수를 직접 읽으면 자격증명이 있는 기기에서
+   * 테스트가 남의 스페이스에 항목을 만든다 — 실물을 넘기는 곳은 index.ts 하나뿐이다.
+   */
+  accounts?: AccountStore | null
 }
 
 export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { store: RoomStore; stop: () => void } {
@@ -86,7 +94,9 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
    * 닉네임은 붙들어 두지 않는다 — 계정이 있어도 그 이름은 남도 쓴다. 그래서 방에
    * 들어가는 자리(만들기·들어가기·관전)는 계정을 아예 보지 않는다.
    */
-  const accounts = new Accounts()
+  const accounts = new Accounts(limits.accounts ?? null)
+  // 밖에 둔 것을 메모리로 옮긴다. 저장소가 없으면 아무 일도 하지 않는다.
+  void accounts.load()
 
   const sendRoom = (room: RoomView) => io.to(room.code).emit('room:updated', room)
   const sendLobbyStats = () =>
@@ -458,8 +468,14 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
      * 게스트는 이 길로 오지 않는다 — 지금처럼 닉네임만 치고 방으로 간다. 계정이 있어도
      * 그 닉네임을 남이 쓰는 것은 막지 않으므로, 방에 들어가는 자리는 이 표를 보지 않는다.
      */
+    /*
+     * 가입만 기다린다. 밖(Contentful)에 먼저 쓰고 성공을 확인한 뒤에야 메모리에 넣기
+     * 때문이다 — 순서를 뒤집으면 「가입됐다」고 말해 놓고 서버가 다시 뜨는 순간 없어진다.
+     */
     socket.on('auth:signup', ({ email, password, nickname }, ack) => {
-      ack(accounts.signup(String(email ?? ''), String(password ?? ''), String(nickname ?? '')))
+      void accounts
+        .signup(String(email ?? ''), String(password ?? ''), String(nickname ?? ''))
+        .then(ack)
     })
 
     socket.on('auth:login', ({ email, password }, ack) => {
@@ -806,6 +822,7 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
       clearInterval(sweeper)
       for (const timer of unlockTimers.values()) clearTimeout(timer)
       unlockTimers.clear()
+      accounts.stop()
     },
   }
 }

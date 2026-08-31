@@ -26,6 +26,9 @@ import {
   type Session,
 } from '@the-gang/shared'
 
+import { logLine } from './log.ts'
+import type { AccountStore } from './accountStore.ts'
+
 function err<T>(code: ErrorCode, message: string): Result<T> {
   return { ok: false, code, message }
 }
@@ -61,17 +64,102 @@ function hash(password: string, salt: string): string {
   return scryptSync(password, salt, 32).toString('hex')
 }
 
+/** 부팅 로딩을 몇 번까지 다시 해보나. 한 번 삐끗한 것과 정말 안 되는 것을 가른다. */
+const LOAD_TRIES = 3
+/** 다시 해보기 전에 쉬는 시간. 회를 거듭할수록 늘린다. */
+const LOAD_WAIT_MS = 1500
+/** 전적을 밖으로 흘려보내는 사이. CMA 는 초당 일곱 건쯤에서 막는다. */
+const DRAIN_MS = 300
+/** 판이 끝나고 이만큼 모았다가 내보낸다. 열 명이 한꺼번에 끝나도 한 줄기로 나간다. */
+const HOLD_MS = 3000
+
+const wait = (ms: number) => new Promise((done) => setTimeout(done, ms))
+
 export class Accounts {
   private byEmail = new Map<string, Account>()
   /** 지금 살아 있는 표. 토큰 하나가 계정 하나를 가리킨다. */
   private sessions = new Map<string, string>()
+  private store: AccountStore | null
+  /**
+   * 밖에 둔 것을 못 읽었다.
+   *
+   * 이때 빈 채로 열면 안 된다 — 가입해 둔 사람들이 「없는 계정」이 되어 다시 가입하고,
+   * 그러면 같은 이메일로 줄이 둘 생긴다. 차라리 계정 기능을 닫는다. 게스트는 그대로 된다.
+   */
+  private locked = false
+  /** 아직 밖으로 못 보낸 전적. 이메일로 모아 두므로 같은 사람이 두 판 끝내도 한 번 나간다. */
+  private pending = new Set<string>()
+  private drain: ReturnType<typeof setTimeout> | null = null
+  private retryWaitMs: number
+  private holdMs: number
+
+  /**
+   * @param timing 기다리는 시간. 테스트가 몇 초를 앉아서 보내지 않게 하려고 열어 두었다 —
+   *               운영에서는 넘기지 않고 위의 상수를 그대로 쓴다.
+   */
+  constructor(
+    store: AccountStore | null = null,
+    timing: { retryWaitMs?: number; holdMs?: number } = {},
+  ) {
+    this.store = store
+    this.retryWaitMs = timing.retryWaitMs ?? LOAD_WAIT_MS
+    this.holdMs = timing.holdMs ?? HOLD_MS
+  }
 
   /** 몇 명이 계정을 만들었나. 서버 상태를 볼 때 쓴다. */
   get size(): number {
     return this.byEmail.size
   }
 
-  signup(rawEmail: string, password: string, rawNickname: string): Result<Session> {
+  /**
+   * 밖에 둔 계정을 메모리로 옮긴다. 부팅 때 한 번만 부른다.
+   *
+   * 저장소가 없으면 아무 일도 하지 않는다 — 그때는 메모리만으로 도는 것이 정상이다.
+   */
+  async load(): Promise<void> {
+    if (!this.store) return
+
+    for (let tried = 1; tried <= LOAD_TRIES; tried += 1) {
+      try {
+        const loaded = await this.store.loadAll()
+        this.byEmail.clear()
+        for (const one of loaded) {
+          this.byEmail.set(one.email, {
+            email: one.email,
+            nickname: one.nickname,
+            salt: one.passwordSalt,
+            hash: one.passwordHash,
+            record: { wins: one.wins, losses: one.losses },
+            counted: new Set(),
+          })
+        }
+        this.locked = false
+        logLine('info', `계정 ${this.byEmail.size}개를 읽었다`)
+        return
+      } catch (trouble) {
+        logLine('error', `계정을 읽지 못했다 (${tried}/${LOAD_TRIES})`, trouble)
+        if (tried < LOAD_TRIES) await wait(this.retryWaitMs * tried)
+      }
+    }
+
+    this.locked = true
+    logLine('error', '계정 기능을 잠근다. 빈 채로 열면 같은 이메일로 줄이 둘 생긴다')
+  }
+
+  /** 밖에 둔 것을 못 읽어 계정 기능이 닫혀 있는가. 화면이 이유를 말할 수 있어야 한다. */
+  get closed(): boolean {
+    return this.locked
+  }
+
+  /** 모아 둔 것을 마저 내보내고 시계를 멈춘다. 서버가 닫힐 때 부른다. */
+  stop(): void {
+    if (this.drain) clearTimeout(this.drain)
+    this.drain = null
+  }
+
+  async signup(rawEmail: string, password: string, rawNickname: string): Promise<Result<Session>> {
+    if (this.locked) return err('NOT_SIGNED_IN', '계정 기능을 지금 쓸 수 없습니다. 게스트로 해 주세요.')
+
     const email = normalizeEmail(rawEmail)
     if (!email) return err('INVALID_NICKNAME', '이메일 주소를 다시 확인해 주세요.')
 
@@ -84,17 +172,45 @@ export class Accounts {
     if (this.byEmail.has(email)) return err('INVALID_SETTINGS', '이미 쓰이는 이메일입니다.')
 
     const salt = randomBytes(16).toString('hex')
-    return ok(this.open(this.put({
+    const account: Account = {
       email,
       nickname,
       salt,
       hash: hash(password, salt),
       record: { ...EMPTY },
       counted: new Set(),
-    })))
+    }
+
+    /*
+     * 밖에 먼저 쓰고 성공을 확인한 뒤에야 메모리에 넣는다. 순서를 뒤집으면 「가입됐다」고
+     * 말해 놓고 서버가 다시 뜨는 순간 그 계정이 없어진다.
+     *
+     * 있는지도 메모리만 믿지 않고 한 번 더 물어본다 — 드문 동작이라 값이 싸고,
+     * 부팅 로딩이 반쯤 어긋났을 때 같은 이메일로 줄이 둘 생기는 것을 막는다.
+     */
+    if (this.store) {
+      try {
+        if (await this.store.has(email)) return err('INVALID_SETTINGS', '이미 쓰이는 이메일입니다.')
+        await this.store.create({
+          email,
+          nickname,
+          passwordHash: account.hash,
+          passwordSalt: account.salt,
+          wins: 0,
+          losses: 0,
+        })
+      } catch (trouble) {
+        logLine('error', '계정을 만들지 못했다', trouble)
+        return err('INVALID_SETTINGS', '계정을 만들지 못했습니다. 잠시 뒤에 다시 시도해 주세요.')
+      }
+    }
+
+    return ok(this.open(this.put(account)))
   }
 
   login(rawEmail: string, password: string): Result<Session> {
+    if (this.locked) return err('NOT_SIGNED_IN', '계정 기능을 지금 쓸 수 없습니다. 게스트로 해 주세요.')
+
     /*
      * 없는 이메일과 틀린 비밀번호를 같은 말로 돌려보낸다. 갈라 말하면 어느 주소가
      * 쓰이고 있는지 물어보는 것만으로 알 수 있다.
@@ -138,7 +254,43 @@ export class Accounts {
       wins: account.record.wins + (outcome === 'win' ? 1 : 0),
       losses: account.record.losses + (outcome === 'lose' ? 1 : 0),
     }
+    this.later(account.email)
     return ok({ ...account.record })
+  }
+
+  /**
+   * 전적을 밖으로 흘려보낸다. **사람은 기다리지 않는다.**
+   *
+   * 열 명이 앉은 판이 끝나면 쓰기 열 건이 한꺼번에 나가는데, CMA 는 초당 일곱 건쯤에서
+   * 막는다. 몇 초 모았다가 한 사람씩 간격을 두고 내보낸다. 이메일로 모으므로 그 사이에
+   * 같은 사람이 두 판을 끝내도 마지막 값 한 번만 나간다.
+   *
+   * 실패는 삼킨다. 전적 한 줄 때문에 판을 멈출 이유가 없고, 다음 판이 끝나면 그때의
+   * 값이 다시 나간다 — 늦게 맞으면 된다.
+   */
+  private later(email: string): void {
+    if (!this.store) return
+    this.pending.add(email)
+    if (this.drain) return
+    this.drain = setTimeout(() => void this.flush(), this.holdMs)
+    this.drain.unref?.()
+  }
+
+  private async flush(): Promise<void> {
+    this.drain = null
+    const going = [...this.pending]
+    this.pending.clear()
+
+    for (const email of going) {
+      const account = this.byEmail.get(email)
+      if (!account || !this.store) continue
+      try {
+        await this.store.saveRecord(email, account.record.wins, account.record.losses)
+      } catch (trouble) {
+        logLine('error', `전적을 남기지 못했다: ${email}`, trouble)
+      }
+      await wait(DRAIN_MS)
+    }
   }
 
   /** 표를 들고 있는 계정. 저장소에 넘길 것을 고를 때 쓴다. */
