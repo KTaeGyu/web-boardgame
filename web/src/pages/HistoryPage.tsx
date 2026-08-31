@@ -1,24 +1,22 @@
 /**
  * 지난 기록.
  *
- * **두 곳에 있다.** 로그인했으면 계정의 것이 맨 위에 서고, 그 아래에 이 기기에 남은
- * 것들이 온다. 기록은 성취감을 위한 것이지 순위표가 아니라, 남과 견주는 자리가 아니다.
+ * **계정의 것만 보여준다.** 예전에는 기기(localStorage)에 닉네임을 열쇠로 쌓았는데,
+ * 계정이 생기면서 같은 것이 두 곳에 있게 됐다. 두 벌을 두면 어느 쪽이 진짜인지 매번
+ * 골라야 하고, 서버가 다시 뜬 뒤에는 두 수가 어긋난 채로 나란히 선다.
  *
- * 계정 쪽은 서버 메모리라 서버가 다시 뜨면 사라지고, 기기 쪽은 그때도 남는다.
- * 그래서 둘 중 하나를 지우지 않는다 — 서로가 서로의 뒷자리다.
+ * 그래서 세는 자리를 하나로 줄였다. **그 대신 서버가 잠들면 전적도 함께 사라진다.**
+ * 화면이 그 사실을 적어야 한다 — 사라진 것을 잃어버린 것으로 읽으면 안 된다.
+ *
+ * 순위표가 아니다. 남과 견주는 자리가 아니라 스스로 보는 자리다.
  */
 
 import { Link } from 'react-router-dom'
 
 import { useSession } from '../lib/auth.ts'
-import { getNickname } from '../lib/identity.ts'
-import { allNames, statsOf } from '../lib/history.ts'
 
 export function HistoryPage() {
   const me = useSession()
-  const nickname = getNickname()
-  const mine = me ? me.record : statsOf(nickname)
-  const others = allNames().filter((one) => one.nickname !== nickname.trim())
 
   return (
     <main className="page page--narrow">
@@ -28,57 +26,41 @@ export function HistoryPage() {
 
       <h1 className="section-title">지난 기록</h1>
 
-      {nickname ? (
+      {me ? (
         <section className="panel record">
-          <p className="record__name">
-            {nickname}
-            {me && ' — 계정'}
-          </p>
+          <p className="record__name">{me.name}</p>
           <p className="record__played">
-            <strong>{mine.played}</strong>판
+            <strong>{me.record.played}</strong>판
           </p>
           <dl className="record__grid">
             <div>
               <dt>이김</dt>
-              <dd className="record__win">{mine.wins}</dd>
+              <dd className="record__win">{me.record.wins}</dd>
             </div>
             <div>
               <dt>짐</dt>
-              <dd className="record__lose">{mine.losses}</dd>
+              <dd className="record__lose">{me.record.losses}</dd>
             </div>
             <div>
               <dt>도중에 나감</dt>
-              <dd>{mine.quits}</dd>
+              <dd>{me.record.quits}</dd>
             </div>
           </dl>
-          {mine.played === 0 && (
+          {me.record.played === 0 && (
             <p className="record__empty">아직 끝까지 간 판이 없습니다. 한 판 하고 오세요.</p>
           )}
         </section>
       ) : (
-        <p className="empty">닉네임을 먼저 정해 주세요.</p>
-      )}
-
-      {others.length > 0 && (
-        <>
-          <h2 className="section-title record__section">이 기기의 다른 이름</h2>
-          <ul className="record__others">
-            {others.map((one) => (
-              <li key={one.nickname}>
-                <span className="record__others-name">{one.nickname}</span>
-                <span className="record__others-line">
-                  {one.record.played}판 · {one.record.wins}승 {one.record.losses}패
-                  {one.record.quits > 0 && ` · 중도 ${one.record.quits}`}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </>
+        /* 게스트는 쌓이는 곳이 없다. 없다는 것을 「아직 없다」로 읽히게 두면 안 된다. */
+        <p className="empty">
+          전적은 계정에 쌓입니다.
+          <br />
+          게스트로 한 판은 세지 않습니다.
+        </p>
       )}
 
       <p className="record__note">
-        기록은 이 브라우저에만 남습니다. 기기를 바꾸면 따라오지 않고, 브라우저 데이터를 지우면
-        함께 사라집니다.
+        전적은 서버가 도는 동안만 남습니다. 서버가 잠들면 계정과 함께 사라집니다.
       </p>
     </main>
   )

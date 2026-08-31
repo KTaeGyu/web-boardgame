@@ -506,38 +506,6 @@ select {
   color: var(--ink-dim);
 }
 
-.record__section {
-  margin-top: 28px;
-  font-size: 15px;
-}
-
-.record__others {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 8px;
-}
-
-.record__others li {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 10px 12px;
-  border: 1px solid var(--line);
-  border-radius: 9px;
-}
-
-.record__others-name {
-  font-weight: 600;
-}
-
-.record__others-line {
-  font-size: 13px;
-  color: var(--ink-dim);
-}
-
 .record__note {
   margin-top: 24px;
   font-size: 12px;

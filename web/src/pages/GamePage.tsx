@@ -25,7 +25,6 @@ import { ConfirmModal } from '../components/Modal.tsx'
 import { CardSlot, PlayingCard } from '../components/PlayingCard.tsx'
 import { Token, TokenBlank, TokenHole } from '../components/Token.tsx'
 import { useBackIntercept } from '../lib/back.ts'
-import { record } from '../lib/history.ts'
 import { getNickname, getPlayerId } from '../lib/identity.ts'
 import { sfx } from '../lib/sfx.ts'
 import { call, socket, useServerEvent } from '../lib/socket.ts'
@@ -607,17 +606,16 @@ export function GamePage({ spectating = false }: { spectating?: boolean } = {}) 
   useEffect(() => {
     if (spectating || tutorial || !game) return
     if (game.phase !== 'gameOver' || !game.outcome) return
-    const outcome = game.outcome === 'win' ? 'win' : 'lose'
-    const once = `${code}:${game.heist}:${game.outcome}`
-    record(nickname, outcome, once)
-    // 로그인했으면 계정에도 적는다. 게스트면 아무 일도 하지 않는다.
-    void recordPlay(outcome, once)
-  }, [spectating, tutorial, game, nickname, code])
+    // 로그인했을 때만 쌓인다. 게스트로 한 판은 세지 않는다 — 쌓을 곳이 없다.
+    void recordPlay(
+      game.outcome === 'win' ? 'win' : 'lose',
+      `${code}:${game.heist}:${game.outcome}`,
+    )
+  }, [spectating, tutorial, game, code])
 
   /** 판이 끝나기 전에 스스로 나가는 것은 중도포기다. */
   function leaveNow() {
     if (!spectating && !tutorial && game && game.phase !== 'gameOver') {
-      record(nickname, 'quit', `${code}:${game.heist}:quit`)
       void recordPlay('quit', `${code}:${game.heist}:quit`)
     }
     setConfirmLeave(false)
