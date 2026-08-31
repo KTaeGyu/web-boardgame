@@ -1610,6 +1610,57 @@ body.scroll-locked {
   font-size: 14px;
 }
 
+/* ── 포커 족보표 ──────────────────────── */
+
+/*
+ * 줄마다 예시 다섯 장과 이름 하나. 강한 것이 위다.
+ *
+ * 카드를 판 위의 것보다 작게 둔다 — 여기서는 무슨 카드인지 읽히기만 하면 되고,
+ * 대신 이름이 한 줄에 서야 위아래로 훑을 때 눈이 미끄러진다.
+ */
+.ranks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.ranks__row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.ranks__cards {
+  display: flex;
+  gap: 3px;
+  flex: none;
+}
+
+.ranks__cards .card {
+  width: 34px;
+  height: 48px;
+  border-radius: 5px;
+  /* 쉰 장이 한꺼번에 날아들 이유가 없다. 표는 놓여 있는 것이지 나눠주는 것이 아니다. */
+  animation: none;
+}
+
+.ranks__cards .card__rank {
+  font-size: 12px;
+}
+
+.ranks__cards .card__suit {
+  font-size: 11px;
+}
+
+.ranks__name {
+  font-size: 14px;
+  font-weight: 600;
+  /* 두 줄이 될 때 낱말 가운데서 끊기지 않게. */
+  word-break: keep-all;
+}
+
 /* ── 상태 표시 ────────────────────────── */
 .error {
   margin: 14px 0 0;
@@ -2041,6 +2092,31 @@ body.scroll-locked {
    *
    * 방 번호는 줄이지 않는다. 불러줄 때 읽어야 하는 것이라 여기서 제일 큰 값이다.
    */
+  /*
+   * 족보표. 카드 다섯 장과 이름이 한 줄에 서야 하는데, 320px 에서는 창 안쪽이
+   * 292px 뿐이다. 카드를 한 단계 줄여 이름에 자리를 넘긴다.
+   */
+  .ranks__cards .card {
+    width: 27px;
+    height: 38px;
+  }
+
+  .ranks__cards .card__rank {
+    font-size: 10px;
+  }
+
+  .ranks__cards .card__suit {
+    font-size: 9px;
+  }
+
+  .ranks__row {
+    gap: 8px;
+  }
+
+  .ranks__name {
+    font-size: 13px;
+  }
+
   .room-header__host {
     font-size: 20px;
     /* 줄을 바꾸는 대신 이 자리에서 줄어들게 한다. 0 이 없으면 글자 길이만큼 버틴다. */

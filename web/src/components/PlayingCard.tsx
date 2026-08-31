@@ -9,13 +9,23 @@ interface Props {
   delay?: number
   /** 지금 내 족보를 이루는 카드인지. 어떤 조합인지 짚어 보여줄 때 켠다. */
   highlight?: boolean
+  /** 뒤로 물릴 카드인지. 족보표에서 족보를 이루지 않는 카드를 어둡게 덮는다. */
+  dim?: boolean
 }
 
 const RED: Suit[] = ['h', 'd']
 
-export function PlayingCard({ card, faceDown = false, size = 'md', delay = 0, highlight = false }: Props) {
+export function PlayingCard({
+  card,
+  faceDown = false,
+  size = 'md',
+  delay = 0,
+  highlight = false,
+  dim = false,
+}: Props) {
   const classes = ['card', `card--${size}`, faceDown || !card ? 'card--back' : 'card--face']
   if (highlight) classes.push('card--highlight')
+  if (dim) classes.push('card--dim')
 
   if (faceDown || !card) {
     return <div className={classes.join(' ')} style={{ animationDelay: `${delay}ms` }} aria-label="뒷면 카드" />

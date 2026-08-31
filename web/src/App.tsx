@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 
 import { DensityToggle } from './components/DensityToggle.tsx'
+import { HandRanks } from './components/HandRanks.tsx'
 import { ReportLink } from './components/ReportLink.tsx'
 import { ServerGate } from './components/ServerGate.tsx'
 import { SoundPanel } from './components/SoundPanel.tsx'
@@ -77,6 +78,7 @@ function Tools() {
       <SoundPanel />
       <DensityToggle />
       <ThemeToggle />
+      <HandRanks />
     </div>
   )
 }

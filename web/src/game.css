@@ -1028,6 +1028,17 @@
   color: #c02a2a;
 }
 
+/*
+ * 뒤로 물린 카드. 족보표에서 족보를 이루지 않는 자리다.
+ *
+ * 지우거나 비우지 않는 것은 「다섯 장 중 몇 장이 족보인가」가 이 표의 요점이기
+ * 때문이다. 자리는 그대로 두고 어둡게 덮는다. 카드는 두 테마가 같은 색이라
+ * 어느 쪽에서 봐도 같은 만큼 어두워진다.
+ */
+.card--dim {
+  filter: brightness(0.72) saturate(0.75);
+}
+
 .card--back {
   background: repeating-linear-gradient(45deg, #2a3f6e 0 6px, #22355d 6px 12px);
   border: 1px solid #16233d;
