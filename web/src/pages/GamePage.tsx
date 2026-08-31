@@ -613,11 +613,13 @@ export function GamePage({ spectating = false }: { spectating?: boolean } = {}) 
     )
   }, [spectating, tutorial, game, code])
 
-  /** 판이 끝나기 전에 스스로 나가는 것은 중도포기다. */
+  /*
+   * 판이 끝나기 전에 나간다.
+   *
+   * 전적에는 아무 줄도 남지 않는다 — 판이 어떻게 끝났는지 모르는 채로 자리를 뜬 것이라
+   * 승도 패도 아니다. 예전에는 「중도포기」로 세었는데, 세는 항목을 둘로 줄이면서 뺐다.
+   */
   function leaveNow() {
-    if (!spectating && !tutorial && game && game.phase !== 'gameOver') {
-      void recordPlay('quit', `${code}:${game.heist}:quit`)
-    }
     setConfirmLeave(false)
     void leave(navigate, tutorial)
   }

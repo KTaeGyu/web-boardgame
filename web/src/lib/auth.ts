@@ -1,10 +1,9 @@
 /**
  * 로그인.
  *
- * **서버 메모리에만 있다.** 서버를 다시 띄우면 계정도 표도 사라진다 — 무료 요금제는
- * 15분 동안 아무도 오지 않으면 잠들고, 깨어날 때 비어 있다. 그래서 이것은 증명서가
- * 아니라 「지금 이 서버가 도는 동안 내 이름을 남이 못 쓰게 하는 것」이다.
- * 화면도 그렇게 적는다 — 비밀번호를 받아 두고 남는다고 믿게 하면 그것이 더 나쁘다.
+ * 계정이 하는 일은 **같은 사람이 돌아왔을 때 전적을 이어 주는 것**이다. 닉네임을
+ * 붙들어 두지는 않는다 — 계정이 있어도 그 이름은 남도 쓴다. 그래서 방에 들어가는
+ * 요청은 이 표를 싣지 않는다.
  *
  * **표는 sessionStorage 에 둔다.** 정체성(playerId)과 같은 자리다. localStorage 로
  * 옮기면 창을 새로 열어도 로그인이 따라오지만, 대신 한 브라우저에서 여러 명으로 붙어
@@ -29,7 +28,7 @@ function read(): Session | null {
     const raw = sessionStorage.getItem(KEY)
     if (!raw) return null
     const parsed = JSON.parse(raw) as Partial<Session>
-    if (typeof parsed?.token !== 'string' || typeof parsed?.name !== 'string') return null
+    if (typeof parsed?.token !== 'string' || typeof parsed?.email !== 'string') return null
     return parsed as Session
   } catch {
     return null
@@ -44,8 +43,11 @@ function put(session: Session | null): void {
   } catch {
     /* 기억하지 못할 뿐이다 */
   }
-  // 로그인하면 이름이 계정 이름이다. 방에 들어갈 때 쓰는 이름과 갈리면 안 된다.
-  if (session) setNickname(session.name)
+  /*
+   * 로그인하면 그 계정의 닉네임으로 앉는다. 유일한 이름은 아니지만, 계정을 만들 때
+   * 적어 둔 이름을 다시 치게 할 이유가 없다.
+   */
+  if (session) setNickname(session.nickname)
   for (const watch of watchers) watch(session)
 }
 
@@ -54,20 +56,15 @@ export function session(): Session | null {
   return current
 }
 
-/** 방에 들어가는 요청에 함께 싣는다. 계정 이름으로 들어오려면 이것이 있어야 한다. */
-export function authToken(): string | undefined {
-  return current?.token
-}
-
-export async function signup(name: string, password: string): Promise<string | null> {
-  const result = await call<Session>('auth:signup', { name, password })
+export async function signup(email: string, password: string, nickname: string): Promise<string | null> {
+  const result = await call<Session>('auth:signup', { email, password, nickname })
   if (!result.ok) return result.message
   put(result.value)
   return null
 }
 
-export async function login(name: string, password: string): Promise<string | null> {
-  const result = await call<Session>('auth:login', { name, password })
+export async function login(email: string, password: string): Promise<string | null> {
+  const result = await call<Session>('auth:login', { email, password })
   if (!result.ok) return result.message
   put(result.value)
   return null
@@ -82,9 +79,9 @@ export async function logout(): Promise<void> {
 /**
  * 표가 아직 사는지 서버에 묻는다.
  *
- * 새로고침한 뒤와 다시 붙은 뒤에 부른다. 서버가 그 사이에 다시 떴으면 계정이
- * 통째로 없어졌을 수 있고, 그때는 로그인하지 않은 것으로 돌아가야 한다 —
- * 화면만 로그인한 척하고 있으면 방에 들어갈 때 이름이 막힌다.
+ * 새로고침한 뒤와 다시 붙은 뒤에 부른다. 서버가 그 사이에 다시 떴으면 표가 죽었을 수
+ * 있고, 그때는 로그인하지 않은 것으로 돌아가야 한다 — 화면만 로그인한 척하고 있으면
+ * 판이 끝나도 전적이 어디에도 안 쌓인다.
  */
 export async function resume(): Promise<void> {
   const token = current?.token

@@ -3,10 +3,10 @@
  *
  * **계정의 것만 보여준다.** 예전에는 기기(localStorage)에 닉네임을 열쇠로 쌓았는데,
  * 계정이 생기면서 같은 것이 두 곳에 있게 됐다. 두 벌을 두면 어느 쪽이 진짜인지 매번
- * 골라야 하고, 서버가 다시 뜬 뒤에는 두 수가 어긋난 채로 나란히 선다.
+ * 골라야 하고, 두 수가 어긋난 채로 나란히 서게 된다. 그래서 세는 자리를 하나로 줄였다.
  *
- * 그래서 세는 자리를 하나로 줄였다. **그 대신 서버가 잠들면 전적도 함께 사라진다.**
- * 화면이 그 사실을 적어야 한다 — 사라진 것을 잃어버린 것으로 읽으면 안 된다.
+ * 세는 것은 **이긴 판과 진 판**뿐이다. 도중에 나간 판은 승도 패도 아니라 아무 줄도
+ * 남기지 않는다.
  *
  * 순위표가 아니다. 남과 견주는 자리가 아니라 스스로 보는 자리다.
  */
@@ -28,10 +28,11 @@ export function HistoryPage() {
 
       {me ? (
         <section className="panel record">
-          <p className="record__name">{me.name}</p>
+          <p className="record__name">{me.nickname}</p>
           <p className="record__played">
-            <strong>{me.record.played}</strong>판
+            <strong>{me.record.wins + me.record.losses}</strong>판
           </p>
+          {/* 도중에 나간 판은 여기에 없다. 승도 패도 아니라 셈에 들지 않는다. */}
           <dl className="record__grid">
             <div>
               <dt>이김</dt>
@@ -41,12 +42,8 @@ export function HistoryPage() {
               <dt>짐</dt>
               <dd className="record__lose">{me.record.losses}</dd>
             </div>
-            <div>
-              <dt>도중에 나감</dt>
-              <dd>{me.record.quits}</dd>
-            </div>
           </dl>
-          {me.record.played === 0 && (
+          {me.record.wins + me.record.losses === 0 && (
             <p className="record__empty">아직 끝까지 간 판이 없습니다. 한 판 하고 오세요.</p>
           )}
         </section>

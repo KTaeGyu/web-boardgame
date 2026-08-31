@@ -3,7 +3,6 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import type { RoomSummary, RoomView } from '@the-gang/shared'
 
 import { ChoiceModal } from '../components/Modal.tsx'
-import { authToken } from '../lib/auth.ts'
 import { getNickname, getPlayerId } from '../lib/identity.ts'
 import { createRoom } from '../lib/rooms.ts'
 import { call, socket, useConnected, useServerEvent } from '../lib/socket.ts'
@@ -102,7 +101,6 @@ export function RoomsPage() {
       playerId: getPlayerId(),
       nickname,
       code: room.code,
-      authToken: authToken(),
     })
     setBusy(false)
     setAsking(null)

@@ -21,7 +21,6 @@ import {
   type RoomView,
 } from '@the-gang/shared'
 
-import { authToken } from '../lib/auth.ts'
 import { CardPicker } from '../components/CardPicker.tsx'
 import { Chat } from '../components/Chat.tsx'
 import { SpecialistGrid } from '../components/SpecialistGrid.tsx'
@@ -83,12 +82,7 @@ export function RoomPage() {
 
   /** 자리에서 물러나 보기만 한다. 성공해야 주소를 바꾼다 — 거절당하면 자리는 그대로다. */
   async function becomeWatcher() {
-    const result = await call<RoomView>('room:spectate', {
-      playerId,
-      nickname,
-      code,
-      authToken: authToken(),
-    })
+    const result = await call<RoomView>('room:spectate', { playerId, nickname, code })
     if (!result.ok) {
       setError(result.message)
       return
@@ -150,7 +144,6 @@ export function RoomPage() {
         playerId,
         nickname,
         code,
-        authToken: authToken(),
       })
       if (!alive) return
       if (result.ok) {

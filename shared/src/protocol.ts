@@ -217,15 +217,18 @@ export type ErrorCode =
 
 export type Result<T> = { ok: true; value: T } | { ok: false; code: ErrorCode; message: string }
 
-/** 계정의 전적. 승·패·중도포기의 합만 센다 — 끝을 본 판이 그 셋뿐이다. */
+/**
+ * 계정의 전적. **이긴 판과 진 판만 센다.**
+ *
+ * 도중에 나간 판은 아무 줄도 남기지 않는다 — 판이 어떻게 끝났는지 모르는 채로
+ * 자리를 뜬 것이라, 승도 패도 아니다. 세는 항목이 둘뿐이라 화면도 한 줄로 끝난다.
+ */
 export interface PlayRecord {
-  played: number
   wins: number
   losses: number
-  quits: number
 }
 
-export type PlayOutcome = 'win' | 'lose' | 'quit'
+export type PlayOutcome = 'win' | 'lose'
 
 /**
  * 로그인한 사람.
@@ -234,26 +237,36 @@ export type PlayOutcome = 'win' | 'lose' | 'quit'
  * 15분 동안 아무도 오지 않으면 잠들고, 깨어날 때 비어 있다. 화면이 그 사실을 적어야 한다.
  */
 export interface Session {
-  /** 이 창이 들고 다니는 표. sessionStorage 에 둔다 — 창마다 다른 사람일 수 있어야 한다. */
+  /** 이 창이 들고 다니는 표. */
   token: string
-  name: string
+  /** 계정을 가리키는 값. 이것만 유일하다. */
+  email: string
+  /** 테이블에서 불릴 이름. **유일하지 않다** — 같은 이름이 둘 앉으면 [1] [2] 가 붙는다. */
+  nickname: string
   record: PlayRecord
 }
 
 export const PASSWORD_MIN = 4
 export const PASSWORD_MAX = 64
+export const EMAIL_MAX = 254
+
+/**
+ * 이메일인가.
+ *
+ * 보내서 확인하지 않으므로 **주인임을 증명하지 않는다.** 여기서 보는 것은 「사람이
+ * 자기 것으로 알아볼 만한 유일한 글자인가」뿐이다. 그래서 규격을 끝까지 따지지 않고
+ * 오타에 가까운 것만 걸러낸다 — 엄하게 잡으면 멀쩡한 주소가 막힌다.
+ */
+export function normalizeEmail(raw: string): string | null {
+  const trimmed = raw.trim().toLowerCase()
+  if (trimmed.length === 0 || trimmed.length > EMAIL_MAX) return null
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed) ? trimmed : null
+}
 
 export interface Identity {
   /** 브라우저 sessionStorage 에 저장된 랜덤 id. 닉네임이 아니라 이것이 정체성이다. */
   playerId: string
   nickname: string
-  /**
-   * 로그인했다면 그 표. 계정 이름으로 들어오려면 이것이 있어야 한다.
-   *
-   * 정체성(playerId)과 다른 것이다 — 저쪽은 「이 창이 누구인가」이고 이쪽은
-   * 「이 이름을 쓸 자격이 있는가」다. 게스트에게는 없다.
-   */
-  authToken?: string
 }
 
 /** 클라이언트 → 서버. 모두 ack 콜백으로 결과를 돌려받는다. */
@@ -273,13 +286,20 @@ export interface ClientToServerEvents {
   'room:where': (payload: { playerId: string }, ack: (result: Result<string | null>) => void) => void
 
   /*
-   * 계정. 이름을 붙들어 두고 전적을 쌓는다.
+   * 계정. 이메일로 사람을 가리키고 전적을 쌓는다.
    *
-   * 게스트는 아무것도 부르지 않는다 — 지금처럼 이름만 치고 들어간다. 다만 남의 계정
-   * 이름은 쓸 수 없다. 그것을 막지 못하면 계정을 만든 뜻이 없다.
+   * **닉네임은 붙들어 두지 않는다.** 계정이 있어도 그 이름은 남도 쓸 수 있다 —
+   * 테이블에서 같은 이름이 둘이면 예전처럼 [1] [2] 가 붙는다. 게스트는 아무것도
+   * 부르지 않고 이름만 치고 들어간다.
    */
-  'auth:signup': (payload: { name: string; password: string }, ack: (result: Result<Session>) => void) => void
-  'auth:login': (payload: { name: string; password: string }, ack: (result: Result<Session>) => void) => void
+  'auth:signup': (
+    payload: { email: string; password: string; nickname: string },
+    ack: (result: Result<Session>) => void,
+  ) => void
+  'auth:login': (
+    payload: { email: string; password: string },
+    ack: (result: Result<Session>) => void,
+  ) => void
   /** 새로고침하고 돌아왔다. 표가 살아 있으면 다시 치지 않는다. */
   'auth:resume': (payload: { token: string }, ack: (result: Result<Session>) => void) => void
   'auth:logout': (payload: { token: string }, ack: (result: Result<null>) => void) => void

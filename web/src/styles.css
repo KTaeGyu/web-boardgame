@@ -237,8 +237,16 @@ select {
   color: var(--danger-ink);
 }
 
+/* 계정을 가리키는 값이지만 불릴 이름은 아니다. 닉네임 아래에 작게 둔다. */
+.signed__email {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--ink-dim);
+  word-break: break-all;
+}
+
 .signed__record {
-  margin: 6px 0 0;
+  margin: 8px 0 0;
   font-size: 13px;
   color: var(--ink-dim);
 }
@@ -474,9 +482,10 @@ select {
   margin-right: 4px;
 }
 
+/* 이김·짐 둘뿐이다. 도중에 나간 판은 승도 패도 아니라 칸이 없다. */
 .record__grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 10px;
   margin: 0;
 }
