@@ -1962,3 +1962,47 @@ button.token:hover:not(:disabled) {
     animation: none;
   }
 }
+
+/* ══════════════════════════════════════════════════════════
+ * 아주 좁은 화면 (400px 아래). styles.css 끝의 같은 단계와 짝이다.
+ *
+ * 판 쪽 규칙을 여기에 따로 두는 이유가 있다. game.css 가 styles.css 뒤에 실려서,
+ * 우선순위가 같으면 이쪽이 이긴다 — 저쪽에서 `.btn` 을 조여도 `.showdown__leave`
+ * 처럼 여기서 제 글자 크기를 정한 것들은 그대로 남는다.
+ * ══════════════════════════════════════════════════════════ */
+@media (max-width: 400px) {
+  .game {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  /* 아래 붙는 막대는 대기실과 좌우 선을 맞춘다. 화면을 옮겨도 단추가 같은 자리에 선다. */
+  .game-actions {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .showdown__panel {
+    padding: 18px 14px calc(18px + env(safe-area-inset-bottom));
+  }
+
+  /*
+   * 「다음 금고로」 줄. 화면을 통틀어 여기 글자가 제일 길다 —
+   * 「다른 사람을 기다리는 중 (2/3)」 은 15px 로도 360px 에 한 줄로 안 들어간다.
+   * 이 줄에서만 한 단계 더 내리고, 옆의 나가기도 함께 좁혀 앞 버튼에 자리를 넘긴다.
+   */
+  .showdown__next {
+    gap: 6px;
+  }
+
+  .showdown__next .btn--primary {
+    padding-left: 10px;
+    padding-right: 10px;
+    font-size: 14px;
+  }
+
+  .showdown__leave {
+    padding: 0 10px;
+    font-size: 12px;
+  }
+}
