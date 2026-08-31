@@ -1548,6 +1548,13 @@ select {
   background: var(--card);
   padding: 24px;
   box-shadow: 0 20px 60px rgba(var(--shadow-rgb), 0.6);
+  /*
+   * 창 안을 끝까지 내려도 그 힘이 뒤 페이지로 넘어가지 않는다.
+   *
+   * 손가락은 창을 만지고 있는데 뒤가 움직이면, 창을 닫았을 때 읽던 자리가 달라져 있다.
+   * 내가 하지 않은 이동이라 되짚을 실마리가 없다. 스크롤이 없는 창에서는 아무 뜻도 없다.
+   */
+  overscroll-behavior: contain;
 }
 
 .modal--wide {

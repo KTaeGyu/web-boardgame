@@ -1444,6 +1444,8 @@ button.token:hover:not(:disabled) {
   background: var(--scrim);
   z-index: 5;
   overflow-y: auto;
+  /* 결과를 다 내려도 그 힘이 뒤 판으로 넘어가지 않는다. 모달과 같은 규칙이다. */
+  overscroll-behavior: contain;
 }
 
 .showdown__panel {
@@ -1951,6 +1953,7 @@ button.token:hover:not(:disabled) {
     max-width: none;
     max-height: calc(var(--app-height, 100dvh) * 0.94);
     overflow-y: auto;
+    overscroll-behavior: contain;
     border-width: 1px 0 0;
     border-radius: 16px 16px 0 0;
     padding: 22px 16px calc(22px + env(safe-area-inset-bottom));
