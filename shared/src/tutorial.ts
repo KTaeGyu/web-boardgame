@@ -20,7 +20,7 @@ import {
   type GameView,
 } from '@the-gang/shared'
 
-import type { Game } from './game.ts'
+import type { Game } from './engine.ts'
 
 /**
  * 봇이 한 번 움직이기까지 두는 사이.

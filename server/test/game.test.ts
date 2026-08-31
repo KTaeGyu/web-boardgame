@@ -2,7 +2,7 @@ import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 
 import { TOKEN_LOCK_MS } from '@the-gang/shared'
-import { Game, type StartingPlayer } from '../src/game.ts'
+import { Game, type StartingPlayer } from '@the-gang/shared/engine'
 
 /** 시계를 손으로 돌리는 판. 잠금과 라운드 전환을 실제로 기다리지 않는다. */
 function makeGame(count = 3, options: { lockMs?: number } = {}) {

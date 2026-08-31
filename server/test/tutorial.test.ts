@@ -11,8 +11,8 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 
-import { Game, type StartingPlayer } from '../src/game.ts'
-import { TIPS, Tutorial } from '../src/tutorial.ts'
+import { Game, type StartingPlayer } from '@the-gang/shared/engine'
+import { TIPS, Tutorial } from '@the-gang/shared/tutorial'
 
 function mulberry32(seed: number): () => number {
   let t = seed >>> 0

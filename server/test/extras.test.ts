@@ -25,8 +25,8 @@ import {
 /** 족보 이름 → 카테고리 번호. 스캔이 족보를 숫자로 주고받으므로 되짚을 표가 필요하다. */
 const HAND_ORDER = Object.values(CATEGORY_LABEL)
 const rankValue = (card: string) => rankValueOf(card as never)
-import { ExtraDealer } from '../src/extras.ts'
-import { Game, type StartingPlayer } from '../src/game.ts'
+import { ExtraDealer } from '@the-gang/shared/extraDealer'
+import { Game, type StartingPlayer } from '@the-gang/shared/engine'
 
 function mulberry32(seed: number): () => number {
   let t = seed >>> 0

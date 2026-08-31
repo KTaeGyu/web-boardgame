@@ -30,8 +30,8 @@ import {
 } from './config.ts'
 import { Accounts } from './accounts.ts'
 import type { AccountStore } from './accountStore.ts'
-import { Game } from './game.ts'
-import { Tutorial } from './tutorial.ts'
+import { Game } from '@the-gang/shared/engine'
+import { Tutorial } from '@the-gang/shared/tutorial'
 import { uniqueRoomCode } from './ids.ts'
 import { RoomStore } from './rooms.ts'
 

@@ -5,7 +5,10 @@
   "type": "module",
   "main": "./src/index.ts",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./engine": "./src/engine.ts",
+    "./extraDealer": "./src/extraDealer.ts",
+    "./tutorial": "./src/tutorial.ts"
   },
   "scripts": {
     "test": "node --test \"test/**/*.test.ts\""

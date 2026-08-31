@@ -48,7 +48,7 @@ import {
   type SpecialistId,
 } from '@the-gang/shared'
 
-import { ExtraDealer } from './extras.ts'
+import { ExtraDealer } from './extraDealer.ts'
 
 function err<T>(code: ErrorCode, message: string): Result<T> {
   return { ok: false, code, message }

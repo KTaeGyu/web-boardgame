@@ -2,7 +2,7 @@ import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 
 import { TOKEN_LOCK_MS } from '@the-gang/shared'
-import { Game } from '../src/game.ts'
+import { Game } from '@the-gang/shared/engine'
 
 /** 게임이 끝난 판을 만든다. 결과가 승이든 패든 재경기 규칙은 같다. */
 function finishedGame() {
