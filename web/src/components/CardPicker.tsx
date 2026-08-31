@@ -28,7 +28,7 @@ interface Props {
  * 이름만 칩으로 흘려 두고 설명은 짚을 때만 보여준다 — 손짓의 규칙은 useCardTip 에 있다.
  */
 export function CardPicker({ label, hint, options, picked, single, describePicked, disabled, onToggle }: Props) {
-  const { tip, handlers, wasReading } = useCardTip()
+  const { tip, handlers } = useCardTip()
   const pickedOption = describePicked ? options.find((option) => picked.includes(option.id)) : undefined
 
   return (
@@ -47,10 +47,7 @@ export function CardPicker({ label, hint, options, picked, single, describePicke
               disabled={disabled || option.locked}
               aria-pressed={on}
               {...handlers(option.text)}
-              onClick={() => {
-                if (wasReading()) return
-                onToggle(option.id)
-              }}
+              onClick={() => onToggle(option.id)}
             >
               <span className={`pick-chip__mark ${single ? 'pick-chip__mark--single' : ''}`} aria-hidden="true" />
               {option.name}

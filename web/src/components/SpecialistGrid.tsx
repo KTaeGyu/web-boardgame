@@ -37,7 +37,7 @@ export function SpecialistGrid({
   onRandomChange,
   onLossChange,
 }: Props) {
-  const { tip, handlers, wasReading } = useCardTip()
+  const { tip, handlers } = useCardTip()
   /** 몇 판이 채워졌나. 같은 카드가 여러 판에 설 수 있으므로 「장」이 아니라 「판」이다. */
   const filled = rounds.filter((id, at) => id !== null || randomRounds[at]).length
 
@@ -117,10 +117,7 @@ export function SpecialistGrid({
                   disabled={disabled}
                   aria-pressed={held === id}
                   aria-label={`${SPECIALISTS[id].name} — ${index + 1}판`}
-                  onClick={() => {
-                    if (wasReading()) return
-                    toggle(id, index)
-                  }}
+                  onClick={() => toggle(id, index)}
                 >
                   <span className="slot-cell__mark" aria-hidden="true" />
                 </button>
