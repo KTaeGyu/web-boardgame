@@ -28,6 +28,7 @@ import {
   MAX_ROOMS,
   SWEEP_INTERVAL_MS,
 } from './config.ts'
+import { Accounts } from './accounts.ts'
 import { Game } from './game.ts'
 import { Tutorial } from './tutorial.ts'
 import { uniqueRoomCode } from './ids.ts'
@@ -79,6 +80,27 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
   const tutorials = new Map<string, Tutorial>()
   /** 사람마다의 최근 말수. 도배를 막는 데만 쓴다. */
   const chatRate = new Map<string, { times: number[]; blockedUntil: number }>()
+  /**
+   * 계정. 방과 같은 자리에 있다 — 서버를 다시 띄우면 함께 사라진다.
+   * 서버만 할 수 있는 일은 하나, 같은 이름을 두 사람이 못 쓰게 하는 것이다.
+   */
+  const accounts = new Accounts()
+
+  /**
+   * 이 이름으로 들어와도 되는가.
+   *
+   * 계정 이름은 그 사람만 쓴다. 막지 못하면 계정을 만든 뜻이 없다 — 아무나 그 이름을
+   * 적고 들어와 남의 이름으로 앉을 수 있다. 계정이 아닌 이름은 예전처럼 아무나 쓴다.
+   */
+  function nameFree(payload: Identity, nickname: string): Result<null> {
+    if (!accounts.taken(nickname)) return { ok: true, value: null }
+    if (accounts.owns(String(payload.authToken ?? ''), nickname)) return { ok: true, value: null }
+    return {
+      ok: false,
+      code: 'INVALID_NICKNAME',
+      message: '이미 계정이 쓰는 이름입니다. 로그인하거나 다른 이름을 적어 주세요.',
+    }
+  }
 
   const sendRoom = (room: RoomView) => io.to(room.code).emit('room:updated', room)
   const sendLobbyStats = () =>
@@ -189,6 +211,8 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
       if (!identity.ok) return ack(identity)
 
       const { playerId, nickname } = identity.value
+      const free = nameFree(payload, nickname)
+      if (!free.ok) return ack(free)
       const previous = store.codeOf(playerId)
       const result = store.createRoom(playerId, nickname)
       if (!result.ok) return ack(result)
@@ -211,6 +235,8 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
       }
 
       const { playerId, nickname } = identity.value
+      const free = nameFree(payload, nickname)
+      if (!free.ok) return ack(free)
       const previous = store.codeOf(playerId)
       const wanted = payload.code.trim().toUpperCase()
       // 혼자 해보는 방은 남이 들어올 자리가 아니다. 목록에 없지만 번호를 찍어 넣을 수는 있다.
@@ -359,6 +385,8 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
       }
 
       const { playerId, nickname } = identity.value
+      const free = nameFree(payload, nickname)
+      if (!free.ok) return ack(free)
       const previous = store.codeOf(playerId)
       const result = store.spectate(playerId, nickname, payload.code.trim())
       if (!result.ok) return ack(result)
@@ -444,6 +472,36 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
      * 매여 있지 않은데, 정작 그때가 이 물음이 필요한 자리다 — 자리는 유예 시간 동안
      * 남아 있고, 목록은 그 방을 정원 참으로 잠그고 있다.
      */
+    /*
+     * 계정. 이름을 붙들어 두고 전적을 쌓는다.
+     *
+     * 게스트는 이 길로 오지 않는다 — 지금처럼 이름만 치고 방으로 간다. 다만 남의 계정
+     * 이름은 쓸 수 없고, 그것은 방에 들어가는 자리에서 막는다(nameFree).
+     */
+    socket.on('auth:signup', ({ name, password }, ack) => {
+      ack(accounts.signup(String(name ?? ''), String(password ?? '')))
+    })
+
+    socket.on('auth:login', ({ name, password }, ack) => {
+      ack(accounts.login(String(name ?? ''), String(password ?? '')))
+    })
+
+    socket.on('auth:resume', ({ token }, ack) => {
+      ack(accounts.resume(String(token ?? '')))
+    })
+
+    socket.on('auth:logout', ({ token }, ack) => {
+      accounts.logout(String(token ?? ''))
+      ack({ ok: true, value: null })
+    })
+
+    socket.on('auth:record', ({ token, outcome, once }, ack) => {
+      if (outcome !== 'win' && outcome !== 'lose' && outcome !== 'quit') {
+        return ack({ ok: false, code: 'INVALID_SETTINGS', message: '알 수 없는 결과입니다.' })
+      }
+      ack(accounts.record(String(token ?? ''), outcome, String(once ?? '')))
+    })
+
     socket.on('room:where', ({ playerId }, ack) => {
       const id = String(playerId ?? '')
       if (!PLAYER_ID_PATTERN.test(id)) return ack({ ok: true, value: null })

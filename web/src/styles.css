@@ -176,6 +176,74 @@ select {
 }
 
 /*
+ * 계정 만들기. 단추 줄에 세우지 않는다 — 셋이 나란히 서면 무엇이 흔한 길인지 안 보인다.
+ * 계정을 만드는 것은 한 번뿐이고 로그인은 올 때마다다.
+ */
+.home-form__signup {
+  margin-top: 10px;
+  border: none;
+  background: none;
+  color: var(--ink-dim);
+  font-size: 13px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.home-form__signup:hover:not(:disabled) {
+  color: var(--gold);
+}
+
+.home-form__signup:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* ── 로그인한 사람 ────────────────────── */
+
+/*
+ * 이름 칸이 서 있던 자리다. 로그인하면 이름은 고칠 수 없으므로 칸이 아니라 글이 된다 —
+ * 고칠 수 있으면 계정이 이름을 붙들어 두는 뜻이 없다.
+ */
+.signed {
+  padding: 14px 16px;
+  border: 1px solid var(--gold-dim);
+  border-radius: 10px;
+  background: rgba(var(--gold-rgb), 0.06);
+}
+
+.signed__who {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.signed__name {
+  font-size: 20px;
+  color: var(--gold);
+}
+
+.signed__out {
+  flex: none;
+  border: none;
+  background: none;
+  color: var(--ink-dim);
+  font-size: 13px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.signed__out:hover {
+  color: var(--danger-ink);
+}
+
+.signed__record {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: var(--ink-dim);
+}
+
+/*
  * 넓은 화면의 첫 화면은 통째로 가운데에 놓인다.
  *
  * 좁은 화면에서는 버튼이 바닥에 붙어야 엄지에 닿지만(그쪽은 .home-form 이 남는 높이를

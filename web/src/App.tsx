@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 
+import { useResumeSession } from './lib/auth.ts'
 import { DensityToggle } from './components/DensityToggle.tsx'
 import { HandRanks } from './components/HandRanks.tsx'
 import { ReportLink } from './components/ReportLink.tsx'
@@ -21,6 +22,11 @@ export function App() {
   useViewportHeight()
   useClickSound()
   useBackgroundMusic()
+  /*
+   * 표가 아직 사는지 붙을 때마다 확인한다. 서버가 그 사이에 다시 떴으면 계정이 통째로
+   * 없어졌을 수 있고, 화면만 로그인한 척하고 있으면 방에 들어갈 때 이름이 막힌다.
+   */
+  useResumeSession()
 
   /** 서버가 감당할 인원을 넘겼다. 연결이 끊기기 전에 이유를 남긴다. */
   const [full, setFull] = useState('')

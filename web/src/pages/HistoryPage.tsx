@@ -1,21 +1,23 @@
 /**
  * 지난 기록.
  *
- * 이 기기에 남은 것만 보여준다. 서버는 아무것도 모른다 — 기록은 성취감을 위한 것이지
- * 순위표가 아니라, 남과 견주는 자리가 아니다.
+ * **두 곳에 있다.** 로그인했으면 계정의 것이 맨 위에 서고, 그 아래에 이 기기에 남은
+ * 것들이 온다. 기록은 성취감을 위한 것이지 순위표가 아니라, 남과 견주는 자리가 아니다.
  *
- * 지금 쓰는 이름을 맨 위에 크게 두고, 이 기기에서 쓰였던 다른 이름들은 아래에 작게 둔다.
- * 한 브라우저를 여럿이 돌려 쓰는 일이 있어서다.
+ * 계정 쪽은 서버 메모리라 서버가 다시 뜨면 사라지고, 기기 쪽은 그때도 남는다.
+ * 그래서 둘 중 하나를 지우지 않는다 — 서로가 서로의 뒷자리다.
  */
 
 import { Link } from 'react-router-dom'
 
+import { useSession } from '../lib/auth.ts'
 import { getNickname } from '../lib/identity.ts'
 import { allNames, statsOf } from '../lib/history.ts'
 
 export function HistoryPage() {
+  const me = useSession()
   const nickname = getNickname()
-  const mine = statsOf(nickname)
+  const mine = me ? me.record : statsOf(nickname)
   const others = allNames().filter((one) => one.nickname !== nickname.trim())
 
   return (
@@ -28,7 +30,10 @@ export function HistoryPage() {
 
       {nickname ? (
         <section className="panel record">
-          <p className="record__name">{nickname}</p>
+          <p className="record__name">
+            {nickname}
+            {me && ' — 계정'}
+          </p>
           <p className="record__played">
             <strong>{mine.played}</strong>판
           </p>

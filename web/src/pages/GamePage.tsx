@@ -13,6 +13,7 @@ import {
   type Round,
 } from '@the-gang/shared'
 
+import { recordPlay } from '../lib/auth.ts'
 import { Chat } from '../components/Chat.tsx'
 import { ExtrasDrawer, NoteCard, type CardNote } from '../components/ExtrasDrawer.tsx'
 import { ScanVote } from '../components/ScanVote.tsx'
@@ -606,13 +607,18 @@ export function GamePage({ spectating = false }: { spectating?: boolean } = {}) 
   useEffect(() => {
     if (spectating || tutorial || !game) return
     if (game.phase !== 'gameOver' || !game.outcome) return
-    record(nickname, game.outcome === 'win' ? 'win' : 'lose', `${code}:${game.heist}:${game.outcome}`)
+    const outcome = game.outcome === 'win' ? 'win' : 'lose'
+    const once = `${code}:${game.heist}:${game.outcome}`
+    record(nickname, outcome, once)
+    // 로그인했으면 계정에도 적는다. 게스트면 아무 일도 하지 않는다.
+    void recordPlay(outcome, once)
   }, [spectating, tutorial, game, nickname, code])
 
   /** 판이 끝나기 전에 스스로 나가는 것은 중도포기다. */
   function leaveNow() {
     if (!spectating && !tutorial && game && game.phase !== 'gameOver') {
       record(nickname, 'quit', `${code}:${game.heist}:quit`)
+      void recordPlay('quit', `${code}:${game.heist}:quit`)
     }
     setConfirmLeave(false)
     void leave(navigate, tutorial)

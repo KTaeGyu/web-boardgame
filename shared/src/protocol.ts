@@ -210,13 +210,50 @@ export type ErrorCode =
   | 'INVALID_TOKEN'
   | 'TOKEN_LOCKED'
   | 'TOO_FAST'
+  /** 이름이나 비밀번호가 맞지 않다. 둘을 갈라 말하지 않는다. */
+  | 'AUTH_FAILED'
+  /** 표가 없거나 만료됐다. 서버가 다시 뜬 뒤가 대부분이다. */
+  | 'NOT_SIGNED_IN'
 
 export type Result<T> = { ok: true; value: T } | { ok: false; code: ErrorCode; message: string }
+
+/** 계정의 전적. 승·패·중도포기의 합만 센다 — 끝을 본 판이 그 셋뿐이다. */
+export interface PlayRecord {
+  played: number
+  wins: number
+  losses: number
+  quits: number
+}
+
+export type PlayOutcome = 'win' | 'lose' | 'quit'
+
+/**
+ * 로그인한 사람.
+ *
+ * **서버 메모리에만 있다.** 서버가 다시 뜨면 계정도 표도 함께 사라진다 — 무료 요금제는
+ * 15분 동안 아무도 오지 않으면 잠들고, 깨어날 때 비어 있다. 화면이 그 사실을 적어야 한다.
+ */
+export interface Session {
+  /** 이 창이 들고 다니는 표. sessionStorage 에 둔다 — 창마다 다른 사람일 수 있어야 한다. */
+  token: string
+  name: string
+  record: PlayRecord
+}
+
+export const PASSWORD_MIN = 4
+export const PASSWORD_MAX = 64
 
 export interface Identity {
   /** 브라우저 sessionStorage 에 저장된 랜덤 id. 닉네임이 아니라 이것이 정체성이다. */
   playerId: string
   nickname: string
+  /**
+   * 로그인했다면 그 표. 계정 이름으로 들어오려면 이것이 있어야 한다.
+   *
+   * 정체성(playerId)과 다른 것이다 — 저쪽은 「이 창이 누구인가」이고 이쪽은
+   * 「이 이름을 쓸 자격이 있는가」다. 게스트에게는 없다.
+   */
+  authToken?: string
 }
 
 /** 클라이언트 → 서버. 모두 ack 콜백으로 결과를 돌려받는다. */
@@ -234,6 +271,28 @@ export interface ClientToServerEvents {
    * playerId 를 함께 보낸다.
    */
   'room:where': (payload: { playerId: string }, ack: (result: Result<string | null>) => void) => void
+
+  /*
+   * 계정. 이름을 붙들어 두고 전적을 쌓는다.
+   *
+   * 게스트는 아무것도 부르지 않는다 — 지금처럼 이름만 치고 들어간다. 다만 남의 계정
+   * 이름은 쓸 수 없다. 그것을 막지 못하면 계정을 만든 뜻이 없다.
+   */
+  'auth:signup': (payload: { name: string; password: string }, ack: (result: Result<Session>) => void) => void
+  'auth:login': (payload: { name: string; password: string }, ack: (result: Result<Session>) => void) => void
+  /** 새로고침하고 돌아왔다. 표가 살아 있으면 다시 치지 않는다. */
+  'auth:resume': (payload: { token: string }, ack: (result: Result<Session>) => void) => void
+  'auth:logout': (payload: { token: string }, ack: (result: Result<null>) => void) => void
+  /**
+   * 한 판의 끝. 화면이 판정해 보낸다.
+   *
+   * 서버가 스스로 세지 않는 것은 지금 판의 끝을 아는 자리가 화면 쪽에 흩어져 있어서다
+   * (승·패는 상태에서, 중도포기는 나가는 단추에서). `once` 로 같은 끝을 두 번 세지 않는다.
+   */
+  'auth:record': (
+    payload: { token: string; outcome: PlayOutcome; once: string },
+    ack: (result: Result<PlayRecord>) => void,
+  ) => void
   'room:settings': (payload: Partial<RoomSettings>, ack: (result: Result<RoomView>) => void) => void
   /** 방 목록 페이지에 머무는 동안 갱신을 받기 위해 구독한다. */
   'rooms:watch': (payload: { watching: boolean }) => void
