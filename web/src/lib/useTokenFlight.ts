@@ -41,10 +41,17 @@ export function useTokenFlight(durationMs: number, layoutKey: string) {
       const dy = previous.top - next.top
       if (Math.abs(dx) < 1 && Math.abs(dy) < 1) continue
 
+      /*
+       * 날아가는 동안만 한 층 올린다. 그러지 않으면 지나는 자리의 카드·자리 밑으로 파고든다.
+       *
+       * **20 이 아니라 8 이다.** 20 은 화면 위에 뜨는 것들(모달 10 · 대화 12)보다 높아,
+       * 대화창을 열어둔 채 토큰을 집으면 칩이 창 위를 가로질러 날아갔다.
+       * 8 은 판 안의 무엇보다는 높고(드로어 6 · 알림 7), 덮고 서는 것들보다는 낮다.
+       */
       const animation = node.animate(
         [
-          { transform: `translate(${dx}px, ${dy}px)`, zIndex: 20 },
-          { transform: 'translate(0, 0)', zIndex: 20 },
+          { transform: `translate(${dx}px, ${dy}px)`, zIndex: 8 },
+          { transform: 'translate(0, 0)', zIndex: 8 },
         ],
         { duration: durationMs, easing: 'cubic-bezier(0.22, 0.9, 0.28, 1)' },
       )
