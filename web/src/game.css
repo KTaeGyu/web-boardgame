@@ -702,24 +702,48 @@
   pointer-events: none;
 }
 
+/*
+ * 알약이 아니라 카드다.
+ *
+ * 배지(.badge)와 접힌 대화의 한 줄(.chat-peek)이 이미 알약이라, 같은 모양으로는
+ * 「지금 나에게 무슨 일이 났다」가 「무언가의 상태 표시」로 읽힌다. 셋을 갈라두는 것은
+ * 모양·바탕·정렬 셋이다 — 모서리를 세우고, 배지가 쓰지 않는 바탕을 쓰고, 왼쪽으로 붙인다.
+ */
 .toast {
   pointer-events: auto;
   max-width: 100%;
-  padding: 9px 14px;
+  padding: 10px 14px;
   border: 1px solid var(--line);
-  border-radius: 999px;
-  background: var(--card);
+  /* 톤은 왼쪽 색띠가 가른다. 안내문(.notice)이 이미 쓰는 어법이다. */
+  border-left: 3px solid var(--gold-dim);
+  border-radius: 10px;
+  /*
+   * 배지와 카드가 --card 위에 선다. 여기만 다른 표면을 써서 바탕부터 갈라둔다.
+   * --tip-bg 는 「뒤에 무엇이 깔려 있든 글이 읽혀야 하는」 자리의 색이라, 초록 펠트
+   * 위에 뜨는 이것에 그대로 맞는다. 두 테마 모두 값이 있다.
+   */
+  background: var(--tip-bg);
   color: var(--ink);
   font-size: 13px;
-  text-align: center;
-  box-shadow: 0 8px 24px rgba(var(--shadow-rgb), 0.5);
+  line-height: 1.5;
+  text-align: left;
+  /* 두 줄이 될 때 낱말 가운데서 끊기지 않게. */
+  word-break: keep-all;
+  /* 떠 있는 것이라는 표시. 배지보다 한 뼘 더 깊다. */
+  box-shadow: 0 12px 32px rgba(var(--shadow-rgb), 0.55);
   animation: toast-in 0.22s ease-out backwards;
 }
 
 /* 내 것이 남의 손에 넘어갔거나 되돌릴 수 없게 된 일. 지나쳐서는 안 된다. */
 .toast--warn {
   border-color: var(--danger-line);
-  background: rgba(var(--danger-rgb), 0.16);
+  border-left-color: var(--danger);
+  /*
+   * 붉은 기를 얹되 바탕은 불투명하게 둔다. 반투명 한 겹만 두면 뒤의 펠트가 비쳐
+   * 정작 지나쳐서는 안 될 글이 제일 흐리게 나온다.
+   */
+  background: linear-gradient(rgba(var(--danger-rgb), 0.16), rgba(var(--danger-rgb), 0.16)),
+    var(--tip-bg);
   color: var(--danger-ink);
 }
 
