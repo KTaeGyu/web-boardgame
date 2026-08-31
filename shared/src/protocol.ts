@@ -138,7 +138,16 @@ export interface PlayerView {
 export interface RoomSummary {
   code: string
   hostNickname: string
+  /**
+   * 찬 자리 수. 접속 중인 사람이 아니라 **자리**를 센다.
+   *
+   * 끊긴 사람의 자리는 유예 시간 동안 지켜지므로 남이 앉을 수 없다. 접속 중인 수만
+   * 세면 목록이 「2 / 3」이라 말해 놓고 서버는 「정원이 찼습니다」로 돌려보낸다 —
+   * 실제로 그렇게 났다(2026-08-31). 들어갈 수 있는지를 정하는 수와 같은 수여야 한다.
+   */
   playerCount: number
+  /** 그중 자리 비움. 「셋인데 왜 둘만 보이나」를 화면이 설명할 수 있어야 한다. */
+  awayCount: number
   maxPlayers: number
   phase: RoomPhase
   /** 자리 없이 보고만 있는 사람 수. 판이 도는 방에만 붙는다. */
@@ -197,6 +206,15 @@ export interface ClientToServerEvents {
   'room:join': (payload: Identity & { code: string }, ack: (result: Result<RoomView>) => void) => void
   'room:leave': (ack: (result: Result<null>) => void) => void
   'room:list': (ack: (result: Result<RoomSummary[]>) => void) => void
+  /**
+   * 내 자리가 어느 방에 남아 있는가. 없으면 null.
+   *
+   * 목록 화면이 정원 찬 방을 잠그는데, 이미 내 자리인 방은 정원과 무관하게 들어갈 수
+   * 있어야 한다(joinRoom 이 정원을 보기 전에 재접속으로 처리한다). 그 방이 어느
+   * 것인지는 서버만 안다 — 새로고침한 창은 소켓이 어느 사람인지도 잊었으므로
+   * playerId 를 함께 보낸다.
+   */
+  'room:where': (payload: { playerId: string }, ack: (result: Result<string | null>) => void) => void
   'room:settings': (payload: Partial<RoomSettings>, ack: (result: Result<RoomView>) => void) => void
   /** 방 목록 페이지에 머무는 동안 갱신을 받기 위해 구독한다. */
   'rooms:watch': (payload: { watching: boolean }) => void

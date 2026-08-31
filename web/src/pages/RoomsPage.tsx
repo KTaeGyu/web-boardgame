@@ -22,6 +22,14 @@ export function RoomsPage() {
   const connected = useConnected()
   /** 지금 몇 명이 붙어 있고 방은 몇 개인가. 서버가 바뀔 때마다 알려준다. */
   const [stats, setStats] = useState<{ online: number; rooms: number } | null>(null)
+  /**
+   * 내 자리가 아직 남아 있는 방. 없으면 null.
+   *
+   * 정원이 찬 방은 잠기지만 **이미 내 자리인 방은 잠기면 안 된다** — 서버는 정원을
+   * 보기 전에 재접속으로 받아준다. 새로고침한 창은 자기가 어느 방에 앉아 있었는지
+   * 잊으므로 서버에 묻는다.
+   */
+  const [mySeat, setMySeat] = useState<string | null>(null)
 
   // 닉네임 없이 들어온 경우는 주소를 직접 친 것이다. 처음으로 돌려보낸다.
   useEffect(() => {
@@ -33,7 +41,10 @@ export function RoomsPage() {
    * 재연결 때 다시 구독해야 서버가 우리를 기억한다.
    */
   useEffect(() => {
-    const watch = () => socket.emit('rooms:watch', { watching: true })
+    const watch = () => {
+      socket.emit('rooms:watch', { watching: true })
+      void askWhere()
+    }
     watch()
     socket.on('connect', watch)
     void call<RoomSummary[]>('room:list').then((result) => {
@@ -45,7 +56,18 @@ export function RoomsPage() {
     }
   }, [])
 
-  useServerEvent('rooms:changed', useCallback((next: RoomSummary[]) => setRooms(next), []))
+  /*
+   * 목록이 바뀔 때마다 다시 묻는다. 자리는 유예가 끝나면 사라지는데, 그 순간에도
+   * 목록은 갱신되므로 같은 신호를 타고 온다. 한 번만 묻고 들고 있으면 없어진 자리를
+   * 「돌아가기」로 그린다.
+   */
+  useServerEvent(
+    'rooms:changed',
+    useCallback((next: RoomSummary[]) => {
+      setRooms(next)
+      void askWhere()
+    }, []),
+  )
 
   useServerEvent(
     'lobby:stats',
@@ -54,6 +76,12 @@ export function RoomsPage() {
 
   // 입장 확인창이 떠 있으면 Esc 는 그쪽 몫이다.
   useEscape(asking === null, useCallback(() => navigate('/'), [navigate]))
+
+  /** 내 자리가 어느 방에 남아 있는지 서버에 묻는다. 답이 없으면 없는 것으로 둔다. */
+  async function askWhere() {
+    const result = await call<string | null>('room:where', { playerId: getPlayerId() })
+    setMySeat(result.ok ? result.value : null)
+  }
 
   /** 여기까지 왔다는 것은 닉네임이 이미 있다는 뜻이라, 바로 방을 열 수 있다. */
   async function makeRoom() {
@@ -131,6 +159,12 @@ export function RoomsPage() {
           {rooms.map((room) => {
             const playing = room.phase !== 'lobby'
             const full = room.playerCount >= room.maxPlayers
+            /*
+              내 자리가 남아 있는 방. 정원이 찼어도 잠그지 않는다 — 그 자리가 내 것이라
+              서버는 정원을 보기 전에 재접속으로 받아준다. 잠가두면 잠깐 끊긴 사람이
+              제 방으로 돌아갈 길이 없어진다.
+            */
+            const mine = room.code === mySeat
             return (
               <li key={room.code}>
                 {/*
@@ -141,7 +175,7 @@ export function RoomsPage() {
                   type="button"
                   className="room-item"
                   onClick={() => (playing ? navigate(`/rooms/${room.code}/watch`) : setAsking(room))}
-                  disabled={(!playing && full) || !connected}
+                  disabled={(!playing && full && !mine) || !connected}
                 >
                   <span className="room-item__code">{room.code}</span>
                   <span className="room-item__main">
@@ -149,11 +183,17 @@ export function RoomsPage() {
                     <br />
                     <span className="room-item__meta">
                       {room.playerCount} / {room.maxPlayers}명
+                      {/*
+                        자리는 찼는데 사람이 덜 보이는 이유. 이 줄이 없으면 「셋이라면서
+                        왜 둘만 있나」가 설명되지 않는다.
+                      */}
+                      {room.awayCount > 0 && ` · 자리 비움 ${room.awayCount}`}
                       {room.spectatorCount > 0 && ` · 관전 ${room.spectatorCount}명`}
                     </span>
                   </span>
                   {playing && <span className="badge badge--playing">게임 중 · 관전</span>}
-                  {!playing && full && <span className="badge">정원 참</span>}
+                  {!playing && mine && <span className="badge badge--mine">돌아가기</span>}
+                  {!playing && !mine && full && <span className="badge">정원 참</span>}
                 </button>
               </li>
             )
@@ -179,7 +219,8 @@ export function RoomsPage() {
             },
           ]}
         >
-          현재 {asking.playerCount}명이 기다리고 있습니다.
+          {asking.playerCount}명이 자리에 있습니다.
+          {asking.awayCount > 0 && ` 그중 ${asking.awayCount}명은 자리를 비웠고, 돌아올 때까지 자리가 남아 있습니다.`}
           <br />
           관전은 자리를 차지하지 않아 <strong>시작 인원에 들어가지 않습니다.</strong>
           {asking.spectatorCount > 0 && ` 지금 ${asking.spectatorCount}명이 보고 있습니다.`}

@@ -536,7 +536,16 @@ export class RoomStore {
     return ok(toView(room))
   }
 
-  /** 방 목록. 접속 중인 사람이 하나도 없는 방은 보이지 않는다. */
+  /**
+   * 방 목록. 접속 중인 사람이 하나도 없는 방은 보이지 않는다.
+   *
+   * **인원은 자리로 센다.** 끊긴 사람의 자리는 유예 시간 동안 지켜지므로 남이 앉을 수
+   * 없는데, 접속 중인 수만 세면 목록이 「2 / 3」이라 말해 놓고 joinRoom 은 그 자리에서
+   * 「정원이 찼습니다」로 돌려보낸다. 두 셈이 갈리면 화면이 거짓말을 한다.
+   *
+   * 「보이지 않는다」의 기준만 접속 중인 수다. 아무도 붙어 있지 않은 방은 아직 자리가
+   * 남아 있어도 부를 사람이 없다.
+   */
   list(): RoomSummary[] {
     const summaries: RoomSummary[] = []
     for (const room of this.rooms.values()) {
@@ -548,7 +557,8 @@ export class RoomStore {
       summaries.push({
         code: room.code,
         hostNickname: host?.displayName ?? '(알 수 없음)',
-        playerCount: connected.length,
+        playerCount: room.players.length,
+        awayCount: room.players.length - connected.length,
         maxPlayers: room.settings.maxPlayers,
         phase: room.phase,
         spectatorCount: room.spectators.length,

@@ -437,6 +437,19 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
 
     socket.on('room:list', (ack) => ack({ ok: true, value: store.list() }))
 
+    /*
+     * 내 자리가 어느 방에 남아 있는가.
+     *
+     * 소켓이 아니라 playerId 로 묻는다. 새로고침한 창은 소켓이 새로 붙어 어느 사람인지
+     * 매여 있지 않은데, 정작 그때가 이 물음이 필요한 자리다 — 자리는 유예 시간 동안
+     * 남아 있고, 목록은 그 방을 정원 참으로 잠그고 있다.
+     */
+    socket.on('room:where', ({ playerId }, ack) => {
+      const id = String(playerId ?? '')
+      if (!PLAYER_ID_PATTERN.test(id)) return ack({ ok: true, value: null })
+      ack({ ok: true, value: store.codeOf(id) })
+    })
+
     socket.on('rooms:watch', ({ watching }) => {
       if (watching) {
         socket.join(LOBBY_WATCHERS)

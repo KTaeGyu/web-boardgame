@@ -139,7 +139,23 @@ describe('방 목록', () => {
     const found = rooms.find((r) => r.code === room.code)
     assert.equal(found?.hostNickname, '태규')
     assert.equal(found?.playerCount, 1)
+    assert.equal(found?.awayCount, 0)
     assert.equal(found?.phase, 'lobby')
+  })
+
+  /*
+   * 목록 화면이 「돌아가기」를 그리는 근거다. 소켓이 아니라 playerId 로 묻는 것이
+   * 핵심이다 — 새로고침한 창은 소켓이 어느 사람인지 매여 있지 않은데, 정작 그때가
+   * 이 물음이 필요한 자리다.
+   */
+  it('내 자리가 어느 방인지 다른 소켓으로도 물을 수 있다', async () => {
+    const host = await client()
+    const room = unwrap(await call<RoomView>(host, 'room:create', identity('player-ffff2222', '태규')))
+
+    const fresh = await client()
+    assert.equal(unwrap(await call<string | null>(fresh, 'room:where', { playerId: 'player-ffff2222' })), room.code)
+    assert.equal(unwrap(await call<string | null>(fresh, 'room:where', { playerId: 'player-9999zzzz' })), null)
+    assert.equal(unwrap(await call<string | null>(fresh, 'room:where', { playerId: '짧음' })), null, '형식이 틀리면 없는 것으로')
   })
 
   it('구독하면 즉시 현재 목록을 받고, 방이 생기면 다시 받는다', async () => {

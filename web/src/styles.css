@@ -578,6 +578,17 @@ select {
   color: var(--gold);
 }
 
+/*
+ * 내 자리가 남아 있는 방. 정원이 차 있어도 여기만 눌린다.
+ * 「정원 참」과 같은 자리에 서므로, 잠긴 줄과 헷갈리지 않게 금빛을 채워 앞으로 낸다.
+ */
+.badge--mine {
+  border-color: var(--gold);
+  background: rgba(var(--gold-rgb), 0.14);
+  color: var(--gold);
+  font-weight: 700;
+}
+
 .empty {
   padding: 48px 20px;
   text-align: center;

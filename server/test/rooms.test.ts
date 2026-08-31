@@ -280,19 +280,59 @@ describe('끊김과 재접속 유예', () => {
 })
 
 describe('방 목록', () => {
-  it('접속 중인 인원수와 방장 닉네임을 보여준다', () => {
+  it('찬 자리 수와 방장 닉네임을 보여준다', () => {
     const { store } = makeStore()
     const code = seed(store, ['p1', 'p2', 'p3'])
     assert.deepEqual(store.list(), [
-      { code, hostNickname: '태규', playerCount: 3, maxPlayers: 6, phase: 'lobby', spectatorCount: 0 },
+      { code, hostNickname: '태규', playerCount: 3, awayCount: 0, maxPlayers: 6, phase: 'lobby', spectatorCount: 0 },
     ])
   })
 
-  it('끊긴 사람은 인원수에서 빠진다', () => {
+  /*
+   * 끊긴 사람의 자리는 유예 동안 지켜지므로 남이 앉을 수 없다. 인원수에서 빼면
+   * 목록이 「2 / 3」이라 말해 놓고 joinRoom 은 「정원이 찼습니다」로 돌려보낸다.
+   */
+  it('끊긴 사람도 자리는 그대로 센다', () => {
     const { store } = makeStore()
     seed(store, ['p1', 'p2'])
     store.markDisconnected('p2')
-    assert.equal(store.list()[0].playerCount, 1)
+    assert.equal(store.list()[0].playerCount, 2)
+    assert.equal(store.list()[0].awayCount, 1, '몇이 비어 있는지는 따로 알려준다')
+  })
+
+  it('목록의 셈과 입장 판정의 셈이 같다', () => {
+    const { store } = makeStore()
+    const code = seed(store, ['p1', 'p2', 'p3'])
+    assert.equal(store.updateSettings('p1', { maxPlayers: 3 }).ok, true)
+    store.markDisconnected('p3')
+
+    const listed = store.list()[0]
+    assert.equal(listed.playerCount >= listed.maxPlayers, true, '목록이 정원 찼다고 보인다')
+
+    const outsider = store.joinRoom('p4', '하늘', code)
+    assert.equal(outsider.ok, false)
+    if (!outsider.ok) assert.equal(outsider.code, 'ROOM_FULL', '보이는 것과 답이 같아야 한다')
+  })
+
+  it('자리가 이미 내 것이면 정원이 차 있어도 돌아올 수 있다', () => {
+    const { store } = makeStore()
+    const code = seed(store, ['p1', 'p2', 'p3'])
+    assert.equal(store.updateSettings('p1', { maxPlayers: 3 }).ok, true)
+    store.markDisconnected('p3')
+
+    // 자리를 지켜주는 뜻이 여기에 있다. 정원을 보기 전에 재접속으로 처리한다.
+    assert.equal(store.joinRoom('p3', '지연', code).ok, true)
+    assert.equal(store.list()[0].awayCount, 0, '돌아왔으니 비어 있지 않다')
+  })
+
+  it('내 자리가 어느 방인지 알려준다', () => {
+    const { store } = makeStore()
+    const code = seed(store, ['p1', 'p2'])
+    store.markDisconnected('p2')
+
+    // 화면이 「돌아가기」를 그리는 근거다. 끊겨 있어도 자리는 남아 있다.
+    assert.equal(store.codeOf('p2'), code)
+    assert.equal(store.codeOf('p9'), null)
   })
 
   it('아무도 접속해 있지 않은 방은 목록에서 감춘다', () => {
