@@ -14,6 +14,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { TRACKS, useAudio } from '../lib/audio.ts'
 import { sfx } from '../lib/sfx.ts'
 import { useEscape } from '../lib/useEscape.ts'
+import { useSheetDrag } from '../lib/useSheetDrag.ts'
 
 export function SoundPanel() {
   const [open, setOpen] = useState(false)
@@ -21,6 +22,8 @@ export function SoundPanel() {
   const box = useRef<HTMLDivElement>(null)
 
   const close = useCallback(() => setOpen(false), [])
+  // 작은 화면에서는 아래에서 올라온 시트다. 끌어내려 닫는다.
+  const drag = useSheetDrag(close)
   useEscape(open, close)
 
   // 바깥을 누르면 닫힌다. 단추도 상자 안에 있으므로 여는 그 손짓에 곧바로 닫히지 않는다.
@@ -71,7 +74,7 @@ export function SoundPanel() {
       </button>
 
       {open && (
-        <div className="sound__panel">
+        <div className={`sound__panel ${drag.className}`} {...drag.handlers}>
           <button
             type="button"
             className={`sound__mute ${audio.muted ? 'sound__mute--on' : ''}`}

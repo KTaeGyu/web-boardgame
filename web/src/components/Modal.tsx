@@ -2,6 +2,7 @@ import { useEffect, type ReactNode } from 'react'
 
 import { useBackClose } from '../lib/back.ts'
 import { useScrollLock } from '../lib/useScrollLock.ts'
+import { useSheetDrag } from '../lib/useSheetDrag.ts'
 
 interface Props {
   title: string
@@ -27,6 +28,8 @@ export function ConfirmModal({
   useBackClose(onCancel)
   // 떠 있는 동안 뒤 페이지는 움직이지 않는다.
   useScrollLock()
+  // 작은 화면에서는 아래에서 올라온 시트다. 끌어내려 닫는다.
+  const drag = useSheetDrag(onCancel)
 
   // 손이 마우스로 가지 않아도 끝낼 수 있게. Esc 는 물러나기, Enter 는 밀고 나가기.
   useEffect(() => {
@@ -47,7 +50,13 @@ export function ConfirmModal({
 
   return (
     <div className="modal-backdrop" onClick={onCancel} role="presentation">
-      <div className="modal" onClick={(event) => event.stopPropagation()} role="dialog" aria-modal="true">
+      <div
+        className={`modal ${drag.className}`}
+        onClick={(event) => event.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        {...drag.handlers}
+      >
         <h2 className="modal__title">{title}</h2>
         <div className="modal__body">{children}</div>
         <div className="btn-row">
@@ -82,6 +91,7 @@ export function ChoiceModal({
 }) {
   useBackClose(onClose)
   useScrollLock()
+  const drag = useSheetDrag(onClose)
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -95,7 +105,13 @@ export function ChoiceModal({
 
   return (
     <div className="modal-backdrop" onClick={onClose} role="presentation">
-      <div className="modal" onClick={(event) => event.stopPropagation()} role="dialog" aria-modal="true">
+      <div
+        className={`modal ${drag.className}`}
+        onClick={(event) => event.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        {...drag.handlers}
+      >
         <button type="button" className="modal__close" onClick={onClose} aria-label="닫기">
           ×
         </button>

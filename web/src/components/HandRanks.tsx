@@ -17,6 +17,7 @@ import { CATEGORY_LABEL, HandCategory, type Card } from '@the-gang/shared'
 
 import { useBackClose } from '../lib/back.ts'
 import { useScrollLock } from '../lib/useScrollLock.ts'
+import { useSheetDrag } from '../lib/useSheetDrag.ts'
 import { PlayingCard } from './PlayingCard.tsx'
 
 interface Rank {
@@ -75,6 +76,7 @@ function RanksModal({ onClose }: { onClose: () => void }) {
   // 휴대폰의 뒤로가기는 화면을 떠나는 것이 아니라 이 창을 닫는 것이어야 한다.
   useBackClose(onClose)
   useScrollLock()
+  const drag = useSheetDrag(onClose)
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -89,11 +91,12 @@ function RanksModal({ onClose }: { onClose: () => void }) {
   return (
     <div className="modal-backdrop" onClick={onClose} role="presentation">
       <div
-        className="modal modal--wide modal--tall"
+        className={`modal modal--wide modal--tall ${drag.className}`}
         onClick={(event) => event.stopPropagation()}
         role="dialog"
         aria-modal="true"
         aria-label="포커 족보"
+        {...drag.handlers}
       >
         <button type="button" className="modal__close" onClick={onClose} aria-label="닫기">
           ×
