@@ -8,7 +8,10 @@ import { ReportLink } from './components/ReportLink.tsx'
 import { ServerGate } from './components/ServerGate.tsx'
 import { SoundPanel } from './components/SoundPanel.tsx'
 import { ThemeToggle } from './components/ThemeToggle.tsx'
+import { GuestPage } from './pages/GuestPage.tsx'
 import { HomePage } from './pages/HomePage.tsx'
+import { LoginPage } from './pages/LoginPage.tsx'
+import { SignupPage } from './pages/SignupPage.tsx'
 import { RoomPage } from './pages/RoomPage.tsx'
 import { RoomsPage } from './pages/RoomsPage.tsx'
 import { GamePage } from './pages/GamePage.tsx'
@@ -52,6 +55,10 @@ export function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<HomePage />} />
+        {/* 진입점에서 갈라지는 세 길. 각 화면이 자기 칸만 들고 있다. */}
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/signup" element={<SignupPage />} />
+        <Route path="/guest" element={<GuestPage />} />
         <Route path="/rooms" element={<RoomsPage />} />
         <Route path="/history" element={<HistoryPage />} />
         <Route path="/rooms/:code" element={<RoomPage />} />

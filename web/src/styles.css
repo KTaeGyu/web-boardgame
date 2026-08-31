@@ -176,11 +176,32 @@ select {
 }
 
 /*
+ * 진입점의 갈래. 둘을 나란히 두지 않는다 — 좌우로 서면 「둘 중 하나를 고르는 일」이
+ * 아니라 「같은 줄의 두 단추」로 읽힌다. 위아래로 세우면 무엇이 흔한 길인지도 보인다.
+ */
+.home-choice {
+  display: grid;
+  gap: 10px;
+}
+
+.home-choice .btn {
+  min-height: 52px;
+}
+
+/*
  * 계정 만들기. 단추 줄에 세우지 않는다 — 셋이 나란히 서면 무엇이 흔한 길인지 안 보인다.
  * 계정을 만드는 것은 한 번뿐이고 로그인은 올 때마다다.
  */
+/*
+ * 계정 만들기로 가는 길. 단추 줄에 세우지 않는다 — 계정을 만드는 것은 한 번뿐이고
+ * 로그인은 올 때마다다. 크기가 그 차이를 말한다.
+ *
+ * button 이 아니라 Link 라서 display 를 준다. 인라인인 채로는 위 여백이 먹지 않는다.
+ */
 .home-form__signup {
-  margin-top: 10px;
+  display: block;
+  margin-top: 12px;
+  text-align: center;
   border: none;
   background: none;
   color: var(--ink-dim);
@@ -431,6 +452,15 @@ select {
 
 .btn--block {
   width: 100%;
+}
+
+/*
+ * 링크를 단추로 쓸 때. 진입점의 「로그인」·「게스트로 하기」가 그렇다 —
+ * 하는 일이 화면을 옮기는 것이라 button 이 아니라 Link 여야 한다(가운데 클릭·새 탭).
+ * 밑줄만 지우면 나머지는 .btn 이 다 해준다.
+ */
+a.btn {
+  text-decoration: none;
 }
 
 .btn-row {
