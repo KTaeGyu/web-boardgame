@@ -16,6 +16,7 @@ import {
 import { Chat } from '../components/Chat.tsx'
 import { ExtrasDrawer, NoteCard, type CardNote } from '../components/ExtrasDrawer.tsx'
 import { ScanVote } from '../components/ScanVote.tsx'
+import { Toast } from '../components/Toast.tsx'
 import { SetupStep } from '../components/SetupStep.tsx'
 import { TableChallenges, TableSpecialist } from '../components/TableExtras.tsx'
 import { TutorialTip, type TipPayload } from '../components/TutorialTip.tsx'
@@ -712,14 +713,12 @@ export function GamePage({ spectating = false }: { spectating?: boolean } = {}) 
       {toasts.length > 0 && (
         <div className="toasts" role="status" aria-live="polite">
           {toasts.map((toast) => (
-            <button
+            <Toast
               key={toast.id}
-              type="button"
-              className={`toast toast--${toast.tone}`}
-              onClick={() => dropToast(toast.id)}
-            >
-              {toast.text}
-            </button>
+              text={toast.text}
+              tone={toast.tone}
+              onAway={() => dropToast(toast.id)}
+            />
           ))}
         </div>
       )}
