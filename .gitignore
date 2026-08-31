@@ -6,5 +6,7 @@ build/
 # 예시는 저장소에 있어야 한다. 값이 아니라 이름표다.
 !.env.example
 *.log
+# 로컬에서만 쌓이는 오류 로그. 뜰 때마다 처음부터 다시 쓴다.
+logs/
 .DS_Store
 .vercel/

@@ -21,6 +21,10 @@ services:
       # 빌드 단계가 없다. 서버는 .ts 를 그대로 실행하므로 22.18 이상이어야 한다.
       - key: NODE_VERSION
         value: 22.18.0
+      # 여기가 운영이라는 표시. 이것이 있으면 파일 로그를 남기지 않는다 —
+      # Render 의 디스크는 배포마다 사라지고, 같은 줄이 대시보드 로그에 이미 있다.
+      - key: NODE_ENV
+        value: production
       # 화면이 어디에 있는가. Vercel 주소를 받은 뒤 대시보드에서 채운다.
       # 콤마로 여럿, 프리뷰까지 열려면 *.vercel.app 를 함께 넣는다.
       - key: CORS_ORIGINS
