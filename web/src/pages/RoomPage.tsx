@@ -55,8 +55,13 @@ export function RoomPage() {
   const [confirmLeave, setConfirmLeave] = useState(false)
   /** 방장이 자리에서 물러나려 한다. 방장이 넘어가는 일이라 한 번 묻는다. */
   const [confirmWatch, setConfirmWatch] = useState(false)
-  /** 내보내려는 사람. 확인창이 떠 있는 동안만 담아 둔다. */
-  const [kicking, setKicking] = useState<{ id: string; name: string } | null>(null)
+  /**
+   * 내보내려는 사람. 확인창이 떠 있는 동안만 담아 둔다.
+   *
+   * `takeover` 는 「자리를 비운 방장을 넘겨받는 길」이라는 표시다. 방장이 내보내는 것과
+   * 물어보는 말도, 고를 것도 다르다 — 저쪽은 차단을 고를 수 있고 이쪽은 없다.
+   */
+  const [kicking, setKicking] = useState<{ id: string; name: string; takeover: boolean } | null>(null)
 
   /** 설정 바꾸기는 방장만 할 수 있다. 거절 사유는 그대로 보여준다. */
   async function change(patch: Partial<RoomView['settings']>) {
@@ -223,6 +228,14 @@ export function RoomPage() {
     room.settings.specialistRandomRounds.every((on) => !on)
   // 내가 빠진 뒤의 인원으로 다음 방장을 미리 구한다. 서버가 실제로 쓰는 규칙과 같은 함수다.
   const successor = iAmHost ? nextHost(room.players.filter((player) => player.id !== playerId)) : null
+  /*
+   * 자리를 비운 방장을 내가 넘겨받을 수 있는가.
+   *
+   * 자리에 앉아 있어야 한다 — 구경하는 사람은 방장이 될 수 없다(관전으로 물러날 때
+   * 방장을 내려놓는 것과 같은 규칙). 먼저 부른 사람이 가지므로 여럿에게 동시에 뜬다.
+   */
+  const canTakeOver =
+    !iAmHost && !watching && room.players.some((player) => player.id === playerId) && !host?.connected
 
   async function startGame() {
     setStarting(true)
@@ -272,14 +285,26 @@ export function RoomPage() {
                 </span>
                 {player.isHost && <span className="player__tag">방장</span>}
                 {!player.connected && <span className="player__tag--waiting">자리 비움</span>}
-                {/* 방장만, 자기 자신은 빼고. 판이 도는 중에는 서버가 막는다. */}
-                {iAmHost && player.id !== playerId && (
+                {/*
+                  방장만, 자기 자신은 빼고. 판이 도는 중에는 서버가 막는다.
+
+                  하나 더 있다 — 자리를 비운 방장은 앉아 있는 누구나 내보낼 수 있다.
+                  방장이 없으면 시작도 설정도 막혀 방이 통째로 멈추기 때문이다.
+                  구경하는 사람에게는 뜨지 않는다. 서버가 같은 판단을 한 번 더 한다.
+                */}
+                {(iAmHost ? player.id !== playerId : canTakeOver && player.isHost) && (
                   <button
                     type="button"
                     className="player__kick"
-                    onClick={() => setKicking({ id: player.id, name: player.displayName })}
-                    aria-label={`${player.displayName}님 내보내기`}
-                    title="내보내기"
+                    onClick={() =>
+                      setKicking({ id: player.id, name: player.displayName, takeover: !iAmHost })
+                    }
+                    aria-label={
+                      iAmHost
+                        ? `${player.displayName}님 내보내기`
+                        : `${player.displayName}님을 내보내고 방장 넘겨받기`
+                    }
+                    title={iAmHost ? '내보내기' : '내보내고 방장 넘겨받기'}
                   >
                     ×
                   </button>
@@ -530,7 +555,29 @@ export function RoomPage() {
         <Chat code={code} />
       </div>
 
-      {kicking && (
+      {/*
+        넘겨받는 길에는 고를 것이 없다 — 차단은 이쪽에 없다. 방을 넘겨받는 것과 영영 못
+        들어오게 하는 것은 다른 이야기이고, 자리를 비운 사람은 그 자리에서 반박할 수 없다.
+      */}
+      {kicking?.takeover && (
+        <ConfirmModal
+          title="방장을 넘겨받으시겠습니까?"
+          confirmLabel="넘겨받기"
+          cancelLabel="그만두기"
+          onConfirm={() => {
+            void call('room:kick', { playerId: kicking.id })
+            setKicking(null)
+          }}
+          onCancel={() => setKicking(null)}
+        >
+          <strong>{kicking.name}</strong>님이 자리를 비워 방이 멈춰 있습니다. 내보내고 방장을
+          가져옵니다.
+          <br />
+          그분은 방 번호로 다시 들어올 수 있습니다.
+        </ConfirmModal>
+      )}
+
+      {kicking && !kicking.takeover && (
         <ChoiceModal
           title={`${kicking.name}님을 내보냅니다`}
           onClose={() => setKicking(null)}

@@ -397,24 +397,35 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
      * 접힌다. 그건 내보내기가 아니라 판을 엎는 것이라, 다른 단추로 있어야 한다.
      */
     socket.on('room:kick', ({ playerId: targetId, ban }, ack) => {
-      const hostId = playerOfSocket.get(socket.id)
-      const code = hostId ? store.codeOf(hostId) : null
+      const byId = playerOfSocket.get(socket.id)
+      const code = byId ? store.codeOf(byId) : null
       const room = code ? store.view(code) : null
-      if (!hostId || !code || !room) {
+      if (!byId || !code || !room) {
         return ack({ ok: false, code: 'NOT_IN_ROOM', message: '방에 들어와 있지 않습니다.' })
       }
       if (room.phase !== 'lobby') {
         return ack({ ok: false, code: 'WRONG_PHASE', message: '판이 도는 중에는 내보낼 수 없습니다.' })
       }
 
-      const result = store.kick(hostId, String(targetId ?? ''), Boolean(ban))
+      /*
+       * 자리를 비운 방장을 넘겨받는 길인가. 내보내진 사람에게 갈 말이 갈리므로
+       * 내보내기 전에 봐 둔다 — 끝난 뒤에는 그 사람이 방에 없어 다시 볼 수 없다.
+       * 실제로 허용할지는 방이 정한다(rooms.ts 의 kick). 여기서는 말만 고른다.
+       */
+      const takeover = room.hostId === String(targetId ?? '') && room.hostId !== byId
+
+      const result = store.kick(byId, String(targetId ?? ''), Boolean(ban))
       if (!result.ok) return ack(result)
 
       // 내보내진 사람에게만 이유를 보낸다. 방이 닫힌 것과 구별되어야 안내가 맞는다.
       const targetSocket = socketOfPlayer.get(String(targetId))
       if (targetSocket) {
         io.to(targetSocket).emit('room:kicked', {
-          message: ban ? '방장이 내보냈습니다. 이 방에는 다시 들어갈 수 없습니다.' : '방장이 내보냈습니다.',
+          message: takeover
+            ? '자리를 비운 사이에 다른 분이 방장을 넘겨받았습니다. 방 번호로 다시 들어올 수 있습니다.'
+            : ban
+              ? '방장이 내보냈습니다. 이 방에는 다시 들어갈 수 없습니다.'
+              : '방장이 내보냈습니다.',
         })
         io.sockets.sockets.get(targetSocket)?.leave(code)
       }

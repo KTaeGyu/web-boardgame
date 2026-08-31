@@ -242,25 +242,48 @@ export class RoomStore {
   }
 
   /**
-   * 방장이 한 사람을 내보낸다.
+   * 한 사람을 내보낸다. 길이 둘이다.
    *
-   * 나가기와 같은 처리를 하되, 차단을 고르면 그 사람만 다시 못 들어오게 표시를 남긴다.
+   * **방장이 내보내는 길** — 나가기와 같은 처리를 하되, 차단을 고르면 그 사람만
+   * 다시 못 들어오게 표시를 남긴다.
+   *
+   * **자리를 비운 방장을 넘겨받는 길**(2026-08-31) — 방장의 소켓이 끊기면 「자리 비움」이
+   * 붙고, 유예 10분이 지나야 자리가 치워지며 방장이 넘어간다. 그동안 방이 멈춘다 —
+   * 시작은 전원이 있어야 하고 설정은 방장만 바꾸므로, 남은 사람들이 할 수 있는 일이
+   * 없다. 그래서 **자리를 비운 방장은 앉아 있는 누구나 내보낼 수 있고, 먼저 부른 사람이
+   * 방장을 가진다.**
+   *
+   * 이 길에서는 차단을 받지 않는다. 영영 못 들어오게 하는 것은 방을 넘겨받는 것과 다른
+   * 이야기이고, 자리를 비운 사람은 그 자리에서 반박할 수 없다.
+   *
    * 대기실에서만 허용하는 판단은 소켓 계층이 한다 — 여기서는 방의 규칙만 본다.
    */
-  kick(hostId: string, targetId: string, ban = false): Result<RoomView> {
-    const code = this.whereIs.get(hostId)
+  kick(byId: string, targetId: string, ban = false): Result<RoomView> {
+    const code = this.whereIs.get(byId)
     const room = code ? this.rooms.get(code) : undefined
     if (!room) return err('NOT_IN_ROOM', '방에 들어와 있지 않습니다.')
-    if (room.hostId !== hostId) return err('NOT_HOST', '방장만 내보낼 수 있습니다.')
-    if (targetId === hostId) return err('INVALID_SETTINGS', '자기 자신은 내보낼 수 없습니다.')
+    if (targetId === byId) return err('INVALID_SETTINGS', '자기 자신은 내보낼 수 없습니다.')
 
     const target = room.players.find((player) => player.id === targetId)
     if (!target) return err('NOT_IN_ROOM', '그 사람은 이 방에 없습니다.')
 
+    const iAmHost = room.hostId === byId
+    /*
+     * 넘겨받는 길인가. 앉아 있는 사람이어야 한다 — 구경꾼은 「인원」이 아니고,
+     * 애초에 방장이 될 수 없다(관전으로 물러날 때 방장을 내려놓는 것과 같은 규칙).
+     */
+    const seated = room.players.some((player) => player.id === byId)
+    const takeover = !iAmHost && seated && targetId === room.hostId && !target.connected
+    if (!iAmHost && !takeover) {
+      return err('NOT_HOST', '방장만 내보낼 수 있습니다. 자리를 비운 방장은 누구나 내보낼 수 있습니다.')
+    }
+
     // 차단은 고른 사람만 받는다. 그냥 내보내면 번호를 알면 다시 들어올 수 있다.
-    if (ban) room.banned.add(targetId)
+    if (ban && !takeover) room.banned.add(targetId)
     this.whereIs.delete(targetId)
     room.players = room.players.filter((player) => player.id !== targetId)
+    // 넘겨받는 길에서는 입장 순서가 아니라 「먼저 부른 사람」이 방장이 된다.
+    if (takeover) room.hostId = byId
     room.lastActivityAt = this.now()
     return ok(toView(room))
   }

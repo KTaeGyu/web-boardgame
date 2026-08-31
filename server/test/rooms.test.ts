@@ -619,6 +619,93 @@ describe('내보내기', () => {
   })
 })
 
+/*
+ * 방장이 자리를 비우면 방이 멈춘다 — 시작은 전원이 있어야 하고 설정은 방장만 바꾼다.
+ * 유예 10분을 기다리는 대신, 남은 사람이 방장을 넘겨받을 수 있다.
+ */
+describe('자리를 비운 방장 넘겨받기', () => {
+  it('자리를 비운 방장은 방장이 아닌 사람도 내보낼 수 있다', () => {
+    const { store } = makeStore()
+    const code = seed(store, ['p1', 'p2', 'p3'])
+    store.markDisconnected('p1')
+
+    const result = store.kick('p2', 'p1')
+    assert.equal(result.ok, true)
+    assert.deepEqual(store.view(code)?.players.map((p) => p.id), ['p2', 'p3'])
+  })
+
+  it('먼저 내보낸 사람이 방장이 된다 — 입장 순서가 아니다', () => {
+    const { store } = makeStore()
+    const code = seed(store, ['p1', 'p2', 'p3'])
+    store.markDisconnected('p1')
+
+    // p2 가 먼저 들어왔지만 부른 것은 p3 다.
+    assert.equal(store.kick('p3', 'p1').ok, true)
+    assert.equal(store.view(code)?.hostId, 'p3')
+  })
+
+  it('두 번째로 부른 사람은 방장을 뺏지 못한다', () => {
+    const { store } = makeStore()
+    const code = seed(store, ['p1', 'p2', 'p3'])
+    store.markDisconnected('p1')
+    assert.equal(store.kick('p2', 'p1').ok, true)
+
+    // 이미 나간 사람이라 대상이 없다. 방장은 그대로 p2 다.
+    assert.equal(store.kick('p3', 'p1').ok, false)
+    assert.equal(store.view(code)?.hostId, 'p2')
+  })
+
+  it('자리에 있는 방장은 아무도 못 내보낸다', () => {
+    const { store } = makeStore()
+    seed(store, ['p1', 'p2'])
+
+    const result = store.kick('p2', 'p1')
+    assert.equal(result.ok, false)
+    if (!result.ok) assert.equal(result.code, 'NOT_HOST')
+  })
+
+  it('돌아온 방장은 다시 못 내보낸다', () => {
+    const { store } = makeStore()
+    const code = seed(store, ['p1', 'p2'])
+    store.markDisconnected('p1')
+    store.joinRoom('p1', '태규', code) // 재접속
+
+    assert.equal(store.kick('p2', 'p1').ok, false)
+    assert.equal(store.view(code)?.hostId, 'p1')
+  })
+
+  it('넘겨받는 길은 방장이 아닌 사람까지 열어주지 않는다', () => {
+    const { store } = makeStore()
+    seed(store, ['p1', 'p2', 'p3'])
+    store.markDisconnected('p1')
+
+    // 방장이 자리를 비웠다고 해서 남들끼리 서로 내보낼 수 있는 것은 아니다.
+    const result = store.kick('p2', 'p3')
+    assert.equal(result.ok, false)
+    if (!result.ok) assert.equal(result.code, 'NOT_HOST')
+  })
+
+  it('구경꾼은 넘겨받을 수 없다', () => {
+    const { store } = makeStore()
+    const code = seed(store, ['p1', 'p2'])
+    assert.equal(store.spectate('p9', '구경', code).ok, true)
+    store.markDisconnected('p1')
+
+    const result = store.kick('p9', 'p1')
+    assert.equal(result.ok, false, '구경하는 사람은 방장이 될 수 없다')
+    assert.equal(store.view(code)?.hostId, 'p1')
+  })
+
+  it('넘겨받으면서 차단할 수는 없다', () => {
+    const { store } = makeStore()
+    const code = seed(store, ['p1', 'p2'])
+    store.markDisconnected('p1')
+    assert.equal(store.kick('p2', 'p1', true).ok, true)
+
+    assert.equal(store.joinRoom('p1', '태규', code).ok, true, '돌아올 길은 남겨둔다')
+  })
+})
+
 describe('방이 열린 시각', () => {
   it('번호가 같아도 다른 방이면 시각이 다르다', () => {
     const ctx = makeStore()
