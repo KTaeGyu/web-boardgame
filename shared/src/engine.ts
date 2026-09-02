@@ -14,7 +14,7 @@
 import {
   ALARMS_TO_LOSE,
   ALARMS_TO_LOSE_MASTER,
-  COMMUNITY_BY_ROUND,
+  AUTO_CONFIRM_MS,
   ROUNDS,
   TOKEN_LOCK_MS,
   VAULTS_TO_WIN,
@@ -23,8 +23,6 @@ import {
   JACK_CARD,
   SETUP_SPECIALISTS,
   SPECIALIST_NEEDS,
-  bestHolding,
-  evaluateHoleAndCommunity,
   displayNames,
   freshDeck,
   judgeShowdown,
@@ -46,6 +44,9 @@ import {
   type ShowdownEntry,
   type ShowdownResult,
   type SpecialistId,
+  type PokerVariant,
+  VARIANTS,
+  type VariantRules,
 } from '@the-gang/shared'
 
 import { ExtraDealer } from './extraDealer.ts'
@@ -72,11 +73,20 @@ export interface GameOptions {
   now?: () => number
   rng?: () => number
   lockMs?: number
+  /** 어떤 포커인가. 없으면 텍사스 홀덤이다. */
+  variant?: PokerVariant
   mode?: GameMode
   /** 「직접 고르기」에서 방장이 고른 도전자 카드. */
   pickedChallenges?: readonly ChallengeId[]
   /** 「직접 고르기」에서 방장이 고른 해결사 카드. */
   specialistRounds?: readonly (SpecialistId | null)[]
+  /**
+   * 모두가 토큰을 쥔 뒤 자동으로 확정되기까지의 시간(ms). 0 이면 재지 않는다.
+   *
+   * 연습판이 0 이다 — 안내가 떠 있는 동안 봇이 멈추는데, 시계는 멈추지 않아
+   * 읽는 사이에 라운드가 넘어가 버린다.
+   */
+  autoConfirmMs?: number
   /** 「직접 고르기」에서 판마다 무작위로 더 얹을 도전자 수. */
   randomChallenges?: number
   /** 무작위 도전자를 직전 판을 이겼을 때만 뽑는가. */
@@ -128,6 +138,15 @@ export class Game {
   private readonly now: () => number
   private readonly rng: () => number
   private readonly lockMs: number
+  private readonly autoConfirmMs: number
+  private readonly variant: PokerVariant
+  /**
+   * 그 변형의 표. 몇 장을 받고 언제 몇 장이 열리고 무엇으로 손을 만드나.
+   *
+   * 판은 어떤 포커인지 모른다 — 이 표를 그대로 따르기만 한다. 그래서 변형을 더할 때
+   * 여기 손댈 곳이 없고, 도전자·해결사 카드도 표 위에서 그대로 돈다.
+   */
+  private readonly rules: VariantRules
   private readonly mode: GameMode
   private readonly vaultsToWin: number
   private readonly alarmsToLose: number
@@ -179,6 +198,15 @@ export class Game {
   private setup: { kind: 'pass' | 'memorize'; picks: Map<string, number>; done: Set<string> } | null = null
   /** 한 장을 더 받아 지금 버릴 카드를 고르고 있는 사람. */
   private discardingId: string | null = null
+  /**
+   * 자동 확정이 걸리는 시각. 재고 있지 않으면 null 이다.
+   *
+   * **시계는 상태를 내다볼 때(view) 맞춰진다.** 켜고 끄는 자리를 토큰이 오가는 길마다
+   * 붙이면 그중 하나를 빠뜨리게 되고, 그 라운드만 시계가 안 도는 모양으로 나타난다.
+   * 조건을 한 곳에서 다시 보는 편이 안전하다 — 서버는 무엇이든 바뀌면 곧바로 상태를
+   * 내보내므로, 「마지막 토큰이 놓인 때」와 「시계가 시작된 때」는 사실상 같은 순간이다.
+   */
+  private autoAt: number | null = null
 
   /** 스캔이 열려 있는 동안의 상태. 모든 물음의 답이 정해지면 쇼다운으로 넘어간다. */
   private scan: {
@@ -196,6 +224,9 @@ export class Game {
     this.now = options.now ?? Date.now
     this.rng = options.rng ?? Math.random
     this.lockMs = options.lockMs ?? TOKEN_LOCK_MS
+    this.autoConfirmMs = options.autoConfirmMs ?? AUTO_CONFIRM_MS
+    this.variant = options.variant ?? 'texas'
+    this.rules = VARIANTS[this.variant]
     this.mode = options.mode ?? 'basic'
     this.vaultsToWin = options.vaultsToWin ?? VAULTS_TO_WIN
     // 마스터 시프의 경보 2는 모드의 정의라 설정보다 앞선다.
@@ -380,9 +411,14 @@ export class Game {
     }
   }
 
-  /** 「보안 카메라」가 걸리면 세 장씩 받는다. */
+  /**
+   * 「보안 카메라」는 **한 장을 더** 주는 카드다.
+   *
+   * 텍사스에서는 2 → 3 이라 룰북과 같고, 오마하에서는 4 → 5 가 된다. 오마하의
+   * 「정확히 두 장」은 그대로라, 고를 폭만 넓어진다.
+   */
   private get holeCount(): number {
-    return this.has(10) ? 3 : 2
+    return this.rules.holeCount + (this.has(10) ? 1 : 0)
   }
 
   private draw(): Card {
@@ -392,7 +428,8 @@ export class Game {
   }
 
   private fillCommunity(): void {
-    while (this.community.length < COMMUNITY_BY_ROUND[this.round]) this.community.push(this.draw())
+    const quota = this.rules.dealt(this.round, this.seats.length)
+    while (this.community.length < quota) this.community.push(this.draw())
   }
 
   /** 카드를 받자마자 저절로 밝혀지는 해결사 효과. */
@@ -480,7 +517,7 @@ export class Game {
       }
       case 2: {
         // 족보 이름만. 「원 페어」까지고 무슨 페어인지는 밝히지 않는다.
-        const holding = bestHolding([...actor.hole, ...this.community])
+        const holding = this.rules.holding(actor.hole, this.communityOf(playerId))
         say(`${this.nameOf(playerId)} — ${holding?.name ?? '알 수 없음'}`)
         break
       }
@@ -781,9 +818,10 @@ export class Game {
         playerId: seat.id,
         token: seat.history[3] ?? 0,
         hole: seat.hole,
+        seat: this.seats.indexOf(seat),
       })),
       this.community,
-      { muscleId: this.muscleId },
+      { muscleId: this.muscleId, rules: this.rules, seats: this.seats.length },
     )
   }
 
@@ -822,20 +860,26 @@ export class Game {
     question.correct =
       question.kind === 'rank'
         ? target.hole.some((card) => rankValueOf(card) === value)
-        : evaluateHoleAndCommunity(target.hole, this.community).category === value
+        : this.rules.evaluate(target.hole, this.communityOf(target.id)).category === value
 
     // 물음이 여럿이면 전부 정해져야 공개로 넘어간다.
     if (this.scan.questions.every((q) => q.decided !== null)) this.runShowdown()
   }
 
   private runShowdown(): void {
-    const entries: ShowdownEntry[] = this.seats.map((seat) => ({
+    const entries: ShowdownEntry[] = this.seats.map((seat, at) => ({
       playerId: seat.id,
       token: seat.history[3] ?? 0,
       hole: seat.hole,
+      // 토큰 순으로 줄을 세우므로 자리는 따로 실어 보낸다. 공용이 사람마다 다를 수 있다.
+      seat: at,
     }))
 
-    const judged = judgeShowdown(entries, this.community, { muscleId: this.muscleId })
+    const judged = judgeShowdown(entries, this.community, {
+      muscleId: this.muscleId,
+      rules: this.rules,
+      seats: this.seats.length,
+    })
     // 스캔을 틀리면 순서가 맞았어도 그 판은 실패다. 물음이 여럿이면 전부 맞혀야 한다.
     const scanOk = this.scan === null || this.scan.questions.every((q) => q.correct === true)
     this.showdown = { ...judged, success: judged.success && scanOk }
@@ -874,8 +918,62 @@ export class Game {
     return null
   }
 
+  /**
+   * 그 사람이 **쓸 수 있는** 공용 카드.
+   *
+   * 대개는 깔린 것 전부지만 바나나스플릿은 자기 양옆 두 묶음뿐이다. 자르는 규칙은
+   * 변형 표에 있고, 판정하는 자리(쇼다운·스캔·「도주 운전사」)는 전부 여기를 지난다 —
+   * 한 군데만 통째 공용을 보면 그 자리만 남의 카드로 답한다.
+   */
+  private communityOf(playerId: string): readonly Card[] {
+    const at = this.seats.findIndex((seat) => seat.id === playerId)
+    return this.rules.communityFor(this.community, Math.max(at, 0), this.seats.length)
+  }
+
   private everyoneHasToken(): boolean {
     return this.seats.every((seat) => this.tokenOf(seat.id) !== null)
+  }
+
+  // ── 자동 확정 ───────────────────────────────────────────
+
+  /** 지금이 시계를 재고 있어야 할 상황인가. */
+  private autoConfirmDue(): boolean {
+    if (this.autoConfirmMs <= 0) return false
+    // 리버는 재지 않는다. 마지막 선언 뒤가 곧 쇼다운이라 무를 자리가 없다.
+    if (this.round === 4) return false
+    if (this.phase !== 'picking') return false
+    // 버릴 카드를 고르는 사람이 있으면 확정 자체가 막혀 있다.
+    if (this.discardingId !== null) return false
+    return this.everyoneHasToken()
+  }
+
+  /**
+   * 조건을 다시 보고 시계를 켜거나 끈다. 이미 돌고 있으면 그대로 둔다.
+   *
+   * 누가 토큰을 옮기면 그 사람의 손이 잠깐 비므로 시계가 꺼졌다가 다시 15초로 시작한다.
+   * 마음이 바뀐 사람에게 판단할 시간을 도로 주는 것이 맞다.
+   */
+  private syncAutoConfirm(): void {
+    if (!this.autoConfirmDue()) {
+      this.autoAt = null
+      return
+    }
+    if (this.autoAt === null) this.autoAt = this.now() + this.autoConfirmMs
+  }
+
+  /**
+   * 시간이 다 됐으면 다 같이 확정한다. 실제로 넘어갔으면 true.
+   *
+   * 「확정 취소」를 눌러 둔 사람도 함께 넘어간다 — 다 같이 확정되는 것이 이 장치의
+   * 뜻이고, 한 사람이 버티면 애초에 멈춰 있던 그 자리로 돌아간다.
+   * 시각을 다시 재는 것은 예약이 늦게 도착하는 경우 때문이다.
+   */
+  autoConfirm(): boolean {
+    this.syncAutoConfirm()
+    if (this.autoAt === null || this.now() < this.autoAt) return false
+    for (const seat of this.seats) seat.ready = true
+    this.advanceRound()
+    return true
   }
 
   get isOver(): boolean {
@@ -915,12 +1013,16 @@ export class Game {
   /** 모두가 보는 상태. 쇼다운 전에는 어떤 홀카드도 담지 않는다. */
   view(): GameView {
     const now = this.now()
+    // 상태를 만드는 김에 시계를 맞춘다. 토큰이 오가는 길이 여럿이라 각각에 붙이면
+    // 어느 하나를 빠뜨리게 되고, 그 라운드만 시계가 안 도는 모양으로 나타난다.
+    this.syncAutoConfirm()
     const revealed = this.phase !== 'picking'
     const names = displayNames(this.seats.map((seat) => seat.nickname))
     const stuck = this.stuckTokens()
 
     return {
       roomCode: this.roomCode,
+      variant: this.variant,
       mode: this.mode,
       vaultsToWin: this.vaultsToWin,
       alarmsToLose: this.alarmsToLose,
@@ -957,6 +1059,7 @@ export class Game {
       ),
       stuckTokens: stuck,
       canConfirm: this.phase === 'picking' && this.everyoneHasToken(),
+      autoConfirmIn: this.autoAt === null ? null : Math.max(0, this.autoAt - now),
       sensor: this.sensorFired,
       setup: this.setupView(),
       discardingId: this.discardingId,

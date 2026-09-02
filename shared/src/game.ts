@@ -8,7 +8,7 @@
 
 import type { Card } from './cards.ts'
 import type { ChallengeId, SpecialistId } from './extraCards.ts'
-import type { GameMode } from './protocol.ts'
+import type { GameMode, PokerVariant } from './protocol.ts'
 import type { ShowdownResult } from './showdown.ts'
 
 /** 금고 3개면 승리, 경보 3개면 패배. 그래서 한 게임은 최대 5판이다. */
@@ -69,6 +69,19 @@ export const ROUND_COLOR: Record<Round, string> = {
   3: 'orange',
   4: 'red',
 }
+
+/**
+ * 모두가 토큰을 쥔 뒤 이만큼 지나면 다 같이 확정된다.
+ *
+ * 아무도 누르지 않아 판이 멈추는 자리를 없애려는 것이다 — 한 사람이 자리를 비우면
+ * 나머지가 그 사람을 기다리는 것 말고 할 수 있는 일이 없었다.
+ * **리버에서는 재지 않는다.** 마지막 선언은 되돌릴 수 없고 그 뒤가 곧 쇼다운이라,
+ * 여기서만은 시간에 쫓겨 누르는 것보다 서로를 기다리는 편이 낫다.
+ */
+export const AUTO_CONFIRM_MS = 15_000
+
+/** 남은 시간을 화면 한가운데 큰 숫자로 세는 구간. 5, 4, 3, 2, 1. */
+export const AUTO_CONFIRM_COUNTDOWN_MS = 5_000
 
 /**
  * 토큰이 날아가는 동안 그 토큰만 잠긴다.
@@ -137,6 +150,8 @@ export interface Announcement {
 
 export interface GameView {
   roomCode: string
+  /** 어떤 포커인가. 화면이 손을 어떻게 읽을지가 여기서 갈린다. */
+  variant: PokerVariant
   mode: GameMode
   /** 몇 개를 열면 이기는가. 「직접 고르기」에서는 방장이 정하고, 나머지 모드는 3이다. */
   vaultsToWin: number
@@ -173,6 +188,13 @@ export interface GameView {
   stuckTokens: number[]
   /** 모두가 토큰을 쥐어서 확정 버튼이 열렸는지. */
   canConfirm: boolean
+  /**
+   * 자동 확정까지 남은 시간(ms). 재고 있지 않으면 null 이다.
+   *
+   * 시각이 아니라 **남은 길이**로 보낸다. 절대 시각을 보내면 화면의 시계가 서버와
+   * 몇 초씩 어긋나 있을 때 그 차이가 그대로 카운트다운에 실린다.
+   */
+  autoConfirmIn: number | null
   /**
    * 감지기가 누군가의 손을 갈아엎었다는 사실. 판이 바뀌면 사라진다.
    * 조용히 바뀌면 아무도 눈치채지 못하므로 화면에 크게 알린다.

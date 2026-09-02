@@ -1,6 +1,7 @@
 import { CATEGORY_LABEL, RANKS, ROUNDS, rankLabel, type GameView, type ScanQuestion } from '@the-gang/shared'
 
-import { PlayingCard } from './PlayingCard.tsx'
+import { CommunityBoard } from './Board.tsx'
+
 import { useScrollLock } from '../lib/useScrollLock.ts'
 import { Token, TokenBlank } from './Token.tsx'
 
@@ -71,11 +72,19 @@ export function ScanVote({ game, playerId, onVote }: Props) {
           번호를 거쳐 지금 자리에 섰는지. 지목된 사람의 손을 어림하는 단서가 그 둘뿐이다.
         */}
         <div className="scan-board">
-          <div className="scan-board__cards">
-            {game.community.map((card, index) => (
-              <PlayingCard key={card} card={card} size="sm" delay={index * 50} />
-            ))}
-          </div>
+          {/* 테이블과 같은 모양으로. 펴지면 어느 줄·어느 이웃인지 셀 수 없다. */}
+          {/*
+            바나나스플릿은 사람마다 쓰는 카드가 다르다. 어림해야 할 것은 **지목된 사람의**
+            손이므로 그쪽으로 돌려 세운다 — 내 자리를 아래에 두면 남의 묶음을 보고 답하게 된다.
+          */}
+          <CommunityBoard
+            game={game}
+            size="sm"
+            delayStep={50}
+            base="scan-board__cards"
+            me={playerId}
+            focus={scan.targetId}
+          />
 
           <ul className="scan-board__tracks">
             {game.players.map((player) => (

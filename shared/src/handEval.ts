@@ -114,6 +114,17 @@ function* fiveCardCombos(cards: readonly Card[]): Generator<Card[]> {
             yield [cards[a], cards[b], cards[c], cards[d], cards[e]]
 }
 
+/** k 장짜리 조합을 모두. 장수가 적어 나이브해도 된다 — 가장 큰 경우가 C(9,5)=126 이다. */
+export function* combinations<T>(items: readonly T[], k: number): Generator<T[]> {
+  if (k === 0) {
+    yield []
+    return
+  }
+  for (let i = 0; i <= items.length - k; i++) {
+    for (const rest of combinations(items.slice(i + 1), k - 1)) yield [items[i], ...rest]
+  }
+}
+
 /** 홀카드 2장 + 커뮤니티 5장 중 최선의 5장. 홀카드를 반드시 써야 한다는 제약은 없다. */
 export function evaluateBest(cards: readonly Card[]): HandValue {
   if (cards.length < 5) throw new Error(`최소 5장이 필요하다: ${cards.length}장 받음`)
@@ -127,6 +138,30 @@ export function evaluateBest(cards: readonly Card[]): HandValue {
 
 export function evaluateHoleAndCommunity(hole: readonly Card[], community: readonly Card[]): HandValue {
   return evaluateBest([...hole, ...community])
+}
+
+/**
+ * 오마하 — **홀카드에서 정확히 2장, 공용에서 정확히 3장.**
+ *
+ * 이 제약이 오마하의 전부다. 손에 A 가 넉 장 있어도 두 장만 쓸 수 있고, 공용에
+ * 플러시가 완성돼 있어도 내 손에 같은 무늬 두 장이 없으면 그 플러시는 내 것이 아니다.
+ * 텍사스의 「일곱 장 중 최선의 다섯 장」과는 답이 다르므로 평가기를 따로 둔다.
+ *
+ * 「보안 카메라」로 홀이 한 장 늘어도 **고르는 수는 여전히 둘**이다.
+ * 세는 양은 C(홀,2) × C(5,3) — 홀 5장이어도 100번이라 눈에 띄지 않는다.
+ */
+export function evaluateOmaha(hole: readonly Card[], community: readonly Card[]): HandValue {
+  if (hole.length < 2) throw new Error(`홀카드가 두 장은 있어야 한다: ${hole.length}장 받음`)
+  if (community.length < 3) throw new Error(`공용 카드가 세 장은 있어야 한다: ${community.length}장 받음`)
+
+  let best: HandValue | null = null
+  for (const two of combinations(hole, 2)) {
+    for (const three of combinations(community, 3)) {
+      const value = evaluateFive([...two, ...three])
+      if (best === null || compareHands(value, best) > 0) best = value
+    }
+  }
+  return best!
 }
 
 /**

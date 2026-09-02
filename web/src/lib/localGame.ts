@@ -129,6 +129,13 @@ export function startLocal(nickname: string): void {
     mode: 'basic',
     pickedChallenges: [],
     specialistRounds: [null, null, null, null, null],
+    /*
+     * 자동 확정을 끈다. 그래서 서버에 있는 예약(scheduleAutoConfirm)의 짝이 여기엔 없다.
+     *
+     * 안내가 떠 있는 동안 봇은 멈추지만 시계는 멈추지 않는다. 읽는 사이에 라운드가
+     * 넘어가면 방금 읽은 것과 화면이 어긋나고, 배우러 온 자리에서 그게 제일 나쁘다.
+     */
+    autoConfirmMs: 0,
   })
   const tutorial = new Tutorial(game, humanId, ['bot1', 'bot2'], {
     onMoved: () => sendGame(),

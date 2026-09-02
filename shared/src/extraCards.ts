@@ -80,7 +80,8 @@ export const CHALLENGES: Record<ChallengeId, ExtraCard> = {
   10: {
     id: 10,
     name: '보안 카메라',
-    text: '카드를 3장씩 받습니다. 3장과 커뮤니티 5장 중 최선의 5장을 만듭니다.',
+    // 포커 방식마다 기본 장수가 달라서 「3장」이라고 못박지 않는다(텍사스 2→3, 오마하 4→5).
+    text: '카드를 한 장 더 받습니다. 고를 수 있는 폭이 그만큼 넓어집니다.',
     ready: true,
   },
 }
@@ -106,7 +107,7 @@ export const SPECIALISTS: Record<SpecialistId, ExtraCard> = {
   8: {
     id: 8,
     name: '계산가',
-    text: '카드를 받자마자, 각자 카드 두 장의 합이 모두에게 공개됩니다. (J·Q·K는 10, A는 11)',
+    text: '카드를 받자마자, 각자 받은 카드의 합이 모두에게 공개됩니다. (J·Q·K는 10, A는 11)',
     ready: true,
   },
   9: { id: 9, name: '사기꾼', text: '모두 카드를 본 뒤, 전원의 카드를 섞어 다시 나눕니다.', ready: true },

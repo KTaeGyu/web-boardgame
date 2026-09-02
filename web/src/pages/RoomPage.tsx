@@ -3,6 +3,10 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
   CHALLENGES,
   GAME_MODES,
+  POKER_VARIANTS,
+  VARIANTS,
+  VARIANT_HINT,
+  VARIANT_LABEL,
   GAME_MODE_HINT,
   GAME_MODE_LABEL,
   MAX_MARKS,
@@ -16,18 +20,21 @@ import {
   maxHeists,
   nextHost,
   type ChallengeId,
-  type SpecialistId,
   type GameMode,
+  type PokerVariant,
+  type PlayerView,
   type RoomView,
 } from '@the-gang/shared'
 
 import { CardPicker } from '../components/CardPicker.tsx'
+import { PickList } from '../components/PickList.tsx'
 import { Chat } from '../components/Chat.tsx'
 import { SpecialistGrid } from '../components/SpecialistGrid.tsx'
 import { ChoiceModal, ConfirmModal } from '../components/Modal.tsx'
 import { useBackIntercept } from '../lib/back.ts'
 import { getNickname, getPlayerId } from '../lib/identity.ts'
 import { call, socket, useServerEvent } from '../lib/socket.ts'
+import { tipPosition, useCardTip } from '../lib/tooltip.ts'
 import { useEscape } from '../lib/useEscape.ts'
 
 /** 방이 닫힌 사유를 사람 말로. 아무 설명 없이 튕겨나가면 고장으로 느껴진다. */
@@ -72,6 +79,14 @@ export function RoomPage() {
    * 물어보는 말도, 고를 것도 다르다 — 저쪽은 차단을 고를 수 있고 이쪽은 없다.
    */
   const [kicking, setKicking] = useState<{ id: string; name: string; takeover: boolean } | null>(null)
+  /*
+   * 설정의 설명은 짚을 때만 뜬다.
+   *
+   * 예전에는 칸마다 밑에 두 줄씩 깔려 있어서, 휴대폰에서는 설정 하나를 보려고 화면을
+   * 몇 번씩 밀어야 했다. 손짓의 규칙은 카드 고르기와 같다 — 마우스는 올리면, 손가락은
+   * 누르면 뜬다(useCardTip).
+   */
+  const { tip: settingTip, handlers: tipOn } = useCardTip()
 
   /** 설정 바꾸기는 방장만 할 수 있다. 거절 사유는 그대로 보여준다. */
   async function change(patch: Partial<RoomView['settings']>) {
@@ -237,6 +252,10 @@ export function RoomPage() {
 
   const host = room.players.find((player) => player.id === room.hostId)
   const iAmHost = room.hostId === playerId
+  /** 이 포커 방식이 덱 52장으로 감당하는 정원. 자세한 산수는 shared/src/variants.ts. */
+  const seatLimit = VARIANTS[room.settings.variant].maxSeats
+  /** 서클잭인가. 와일드를 켠 것도 같은 줄로 친다 — 목록에는 한 줄만 선다. */
+  const circling = room.settings.variant === 'circle' || room.settings.variant === 'circleWild'
   const enoughPlayers = room.players.length >= MIN_PLAYERS
   const everyoneHere = room.players.every((player) => player.connected)
   // 직접 고르기인데 아무것도 고르지 않았다. 설정은 그대로 두고 시작만 막는다.
@@ -300,7 +319,11 @@ export function RoomPage() {
                   .join(' ')}
               >
                 <span className="player__seat">{index + 1}</span>
-                <span className="player__name">
+                {/*
+                  이름은 자리에 맞춰 잘린다. 짚으면 전체 이름과 지금 상태가 뜬다 —
+                  예전에는 방장이 아니면 아무것도 뜨지 않고 금지 표시만 났다.
+                */}
+                <span className="player__name" {...tipOn(describePlayer(player, playerId))}>
                   {player.displayName}
                   {player.id === playerId && ' (나)'}
                 </span>
@@ -358,28 +381,78 @@ export function RoomPage() {
         <section className="panel">
           <h2 className="section-title">게임 설정</h2>
 
-          <CardPicker
+          {/*
+            * 포커 방식이 모드보다 앞에 선다. 「어떤 포커인가」가 정해져야 「어떤 카드가
+            * 걸리는가」가 뜻을 갖는다. 둘은 곱해진다 — 오마하 + 프로 모드가 성립한다.
+            */}
+          {/*
+            와일드카드를 켠 서클잭은 계약에서 따로 선 변형(circleWild)이지만, 고르는 자리에는
+            **한 줄과 체크칸**으로 보인다. 목록에 「서클잭」이 둘 서면 무엇이 다른지
+            이름만으로 가려야 한다.
+          */}
+          <PickList
+            label="포커 방식"
+            hint="어떤 포커로 할지 정합니다. 카드를 몇 장 받는지, 공용 카드가 어떻게 깔리는지, 그중 무엇으로 손을 만드는지가 방식마다 다릅니다. 방식에 따라 앉을 수 있는 인원도 달라집니다."
+            options={POKER_VARIANTS.filter((variant) => variant !== 'circleWild').map((variant) => ({
+              id: variant,
+              name: VARIANT_LABEL[variant],
+              text: VARIANT_HINT[variant],
+            }))}
+            picked={circling ? 'circle' : room.settings.variant}
+            disabled={!iAmHost}
+            onPick={(id) => void change({ variant: id as PokerVariant })}
+          />
+
+          {circling && (
+            <label className="check">
+              <input
+                type="checkbox"
+                checked={room.settings.variant === 'circleWild'}
+                disabled={!iAmHost}
+                onChange={(event) => void change({ variant: event.target.checked ? 'circleWild' : 'circle' })}
+              />
+              <span
+                {...tipOn(
+                  '마지막에 원 한가운데 한 장이 더 열립니다. 자리가 자유로운 카드라, 붙어 있는 3장 중 아무 자리에나 끼워 쓸 수 있습니다. 숫자와 무늬는 보이는 그대로이고 모두에게 같은 한 장입니다. 내 카드 두 장은 그대로 씁니다.',
+                )}
+              >
+                가운데 와일드카드
+                <i className="setting__more" aria-hidden="true">
+                  ?
+                </i>
+              </span>
+            </label>
+          )}
+
+          <PickList
             label="진행 방식"
-            single
-            describePicked
+            hint="도전자·해결사 카드가 어떻게 걸리는지 정합니다. 포커 방식과는 따로 정하며 둘이 함께 걸립니다 — 오마하로 프로 모드를 할 수 있습니다."
             options={GAME_MODES.map((mode) => ({
               id: mode,
               name: GAME_MODE_LABEL[mode],
               text: GAME_MODE_HINT[mode],
             }))}
-            picked={[room.settings.mode]}
+            picked={room.settings.mode}
             disabled={!iAmHost}
-            onToggle={(id) => void change({ mode: id as GameMode })}
+            onPick={(id) => void change({ mode: id as GameMode })}
           />
 
           {room.settings.mode === 'custom' && (
             <>
               <div className="setting">
-                <span className="setting__label">금고와 경보</span>
-                <span className="pick-hint">
-                  금고를 다 열면 이기고, 경보가 다 울리면 집니다. 한 게임은 최대{' '}
-                  {maxHeists(room.settings.vaultsToWin, room.settings.alarmsToLose)}판입니다.
-                  수를 줄이면 없어지는 판에 둔 해결사도 함께 지워집니다.
+                <span
+                  className="setting__label"
+                  {...tipOn(
+                    `금고를 다 열면 이기고, 경보가 다 울리면 집니다. 한 게임은 최대 ${maxHeists(
+                      room.settings.vaultsToWin,
+                      room.settings.alarmsToLose,
+                    )}판입니다. 수를 줄이면 없어지는 판에 둔 해결사도 함께 지워집니다.`,
+                  )}
+                >
+                  금고와 경보
+                  <i className="setting__more" aria-hidden="true">
+                    ?
+                  </i>
                 </span>
                 <div className="number-row">
                   <label className="number-field">
@@ -433,10 +506,16 @@ export function RoomPage() {
               />
 
               <div className="setting">
-                <span className="setting__label">무작위 도전자</span>
-                <span className="pick-hint">
-                  <strong>판마다</strong> 이만큼을 무작위로 새로 뽑아 얹습니다. 위에서 고른 카드와는
-                  겹치지 않고, 지난 판에 나왔던 카드는 다시 나올 수 있습니다.
+                <span
+                  className="setting__label"
+                  {...tipOn(
+                    '판마다 이만큼을 무작위로 새로 뽑아 얹습니다. 위에서 고른 카드와는 겹치지 않고, 지난 판에 나왔던 카드는 다시 나올 수 있습니다.',
+                  )}
+                >
+                  무작위 도전자
+                  <i className="setting__more" aria-hidden="true">
+                    ?
+                  </i>
                 </span>
                 <div className="number-row">
                   <label className="number-field">
@@ -460,11 +539,11 @@ export function RoomPage() {
                     disabled={!iAmHost}
                     onChange={(event) => void change({ randomChallengesOnWin: event.target.checked })}
                   />
-                  <span>
+                  <span {...tipOn('켜면 첫 판에는 나오지 않습니다. 위에서 고른 카드는 이것과 상관없이 늘 걸립니다.')}>
                     이긴 다음 판에만 얹기
-                    <span className="check__hint">
-                      켜면 첫 판에는 나오지 않습니다. 위에서 고른 카드는 이것과 상관없이 늘 걸립니다.
-                    </span>
+                    <i className="setting__more" aria-hidden="true">
+                      ?
+                    </i>
                   </span>
                 </label>
 
@@ -475,9 +554,11 @@ export function RoomPage() {
                     disabled={!iAmHost}
                     onChange={(event) => void change({ randomChallengesStay: event.target.checked })}
                   />
-                  <span>
+                  <span {...tipOn('판이 갈수록 쌓입니다. 이미 걸린 카드는 다시 뽑지 않습니다.')}>
                     한 번 나온 카드는 계속 걸어두기
-                    <span className="check__hint">판이 갈수록 쌓입니다. 이미 걸린 카드는 다시 뽑지 않습니다.</span>
+                    <i className="setting__more" aria-hidden="true">
+                      ?
+                    </i>
                   </span>
                 </label>
               </div>
@@ -499,10 +580,19 @@ export function RoomPage() {
             이 자리가 남아 있으면 들어와 볼 수 있다 — 두 수가 함께 보여야 그것이 읽힌다.
           */}
           <div className="setting">
-            <span className="setting__label">자리</span>
-            <span className="pick-hint">
-              관전은 시작 인원에 들지 않습니다. 정원이 차도 관전 자리가 남아 있으면
-              들어와 볼 수 있습니다. 0 으로 두면 관전을 받지 않습니다.
+            <span
+              className="setting__label"
+              {...tipOn(
+                '관전은 시작 인원에 들지 않습니다. 정원이 차도 관전 자리가 남아 있으면 들어와 볼 수 있습니다. 0 으로 두면 관전을 받지 않습니다.' +
+                  (seatLimit < MAX_PLAYERS_LIMIT
+                    ? ` ${VARIANT_LABEL[room.settings.variant]}는 카드를 많이 쓰기 때문에 ${seatLimit}명까지 앉을 수 있습니다.`
+                    : ''),
+              )}
+            >
+              자리
+              <i className="setting__more" aria-hidden="true">
+                ?
+              </i>
             </span>
             <div className="number-row">
               <label className="number-field">
@@ -511,7 +601,7 @@ export function RoomPage() {
                   className="number-input"
                   type="number"
                   min={MIN_PLAYERS}
-                  max={MAX_PLAYERS_LIMIT}
+                  max={seatLimit}
                   value={room.settings.maxPlayers}
                   disabled={!iAmHost}
                   onChange={(event) => changeNumber('maxPlayers', event.target.value)}
@@ -625,6 +715,12 @@ export function RoomPage() {
         </ConfirmModal>
       )}
 
+      {settingTip && (
+        <div className="card-tip" style={tipPosition(settingTip)}>
+          {settingTip.text}
+        </div>
+      )}
+
       {kicking && !kicking.takeover && (
         <ChoiceModal
           title={`${kicking.name}님을 내보냅니다`}
@@ -699,4 +795,18 @@ function LeaveMessage({ isHost, successorName }: { isHost: boolean; successorNam
       방장이 <strong>{successorName}</strong>님에게 넘어갑니다.
     </>
   )
+}
+
+/**
+ * 참여자 한 줄을 짚었을 때 뜨는 말.
+ *
+ * 이름은 자리에 맞춰 잘리므로 전체 이름이 먼저다. 그 뒤에 지금 상태를 붙인다 —
+ * 「자리 비움」이 무슨 뜻인지가 목록에서 제일 자주 나오는 물음이다.
+ */
+function describePlayer(player: PlayerView, me: string): string {
+  const parts = [player.displayName]
+  if (player.id === me) parts.push('나')
+  if (player.isHost) parts.push('방장 — 설정과 시작을 맡습니다')
+  if (!player.connected) parts.push('자리 비움 — 접속이 끊겼지만 자리는 잠시 지켜집니다')
+  return parts.join(' · ')
 }

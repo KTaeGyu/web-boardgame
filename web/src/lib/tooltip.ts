@@ -63,6 +63,13 @@ export function useCardTip(): {
   tip: CardTip | null
   /** 이 글을 보여줄 자리에 그대로 펼쳐 붙인다. */
   handlers: (text: string) => CardTipHandlers
+  /**
+   * 지금 뜬 것을 곧바로 지운다.
+   *
+   * 손짓이 아니라 **화면이 바뀌어서** 지워야 할 때가 있다 — 짚고 있던 단추가 목록을
+   * 펼치면 그 단추에서 마우스가 나간 적이 없어 mouseleave 가 오지 않는다.
+   */
+  hide: () => void
 } {
   const [tip, setTip] = useState<CardTip | null>(null)
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -90,5 +97,10 @@ export function useCardTip(): {
     },
   })
 
-  return { tip, handlers }
+  const hide = () => {
+    if (hideTimer.current) clearTimeout(hideTimer.current)
+    setTip(null)
+  }
+
+  return { tip, handlers, hide }
 }

@@ -7,13 +7,20 @@
  */
 
 import type { Card } from './cards.ts'
-import { compareHands, describeHand, evaluateHoleAndCommunity, type HandValue } from './handEval.ts'
+import { compareHands, describeHand, type HandValue } from './handEval.ts'
+import { VARIANTS, type VariantRules } from './variants.ts'
 
 export interface ShowdownEntry {
   playerId: string
   /** 4라운드(빨강) 토큰 번호. 1이 가장 약하다는 선언. */
   token: number
   hole: Card[]
+  /**
+   * 테이블에서 몇 번째 자리인가. **공용이 사람마다 다른 변형만 쓴다**(바나나스플릿).
+   *
+   * 토큰 순으로 줄을 세우므로 배열의 차례가 곧 자리가 아니다. 그래서 따로 싣는다.
+   */
+  seat?: number
 }
 
 export interface ShowdownReveal {
@@ -29,6 +36,16 @@ export interface ShowdownReveal {
 export interface ShowdownOptions {
   /** 「근육」을 가진 사람. 같은 족보끼리는 이 사람이 이긴다. */
   muscleId?: string | null
+  /**
+   * 어떤 포커인가. 손을 만드는 법과 공용 카드 장수가 여기서 온다.
+   * 넘기지 않으면 텍사스 홀덤이다 — 테스트가 대부분 그렇게 부른다.
+   */
+  rules?: VariantRules
+  /**
+   * 자리가 몇인가. 판에 깔리는 장수가 인원에 따라 달라지는 변형(바나나스플릿)이 쓴다.
+   * 넘기지 않으면 참가자 수로 본다 — 쇼다운에는 모두가 서므로 대개 같은 수다.
+   */
+  seats?: number
 }
 
 export interface ShowdownResult {
@@ -42,7 +59,12 @@ export function judgeShowdown(
   community: readonly Card[],
   options: ShowdownOptions = {},
 ): ShowdownResult {
-  if (community.length !== 5) throw new Error(`커뮤니티 카드는 5장이어야 한다: ${community.length}장 받음`)
+  const rules = options.rules ?? VARIANTS.texas
+  const seats = options.seats ?? entries.length
+  const expected = rules.dealt(4, seats)
+  if (community.length !== expected) {
+    throw new Error(`커뮤니티 카드는 ${expected}장이어야 한다: ${community.length}장 받음`)
+  }
 
   const tokens = entries.map((e) => e.token)
   if (new Set(tokens).size !== tokens.length) throw new Error('토큰 번호가 중복됐다')
@@ -57,7 +79,9 @@ export function judgeShowdown(
   const reveals: ShowdownReveal[] = []
 
   for (const entry of ordered) {
-    const value = evaluateHoleAndCommunity(entry.hole, community)
+    // 사람마다 쓸 수 있는 공용이 다를 수 있다(바나나스플릿). 자르는 규칙은 표에 있다.
+    const usable = rules.communityFor(community, entry.seat ?? 0, seats)
+    const value = rules.evaluate(entry.hole, usable)
     const mine = { value, muscle: entry.playerId === options.muscleId }
     const diff = strongestSoFar === null ? 1 : compareWithMuscle(mine, strongestSoFar)
     const ok = diff >= 0

@@ -64,10 +64,16 @@ export function SpecialistGrid({
 
   return (
     <div className="setting">
-      <span className="setting__label">해결사 카드 ({filled}판)</span>
-      <span className="pick-hint">
-        몇 번째 판에 나올지 정합니다. 한 판에 한 장이고, 같은 카드를 여러 판에 둬도 됩니다.
-        비워 둔 판은 해결사 없이 지나갑니다.
+      <span
+        className="setting__label"
+        {...handlers(
+          '몇 번째 판에 나올지 정합니다. 한 판에 한 장이고, 같은 카드를 여러 판에 둬도 됩니다. 비워 둔 판은 해결사 없이 지나갑니다.',
+        )}
+      >
+        해결사 카드 ({filled}판)
+        <i className="setting__more" aria-hidden="true">
+          ?
+        </i>
       </span>
 
       <div className="slot-grid" style={{ '--rounds': rounds.length } as CSSProperties}>
@@ -134,9 +140,11 @@ export function SpecialistGrid({
           disabled={disabled}
           onChange={(event) => onLossChange(event.target.checked)}
         />
-        <span>
+        <span {...handlers('끄면 결과와 상관없이 표대로 나옵니다. 켜면 첫 판에는 나오지 않습니다.')}>
           진 다음 판에만 나오기
-          <span className="check__hint">끄면 결과와 상관없이 표대로 나옵니다. 켜면 첫 판에는 나오지 않습니다.</span>
+          <i className="setting__more" aria-hidden="true">
+            ?
+          </i>
         </span>
       </label>
 

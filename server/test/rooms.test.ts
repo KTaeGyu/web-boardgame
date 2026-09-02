@@ -39,6 +39,37 @@ function seed(store: RoomStore, ids: string[]) {
   return code
 }
 
+describe('포커 방식과 정원', () => {
+  it('방식을 바꾸면 정원이 그 방식의 상한으로 깎인다', () => {
+    const { store } = makeStore()
+    const code = seed(store, ['p1'])
+    assert.equal(store.updateSettings('p1', { maxPlayers: 10 }).ok, true)
+
+    // 오마하는 여덟까지. 되돌려보내지 않고 여기서 깎는다.
+    const result = store.updateSettings('p1', { variant: 'omaha' })
+    assert.equal(result.ok, true)
+    assert.equal(result.ok && result.value.settings.maxPlayers, 8)
+    assert.equal(store.view(code)?.settings.variant, 'omaha')
+  })
+
+  it('이미 앉아 있는 사람보다 적은 정원의 방식으로는 못 바꾼다', () => {
+    const { store } = makeStore()
+    seed(store, ['p1', 'p2', 'p3', 'p4'])
+    assert.equal(store.updateSettings('p1', { maxPlayers: 10 }).ok, true)
+
+    // 바나나스플릿은 여섯까지 — 넷이면 된다.
+    assert.equal(store.updateSettings('p1', { variant: 'banana' }).ok, true)
+    assert.equal(store.view(store.codeOf('p1')!)?.settings.maxPlayers, 6)
+  })
+
+  it('없는 방식은 거절한다', () => {
+    const { store } = makeStore()
+    seed(store, ['p1'])
+    const result = store.updateSettings('p1', { variant: 'holdem' as never })
+    assert.equal(result.ok, false)
+  })
+})
+
 describe('방 만들기', () => {
   it('만든 사람이 방장이고 혼자 들어가 있다', () => {
     const { store } = makeStore()
@@ -56,6 +87,7 @@ describe('방 만들기', () => {
     assert.equal(result.ok, true)
     if (!result.ok) return
     assert.deepEqual(result.value.settings, {
+      variant: 'texas',
       mode: 'basic',
       pickedChallenges: [],
       specialistRounds: [null, null, null, null, null],

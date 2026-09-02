@@ -59,9 +59,21 @@ export function ExtrasDrawer({ game, playerId, hand, notes, onUse }: Props) {
   const askDrag = useSheetDrag(() => setAsking(false))
   if (count === 0) return null
 
-  const canUse = specialist !== null && !game.specialistUsed && game.phase === 'picking'
+  /*
+   * 쓸 수 있는가. 서버가 보는 것과 같은 조건이어야 한다(Game.useSpecialist).
+   *
+   * **구경꾼에게는 열지 않는다.** 서버가 어차피 「이 판에 참여하고 있지 않습니다」로
+   * 돌려보내므로, 열어두면 눌러도 아무 일이 없어 고장으로 읽힌다 —
+   * 「다음 금고로」·「재경기 제안」과 같은 판단이다.
+   */
+  const seated = game.players.some((player) => player.id === playerId)
+  const canUse = seated && specialist !== null && !game.specialistUsed && game.phase === 'picking'
   const myNote = notes.find((note) => note.specialist === game.specialist) ?? null
-  const others = game.players.filter((player) => player.id !== playerId)
+  /*
+   * 대상은 **접속 중인 사람만**이다. 자리 비운 사람을 고르면 카드는 쓰였는데
+   * 알려줄 소켓이 없어 쪽지가 어디에도 닿지 않는다 — 그 판의 해결사가 그냥 사라진다.
+   */
+  const others = game.players.filter((player) => player.id !== playerId && player.connected)
   const ready = !needs?.target || targetId !== ''
 
   function start() {
@@ -116,7 +128,13 @@ export function ExtrasDrawer({ game, playerId, hand, notes, onUse }: Props) {
             <h2 className="modal__title">「{specialist.name}」을 쓰시겠습니까?</h2>
             <p className="modal__body">{specialist.text}</p>
 
-            {needs?.target && (
+            {needs?.target && others.length === 0 && (
+              <p className="field__note">
+                지금 접속 중인 사람이 없습니다. 누군가 돌아와야 쓸 수 있습니다.
+              </p>
+            )}
+
+            {needs?.target && others.length > 0 && (
               <label className="field">
                 <span className="field__label">누구에게</span>
                 <select
@@ -223,6 +241,11 @@ interface TileProps {
  *
  * 앞면은 이름만 두어 한눈에 몇 장인지 보이게 하고, 마우스를 올리면 설명이 커서 옆에 뜬다.
  * 눌러서 뒤집으면 설명과 지금까지의 결과가 나온다 — 길어질 수 있어 뒷면은 스크롤된다.
+ *
+ * **쓸 수 있는 카드는 앞면에서도 바로 쓴다**(2026-09-03). 뒤집어야만 단추가 나오면
+ * 「해결사를 어떻게 쓰나」가 한 번 더 물어야 하는 물음이 된다. 그 자리에 있던
+ * 「눌러서 뒤집기」는 단추에 내준다 — 쓰기 전에 확인창이 카드 설명을 다시 보여주므로,
+ * 뒤집지 않고 눌러도 무엇을 하는 카드인지 모르고 쓰게 되지는 않는다.
  */
 export function ExtraTile({ kind, card, status, note, onUse }: TileProps) {
   const [flipped, setFlipped] = useState(false)
@@ -248,7 +271,21 @@ export function ExtraTile({ kind, card, status, note, onUse }: TileProps) {
           <div className="extra-card__face extra-card__front">
             <span className="extra-card__kind">{kind === 'challenge' ? '도전자' : '해결사'}</span>
             <b className="extra-card__name">{card.name}</b>
-            <span className="extra-card__hint">눌러서 뒤집기</span>
+            {onUse ? (
+              <button
+                type="button"
+                className="btn btn--primary extra-card__use extra-card__use--front"
+                onClick={(event) => {
+                  // 이 누름은 뒤집기가 아니다. 부모까지 올라가면 카드가 함께 돌아간다.
+                  event.stopPropagation()
+                  onUse()
+                }}
+              >
+                이 카드 사용
+              </button>
+            ) : (
+              <span className="extra-card__hint">눌러서 뒤집기</span>
+            )}
           </div>
 
           <div className="extra-card__face extra-card__back">

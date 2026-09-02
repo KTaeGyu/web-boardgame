@@ -16,6 +16,9 @@ import {
   MAX_SPECTATORS_LIMIT,
   MIN_MARKS,
   MIN_PLAYERS,
+  POKER_VARIANTS,
+  VARIANTS,
+  VARIANT_LABEL,
   READY_CHALLENGES,
   READY_SPECIALISTS,
   conflictsWith,
@@ -25,6 +28,7 @@ import {
   nextHost as pickNextHost,
   type ErrorCode,
   type GameMode,
+  type PokerVariant,
   type ChallengeId,
   type SpecialistId,
   type Result,
@@ -478,12 +482,36 @@ export class RoomStore {
 
     const next: RoomSettings = { ...room.settings, ...patch }
     if (!GAME_MODES.includes(next.mode as GameMode)) return err('INVALID_SETTINGS', '알 수 없는 모드입니다.')
+    if (!POKER_VARIANTS.includes(next.variant as PokerVariant)) {
+      return err('INVALID_SETTINGS', '알 수 없는 포커 방식입니다.')
+    }
+    /*
+     * 변형마다 정원이 다르다. 취향이 아니라 덱 52장의 산수다 — 자세한 계산은
+     * shared/src/variants.ts 머리말에 있다.
+     *
+     * 이미 앉아 있는 사람보다 적은 정원의 변형으로는 바꿀 수 없다. 바꾸는 것이 곧
+     * 내보내는 것이 되면, 설정 한 칸이 사람을 쫓아내는 단추가 된다.
+     */
+    const seatLimit = VARIANTS[next.variant].maxSeats
+    if (room.players.length > seatLimit) {
+      return err(
+        'INVALID_SETTINGS',
+        `${VARIANT_LABEL[next.variant]}는 ${seatLimit}명까지입니다. 지금 ${room.players.length}명이 앉아 있습니다.`,
+      )
+    }
     if (!Number.isInteger(next.maxPlayers) || next.maxPlayers < MIN_PLAYERS || next.maxPlayers > MAX_PLAYERS_LIMIT) {
       return err('INVALID_SETTINGS', `최대 인원은 ${MIN_PLAYERS}~${MAX_PLAYERS_LIMIT}명입니다.`)
     }
     if (next.maxPlayers < room.players.length) {
       return err('INVALID_SETTINGS', '이미 들어와 있는 인원보다 적게 줄일 수 없습니다.')
     }
+    /*
+     * 정원이 변형의 상한을 넘으면 되돌려보내지 않고 여기서 깎는다.
+     *
+     * 해결사 자리 수를 승·패 수에 맞추는 것(fitRounds)과 같은 판단이다 — 방장은
+     * 「오마하로 바꾸겠다」고 했지 「정원을 먼저 8로 줄이고 오마하로 바꾸겠다」고 하지 않았다.
+     */
+    const maxPlayers = Math.min(next.maxPlayers, seatLimit)
     if (!inRange(next.maxSpectators, 0, MAX_SPECTATORS_LIMIT)) {
       return err('INVALID_SETTINGS', `관전은 0~${MAX_SPECTATORS_LIMIT}명입니다.`)
     }
@@ -544,6 +572,7 @@ export class RoomStore {
     // (Game.startHeist) 앞 판의 사용 여부가 뒤 판으로 새지 않는다.
     room.settings = {
       ...next,
+      maxPlayers,
       pickedChallenges: [...new Set(next.pickedChallenges)].sort((a, b) => a - b),
       // 정렬하지 않는다 — 여기서는 자리가 곧 뜻이다.
       specialistRounds: rounds,

@@ -10,6 +10,39 @@ import type { ChallengeId, SpecialistId } from './extraCards.ts'
 import { ALARMS_TO_LOSE, SPECIALIST_ROUNDS, VAULTS_TO_WIN } from './game.ts'
 import type { GameOverReason, GameView } from './game.ts'
 
+/**
+ * 어떤 포커로 하는가.
+ *
+ * 모드(기본·고급·프로…)와는 층이 다르다 — 모드는 **어떤 카드가 걸리는가**이고,
+ * 이쪽은 **포커 자체의 규칙**이다. 둘은 곱해진다: 오마하 + 프로 모드가 성립한다.
+ * 아직 붙지 않은 변형은 여기 이름을 두지 않는다. 이름만 있고 규칙이 없으면
+ * 방 설정에서 고를 수 있는데 판이 안 열리는 자리가 생긴다.
+ */
+export const POKER_VARIANTS = ['texas', 'omaha', 'spots', 'circle', 'circleWild', 'banana'] as const
+export type PokerVariant = (typeof POKER_VARIANTS)[number]
+
+export const VARIANT_LABEL: Record<PokerVariant, string> = {
+  texas: '텍사스 홀덤',
+  omaha: '오마하',
+  spots: '스팟스',
+  circle: '서클잭',
+  // 방 설정에는 「서클잭」 한 줄과 체크칸으로 보인다. 갈라 두는 것은 계약 쪽 사정이다.
+  circleWild: '서클잭 (와일드카드)',
+  banana: '바나나스플릿',
+}
+
+export const VARIANT_HINT: Record<PokerVariant, string> = {
+  texas: '카드 2장을 받고, 공용 카드 5장과 합쳐 일곱 장 중 최선의 다섯 장을 만듭니다.',
+  omaha: '카드 4장을 받습니다. 손에서 정확히 2장, 공용에서 정확히 3장을 써야 합니다.',
+  spots:
+    '카드 4장을 받습니다. 공용 카드 9장이 3×3 으로 깔리고, 가로·세로·대각 세 장 줄 하나를 골라 씁니다.',
+  circle: '카드 2장을 받습니다. 공용 카드 7장이 원으로 깔리고, 원에서 붙어 있는 3장을 함께 씁니다.',
+  circleWild:
+    '카드 2장을 받습니다. 공용 카드 7장이 원으로 깔리고, 원에서 붙어 있는 3장을 함께 씁니다. 원 한가운데 와일드카드 한 장이 더 있어, 붙어 있는 3장 중 아무 자리에나 끼워 쓸 수 있습니다.',
+  banana:
+    '카드 2장을 받습니다. 공용 카드가 가운데가 아니라 사람과 사람 사이에 3장씩 놓입니다. 내 양옆 두 묶음 6장과 내 카드 2장, 여덟 장 중 다섯 장으로 승부합니다.',
+}
+
 /** 방 설정. 지금은 기본값 고정으로 시작하고, UI 는 자리만 잡아둔다. */
 export const GAME_MODES = ['basic', 'advanced', 'professional', 'masterThief', 'custom'] as const
 export type GameMode = (typeof GAME_MODES)[number]
@@ -48,6 +81,8 @@ export const MAX_SPECTATORS_LIMIT = 5
 export const MAX_PLAYERS_LIMIT = 10
 
 export interface RoomSettings {
+  /** 어떤 포커로 하는가. 모드와 곱해진다 — 오마하 + 프로 모드가 성립한다. */
+  variant: PokerVariant
   mode: GameMode
   /** 「직접 고르기」에서 고른 도전자 카드. 다른 모드에서는 쓰이지 않는다. */
   pickedChallenges: ChallengeId[]
@@ -122,6 +157,7 @@ export function emptyFlags(count: number = SPECIALIST_ROUNDS): boolean[] {
 }
 
 export const DEFAULT_SETTINGS: RoomSettings = {
+  variant: 'texas',
   mode: 'basic',
   pickedChallenges: [],
   specialistRounds: emptyRounds(),

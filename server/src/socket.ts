@@ -84,6 +84,8 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
   const socketOfPlayer = new Map<string, string>()
   /** 잠금이 풀리는 시점에 상태를 한 번 더 쏘기 위한 타이머. */
   const unlockTimers = new Map<string, NodeJS.Timeout>()
+  /** 시간이 다 됐을 때 다 같이 확정시키기 위한 타이머. */
+  const autoTimers = new Map<string, NodeJS.Timeout>()
   /** 혼자 해보는 방의 진행자. 봇을 움직이고 안내를 띄운다. */
   const tutorials = new Map<string, Tutorial>()
   /** 사람마다의 최근 말수. 도배를 막는 데만 쓴다. */
@@ -127,6 +129,7 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
       for (const player of view.players) sendHand(code, player.id)
     }
     scheduleUnlock(code, view)
+    scheduleAutoConfirm(code, view)
   }
 
   /**
@@ -167,9 +170,35 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
       const next = game.view()
       io.to(code).emit('game:state', next)
       scheduleUnlock(code, next)
+      scheduleAutoConfirm(code, next)
     }, TOKEN_LOCK_MS + 20)
     timer.unref()
     unlockTimers.set(code, timer)
+  }
+
+  /**
+   * 모두가 토큰을 쥐면 시계가 돈다. 다 되면 서버가 대신 확정한다.
+   *
+   * 판정도 시각도 판(Game)이 쥐고 있고 여기는 깨우는 일만 한다 — 예약이 늦게
+   * 도착하면 판이 「아직 아니다」로 돌려보내고, 그때 남은 만큼 다시 잰다.
+   * 상태를 내보낼 때마다 다시 거는 것은 사이에 토큰이 오가면 시계가 처음부터이기 때문이다.
+   */
+  function scheduleAutoConfirm(code: string, view: GameView): void {
+    clearTimeout(autoTimers.get(code))
+    autoTimers.delete(code)
+    if (view.autoConfirmIn === null) return
+
+    const timer = setTimeout(() => {
+      autoTimers.delete(code)
+      const game = games.get(code)
+      if (!game) return
+      const before = game.view().round
+      // 라운드가 넘어가면 손패도 함께 간다. 감지기가 카드를 갈아엎었을 수 있다.
+      if (game.autoConfirm()) sendGame(code, { hands: game.view().round !== before })
+      else scheduleAutoConfirm(code, game.view())
+    }, view.autoConfirmIn + 20)
+    timer.unref()
+    autoTimers.set(code, timer)
   }
 
   /** 방이 사라졌다. 딸려 있던 판과 타이머도 함께 정리한다. */
@@ -179,6 +208,8 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
     games.delete(code)
     clearTimeout(unlockTimers.get(code))
     unlockTimers.delete(code)
+    clearTimeout(autoTimers.get(code))
+    autoTimers.delete(code)
   }
 
   /** 판을 접고 방은 대기실로 되돌린다. 방 자체는 남는다. */
@@ -573,6 +604,7 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
         code,
         room.players.map((p) => ({ ...p })),
         {
+          variant: room.settings.variant,
           mode: room.settings.mode,
           pickedChallenges: room.settings.pickedChallenges,
           specialistRounds: room.settings.specialistRounds,
@@ -721,6 +753,8 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
           games.delete(code)
           clearTimeout(unlockTimers.get(code))
           unlockTimers.delete(code)
+          clearTimeout(autoTimers.get(code))
+          autoTimers.delete(code)
           io.to(code).emit('room:closed', { reason: 'rematchDeclined' })
           return
         }
@@ -822,6 +856,8 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
       clearInterval(sweeper)
       for (const timer of unlockTimers.values()) clearTimeout(timer)
       unlockTimers.clear()
+      for (const timer of autoTimers.values()) clearTimeout(timer)
+      autoTimers.clear()
       accounts.stop()
     },
   }

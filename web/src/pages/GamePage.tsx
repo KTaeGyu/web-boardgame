@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
+  AUTO_CONFIRM_COUNTDOWN_MS,
   CHALLENGES,
   ROUNDS,
   ROUND_LABEL,
   TOKEN_LOCK_MS,
-  bestHolding,
+  usableCommunity,
+  VARIANTS,
   orderForReading,
   type Card,
   type GamePlayerView,
@@ -22,6 +24,7 @@ import { SetupStep } from '../components/SetupStep.tsx'
 import { TableChallenges, TableSpecialist } from '../components/TableExtras.tsx'
 import { TutorialTip, type TipPayload } from '../components/TutorialTip.tsx'
 import { ConfirmModal } from '../components/Modal.tsx'
+import { CommunityBoard } from '../components/Board.tsx'
 import { CardSlot, PlayingCard } from '../components/PlayingCard.tsx'
 import { Token, TokenBlank, TokenHole } from '../components/Token.tsx'
 import { useBackIntercept } from '../lib/back.ts'
@@ -130,6 +133,16 @@ export function GamePage({ spectating = false }: { spectating?: boolean } = {}) 
     setToasts((current) => current.filter((toast) => toast.id !== id))
   }, [])
 
+  /** 화면이 스스로 알려야 할 때. 서버가 보낸 것(game:toast)과 같은 자리에 같은 모양으로 쌓인다. */
+  const showToast = useCallback(
+    (text: string, tone: 'info' | 'warn' = 'warn') => {
+      const id = (toastSeq.current += 1)
+      setToasts((current) => [...current, { id, text, tone }].slice(-3))
+      setTimeout(() => dropToast(id), TOAST_MS)
+    },
+    [dropToast],
+  )
+
   const toggleSeatView = useCallback(() => {
     setSeatView((current) => {
       const next: SeatView = current === 'cards' ? 'chips' : 'cards'
@@ -153,8 +166,16 @@ export function GamePage({ spectating = false }: { spectating?: boolean } = {}) 
     : ''
   const tokenRef = useTokenFlight(TOKEN_LOCK_MS, layoutKey)
 
-  // 내 홀카드와 이미 공개된 보드만으로 구한다. 남의 정보는 쓰지 않으므로 새는 것이 없다.
-  const myHolding = useMemo(() => bestHolding([...hand, ...(game?.community ?? [])]), [hand, game?.community])
+  /*
+   * 내 홀카드와 이미 공개된 보드만으로 구한다. 남의 정보는 쓰지 않으므로 새는 것이 없다.
+   *
+   * 손을 만드는 법은 포커 방식마다 다르다 — 오마하는 손에서 정확히 두 장이라,
+   * 텍사스와 같은 카드를 들고도 답이 다르다. 규칙은 shared 에 한 벌뿐이다.
+   */
+  const myHolding = useMemo(
+    () => (game ? VARIANTS[game.variant].holding(hand, usableCommunity(game, playerId)) : null),
+    [hand, game, playerId],
+  )
 
   /**
    * 뱃지를 짚고 있는 동안에만 그 조합을 밝힌다. 평소에는 판을 어지럽히지 않는다.
@@ -572,6 +593,30 @@ export function GamePage({ spectating = false }: { spectating?: boolean } = {}) 
     }
   }, [showdownKey, revealCount, phase])
 
+  /*
+   * 자동 확정까지 남은 시간.
+   *
+   * 서버는 「몇 시에」가 아니라 **「얼마나 남았는가」**를 보낸다. 화면의 시계는 서버와
+   * 몇 초씩 어긋나 있을 수 있고, 절대 시각을 받으면 그 차이가 그대로 숫자에 실린다.
+   * 받은 길이를 내 시계 기준으로 못박고 여기서부터 센다. 상태가 새로 올 때마다 다시
+   * 못박히므로, 누가 토큰을 옮겨 시계가 처음부터 시작하면 화면도 함께 되감긴다.
+   */
+  const autoIn = game?.autoConfirmIn ?? null
+  const [autoLeft, setAutoLeft] = useState<number | null>(null)
+
+  useEffect(() => {
+    if (autoIn === null) {
+      setAutoLeft(null)
+      return
+    }
+    const deadline = Date.now() + autoIn
+    const tick = () => setAutoLeft(Math.max(0, deadline - Date.now()))
+    tick()
+    // 초가 바뀌는 순간과 눈금이 어긋나면 숫자가 한 박자 늦게 넘어간다. 촘촘히 센다.
+    const timer = setInterval(tick, 100)
+    return () => clearInterval(timer)
+  }, [autoIn])
+
   /**
    * 감지기가 터지면 한 번 크게 알린다.
    *
@@ -672,6 +717,14 @@ export function GamePage({ spectating = false }: { spectating?: boolean } = {}) 
     (game.showdown?.reveals ?? []).slice(0, revealed).map((reveal) => reveal.playerId),
   )
   const picking = game.phase === 'picking'
+  /*
+   * 마지막 5초만 크게 센다. 그전에는 발밑의 한 줄로 충분하다 —
+   * 15초 내내 큰 숫자가 떠 있으면 정작 봐야 할 카드와 토큰을 가린다.
+   */
+  const countdown =
+    autoLeft !== null && autoLeft > 0 && autoLeft <= AUTO_CONFIRM_COUNTDOWN_MS
+      ? Math.max(1, Math.ceil(autoLeft / 1000))
+      : null
   /*
    * 내 토큰이 날아가는 중이다.
    *
@@ -783,20 +836,7 @@ export function GamePage({ spectating = false }: { spectating?: boolean } = {}) 
         <TableSpecialist game={game} note={notes.find((n) => n.specialist === game.specialist) ?? null} />
 
       <section className="table">
-        <div className="table__community">
-          {Array.from({ length: 5 }, (_, index) =>
-            game.community[index] ? (
-              <PlayingCard
-                key={game.community[index]}
-                card={game.community[index]}
-                delay={index * 90}
-                highlight={lit.has(game.community[index])}
-              />
-            ) : (
-              <CardSlot key={`slot-${index}`} />
-            ),
-          )}
-        </div>
+        <CommunityBoard game={game} slots lit={lit} delayStep={90} base="table__community" me={playerId} />
 
         {/*
           토큰 번호는 1..인원수이고, **그 자리를 늘 다 그린다.**
@@ -839,10 +879,8 @@ export function GamePage({ spectating = false }: { spectating?: boolean } = {}) 
                 <PlayingCard key={card} card={card} delay={index * 120} highlight={lit.has(card)} />
               ))
             ) : (
-              <>
-                <CardSlot />
-                <CardSlot />
-              </>
+              // 아직 손패가 안 왔을 때의 빈자리. 몇 장인지는 포커 방식이 정한다.
+              Array.from({ length: game.holeCount }, (_, index) => <CardSlot key={`hole-${index}`} />)
             )}
           </div>
           <div className="my-seat__info">
@@ -906,7 +944,8 @@ export function GamePage({ spectating = false }: { spectating?: boolean } = {}) 
         {picking && (
           <span className="game-actions__status">
             {game.canConfirm
-              ? `확정 ${game.players.filter((p) => p.ready).length} / ${game.players.length}`
+              ? `확정 ${game.players.filter((p) => p.ready).length} / ${game.players.length}` +
+                (autoLeft !== null ? ` · ${Math.ceil(autoLeft / 1000)}초 뒤 자동 확정` : '')
               : '모두가 토큰을 가져가면 확정할 수 있습니다'}
           </span>
         )}
@@ -917,7 +956,19 @@ export function GamePage({ spectating = false }: { spectating?: boolean } = {}) 
         playerId={playerId}
         hand={hand}
         notes={notes}
-        onUse={(input) => void call('game:useSpecialist', input)}
+        /*
+         * 거절을 조용히 삼키지 않는다. 확인창은 누르는 순간 닫히므로, 실패하면
+         * 「눌렀는데 아무 일도 안 일어났다」로만 남는다. 실제로 두 갈래가 있다 —
+         * 남이 한발 먼저 눌렀을 때, 그리고 창을 열어둔 사이에 라운드가 넘어갔을 때
+         * (마지막 라운드에서는 그대로 쇼다운으로 간다).
+         */
+        onUse={(input) => {
+          void call<null>('game:useSpecialist', input).then((result) => {
+            if (result.ok) return
+            sfx('deny')
+            showToast(result.message)
+          })
+        }}
       />
 
       {tip && (
@@ -963,6 +1014,17 @@ export function GamePage({ spectating = false }: { spectating?: boolean } = {}) 
           spectating={spectating}
           onLeave={() => setConfirmLeave(true)}
         />
+      )}
+
+      {/*
+        * 성공·실패와 같은 자리다. 둘이 겹치면 판정이 이긴다 — 감지기가 터진 순간에
+        * 숫자가 그 위에 겹치면 둘 다 못 읽는다.
+        */}
+      {!flash && countdown !== null && (
+        <div key={countdown} className="verdict verdict--count" aria-live="off">
+          {countdown}
+          <em className="verdict__hint">뒤에 자동 확정</em>
+        </div>
       )}
 
       {/* 쇼다운 밖에서도 뜬다. 감지기는 라운드 도중에 터진다. */}
@@ -1182,10 +1244,10 @@ function Showdown({
    */
   const lit = new Set<string>(
     hovered && view === 'hand'
-      ? (bestHolding([
-          ...(reveals.find((one) => one.playerId === hovered)?.hole ?? []),
-          ...game.community,
-        ])?.used ?? [])
+      ? (VARIANTS[game.variant].holding(
+          reveals.find((one) => one.playerId === hovered)?.hole ?? [],
+          usableCommunity(game, hovered),
+        )?.used ?? [])
       : [],
   )
 
@@ -1205,21 +1267,23 @@ function Showdown({
         </h2>
 
         {/*
-          판정의 근거가 되는 다섯 장. 모달이 테이블을 덮고 있어, 이것이 없으면
+          판정의 근거가 되는 공용 카드. 모달이 테이블을 덮고 있어, 이것이 없으면
           「내 카드가 왜 그 족보인지」를 확인하려고 모달을 닫아야 한다.
+
+          모양은 테이블과 같다 — 격자가 한 줄로 펴지거나 원이 일렬로 서면
+          어느 줄·어느 이웃으로 만든 손인지 짚어 봐도 알아볼 수 없다.
         */}
         {game.community.length > 0 && (
-          <div className="showdown__community">
-            {game.community.map((card, index) => (
-              <PlayingCard
-                key={card}
-                card={card}
-                size="sm"
-                delay={index * 60}
-                highlight={lit.has(card)}
-              />
-            ))}
-          </div>
+          <CommunityBoard
+            game={game}
+            size="sm"
+            lit={lit}
+            delayStep={60}
+            base="showdown__community"
+            me={playerId}
+            // 짚은 사람 쪽으로 돌린다. 「나」는 내 자리에 그대로 남는다.
+            focus={hovered ?? playerId}
+          />
         )}
 
         {done && (
@@ -1274,7 +1338,10 @@ function Showdown({
                     서버가 고른 다섯 장은 딜 순서 그대로라 무엇이 짝이었는지 눈으로 세어야 했다.
                   */}
                   {(view === 'combo' && shown
-                    ? orderForReading(bestHolding([...reveal.hole, ...game.community])?.used ?? reveal.hole)
+                    ? orderForReading(
+                        VARIANTS[game.variant].holding(reveal.hole, usableCommunity(game, reveal.playerId))
+                          ?.used ?? reveal.hole,
+                      )
                     : reveal.hole
                   ).map((card) => (
                     <PlayingCard
