@@ -167,7 +167,7 @@ export interface GameView {
   muscleId: string | null
   /** 해결사가 공개한 정보. 판이 바뀌면 사라진다. */
   announcements: Announcement[]
-  /** 한 사람이 받은 카드 수. 「보안 카메라」가 걸리면 3장이다. */
+  /** 한 사람이 받은 카드 수. 포커 방식이 정하고, 「보안 카메라」가 걸리면 한 장 더다. */
   holeCount: number
   /** 몇 번째 판인가. 1부터 센다. */
   heist: number

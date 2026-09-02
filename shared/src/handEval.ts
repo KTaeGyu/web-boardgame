@@ -125,7 +125,7 @@ export function* combinations<T>(items: readonly T[], k: number): Generator<T[]>
   }
 }
 
-/** 홀카드 2장 + 커뮤니티 5장 중 최선의 5장. 홀카드를 반드시 써야 한다는 제약은 없다. */
+/** 받은 카드 전부 중 최선의 5장. 홀카드를 반드시 써야 한다는 제약은 없다(텍사스·바나나스플릿). */
 export function evaluateBest(cards: readonly Card[]): HandValue {
   if (cards.length < 5) throw new Error(`최소 5장이 필요하다: ${cards.length}장 받음`)
   let best: HandValue | null = null
