@@ -372,6 +372,67 @@
   font-size: 13px;
 }
 
+/*
+ * 「누가 쓸까」를 고르는 줄.
+ *
+ * 한 사람이 한 줄이고, 그 사람을 고른 표가 오른쪽에 붙는다. **표가 서로 보이는 것이
+ * 이 투표의 전부다** — 카드 이야기가 금지라 「나에게 오는 게 낫다」를 표로만 말할 수
+ * 있고, 남이 어디로 기울었는지 보면서 한 사람으로 모아간다(스캔이 쓰는 어법과 같다).
+ */
+.pick-people {
+  display: grid;
+  gap: 8px;
+  margin: 14px 0 4px;
+}
+
+.pick-person {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 11px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ink);
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+}
+
+.pick-person:hover {
+  border-color: var(--gold-dim);
+}
+
+/* 내가 고른 사람. 남들의 표와 갈려 보여야 「내가 어디에 섰나」가 한눈에 온다. */
+.pick-person--on {
+  border-color: var(--gold);
+  background: rgba(var(--gold-rgb), 0.16);
+  color: var(--gold);
+  font-weight: 700;
+}
+
+.pick-person__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 이 사람을 고른 사람들. 이름이 늘어나도 줄을 밀지 않도록 오른쪽에서 줄인다. */
+.pick-person__backers {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--gold);
+}
+
 /* ── 상대 자리 ────────────────────────── */
 /* 판을 위아래 가운데로 모으는 위쪽 절반. 아래쪽 절반은 화면 크기마다 다르다. */
 .seats-area {
@@ -510,7 +571,27 @@
   animation: toast-in 0.22s ease-out backwards;
 }
 
+/*
+ * 접힌 대화의 한 줄은 **알약 하나**다.
+ *
+ * 이름은 줄이지 않고 한 줄로 세운다 — 닉네임이 길면 이름 쪽이 먼저 접혀 알약이 두 줄이
+ * 되고, 그러면 옆의 단추와 아래 선이 어긋나 한 덩어리로 읽히지 않는다. 대신 이름이
+ * 알약을 다 먹지 않도록 절반 아래로 묶고, 넘치면 말줄임으로 끊는다.
+ *
+ * 말 쪽은 `min-width: 0` 이 있어야 줄어든다 — flex 항목의 기본 최소 너비는 내용 길이라,
+ * 그대로 두면 긴 한마디가 알약을 밀어 이름을 밀어낸다.
+ */
+.chat-peek .chat__who {
+  flex: 0 0 auto;
+  max-width: 45%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .chat-peek__text {
+  flex: 1 1 auto;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1050,6 +1131,34 @@
 
 .board-banana__group > * + * {
   margin-left: -22px;
+}
+
+/*
+ * 겹친 카드는 **왼쪽 띠만 드러난다.**
+ *
+ * 내용을 가운데 둔 채로 겹치면 숫자와 무늬가 옆 카드 밑으로 들어가, 세 장이 「무엇인지
+ * 모를 세 장」이 된다 — 좁은 화면에서는 아예 안 보인다. 덮이는 카드만 내용을 왼쪽 끝으로
+ * 몰아 드러난 띠 안에 세운다. 실제 카드를 부채꼴로 쥐었을 때 모서리의 숫자만 읽는 것과
+ * 같은 모양이고, **겹침 자체는 그대로 둔다** — 세 장이 한 덩이로 읽히는 것이 이 배치의 뜻이다.
+ *
+ * 맨 뒤 한 장은 아무것도 덮지 않으므로 가운데 정렬 그대로다.
+ */
+.board-banana__group > .card:not(:last-child) {
+  align-items: flex-start;
+  padding-left: 4px;
+}
+
+/* 작은 카드는 띠도 그만큼 좁다. 안 보이느니 작게라도 보이는 편이 낫다. */
+.board-banana__group > .card--sm:not(:last-child) {
+  padding-left: 3px;
+}
+
+.board-banana__group > .card--sm:not(:last-child) .card__rank {
+  font-size: 12px;
+}
+
+.board-banana__group > .card--sm:not(:last-child) .card__suit {
+  font-size: 10px;
 }
 
 /*
@@ -1991,6 +2100,19 @@ button.token:hover:not(:disabled) {
 
   .board-banana__group > * + * {
     margin-left: -19px;
+  }
+
+  /* 좁은 화면의 띠는 15px 뿐이다. 그 안에 들어갈 만큼만 남긴다. */
+  .board-banana__group > .card:not(:last-child) {
+    padding-left: 2px;
+  }
+
+  .board-banana__group > .card:not(:last-child) .card__rank {
+    font-size: 11px;
+  }
+
+  .board-banana__group > .card:not(:last-child) .card__suit {
+    font-size: 9px;
   }
 }
 

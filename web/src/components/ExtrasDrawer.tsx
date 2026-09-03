@@ -3,7 +3,6 @@ import {
   CATEGORY_LABEL,
   CHALLENGES,
   SPECIALISTS,
-  SPECIALIST_NEEDS,
   rankLabel,
   type Card,
   type ExtraCard,
@@ -26,14 +25,17 @@ export interface CardNote {
 
 interface Props {
   game: GameView
-  playerId: string
-  hand: Card[]
   /** 이번 판에 내가 받은 쪽지들. */
   notes: CardNote[]
-  onUse: (input: { targetId?: string; value?: number; cardIndex?: number }) => void
+  /**
+   * 해결사를 쓰는 손잡이(`useSpecialistUse`). 쓸 수 없으면 넘기지 않는다 —
+   * 그때는 카드가 단추 대신 「눌러서 뒤집기」를 그린다. 물음창은 이 드로어가 아니라
+   * 훅을 든 쪽이 그린다. 테이블 옆에 선 같은 카드와 한 벌을 나눠 쓰기 때문이다.
+   */
+  onUse?: () => void
+  /** 그 손잡이에 적을 말. 투표 자리와 사용 자리가 단추에 갈려 보여야 한다. */
+  useLabel?: string
 }
-
-const RANK_VALUES = [14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2]
 
 /**
  * 이번 판에 걸린 카드들.
@@ -41,47 +43,17 @@ const RANK_VALUES = [14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2]
  * 판 내내 옆에 붙어 있고 접을 수 있다. 규칙이 바뀐 채로 진행되므로 언제든 다시
  * 읽을 수 있어야 하지만, 늘 펼쳐 두면 테이블을 가린다.
  */
-export function ExtrasDrawer({ game, playerId, hand, notes, onUse }: Props) {
+export function ExtrasDrawer({ game, notes, onUse, useLabel }: Props) {
   // 접힌 채로 시작한다. 펼쳐 두면 테이블을 가리고, 대개는 걸린 것을 이미 옆에서 보고 있다.
   const [open, setOpen] = useState(false)
   // 펼쳐 둔 채 뒤로가기를 누르면 판을 떠나는 것이 아니라 서랍을 접는다.
   useBackIntercept(open, () => setOpen(false))
-  const [asking, setAsking] = useState(false)
-  const [targetId, setTargetId] = useState('')
-  const [value, setValue] = useState(14)
-  const [cardIndex, setCardIndex] = useState(0)
 
   const specialist = game.specialist === null ? null : SPECIALISTS[game.specialist]
-  const needs = game.specialist === null ? null : SPECIALIST_NEEDS[game.specialist]
   const count = game.challenges.length + (specialist ? 1 : 0)
-  // 물음이 떠 있는 동안 뒤 판은 움직이지 않는다. 서랍 자체는 옆에 붙는 것이라 잠그지 않는다.
-  useScrollLock(asking && specialist !== null)
-  const askDrag = useSheetDrag(() => setAsking(false))
   if (count === 0) return null
 
-  /*
-   * 쓸 수 있는가. 서버가 보는 것과 같은 조건이어야 한다(Game.useSpecialist).
-   *
-   * **구경꾼에게는 열지 않는다.** 서버가 어차피 「이 판에 참여하고 있지 않습니다」로
-   * 돌려보내므로, 열어두면 눌러도 아무 일이 없어 고장으로 읽힌다 —
-   * 「다음 금고로」·「재경기 제안」과 같은 판단이다.
-   */
-  const seated = game.players.some((player) => player.id === playerId)
-  const canUse = seated && specialist !== null && !game.specialistUsed && game.phase === 'picking'
   const myNote = notes.find((note) => note.specialist === game.specialist) ?? null
-  /*
-   * 대상은 **접속 중인 사람만**이다. 자리 비운 사람을 고르면 카드는 쓰였는데
-   * 알려줄 소켓이 없어 쪽지가 어디에도 닿지 않는다 — 그 판의 해결사가 그냥 사라진다.
-   */
-  const others = game.players.filter((player) => player.id !== playerId && player.connected)
-  const ready = !needs?.target || targetId !== ''
-
-  function start() {
-    setTargetId(others[0]?.id ?? '')
-    setValue(14)
-    setCardIndex(0)
-    setAsking(true)
-  }
 
   return (
     <aside className={`drawer ${open ? 'drawer--open' : ''}`}>
@@ -106,111 +78,34 @@ export function ExtrasDrawer({ game, playerId, hand, notes, onUse }: Props) {
             <ExtraTile
               kind="specialist"
               card={specialist}
-              status={
-                game.specialistUsed ? (myNote ? '사용됨 — 아래에 결과가 있습니다' : '사용됨') : '아직 쓰지 않았습니다'
-              }
+              status={specialistStatus(game, myNote)}
               note={myNote}
-              onUse={canUse ? start : undefined}
+              onUse={onUse}
+              useLabel={useLabel}
             />
           )}
         </div>
       )}
-
-      {asking && specialist && (
-        <div className="modal-backdrop" onClick={() => setAsking(false)} role="presentation">
-          <div
-            className={`modal ${askDrag.className}`}
-            onClick={(event) => event.stopPropagation()}
-            role="dialog"
-            aria-modal="true"
-            {...askDrag.handlers}
-          >
-            <h2 className="modal__title">「{specialist.name}」을 쓰시겠습니까?</h2>
-            <p className="modal__body">{specialist.text}</p>
-
-            {needs?.target && others.length === 0 && (
-              <p className="field__note">
-                지금 접속 중인 사람이 없습니다. 누군가 돌아와야 쓸 수 있습니다.
-              </p>
-            )}
-
-            {needs?.target && others.length > 0 && (
-              <label className="field">
-                <span className="field__label">누구에게</span>
-                <select
-                  className="field__input"
-                  value={targetId}
-                  onChange={(event) => setTargetId(event.target.value)}
-                >
-                  {others.map((player) => (
-                    <option key={player.id} value={player.id}>
-                      {player.displayName}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
-
-            {needs?.value && (
-              <label className="field">
-                <span className="field__label">어떤 숫자를</span>
-                <select
-                  className="field__input"
-                  value={value}
-                  onChange={(event) => setValue(Number(event.target.value))}
-                >
-                  {RANK_VALUES.map((rank) => (
-                    <option key={rank} value={rank}>
-                      {rankLabel(rank)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
-
-            {needs?.ownCard && (
-              <div className="field">
-                <span className="field__label">보여줄 내 카드</span>
-                <div className="pick-cards">
-                  {hand.map((card, index) => (
-                    <button
-                      key={card}
-                      type="button"
-                      className={`pick-card ${index === cardIndex ? 'pick-card--on' : ''}`}
-                      onClick={() => setCardIndex(index)}
-                    >
-                      <PlayingCard card={card} size="sm" />
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <div className="btn-row">
-              <button type="button" className="btn btn--ghost" onClick={() => setAsking(false)}>
-                취소
-              </button>
-              <button
-                type="button"
-                className="btn btn--primary"
-                onClick={() => {
-                  onUse({
-                    targetId: needs?.target ? targetId : undefined,
-                    value: needs?.value ? value : undefined,
-                    cardIndex: needs?.ownCard ? cardIndex : undefined,
-                  })
-                  setAsking(false)
-                }}
-                disabled={!ready}
-              >
-                사용
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </aside>
   )
+}
+
+/**
+ * 해결사 카드가 지금 어떤 상태인지.
+ *
+ * 드로어와 테이블 옆이 같은 카드를 그리므로 이 말도 한 곳에서 나와야 한다 —
+ * 「사용됨」과 「사용됨 — 아래에 결과가 있습니다」가 자리마다 다르면 같은 카드로 읽히지 않는다.
+ */
+export function specialistStatus(game: GameView, note: CardNote | null): string {
+  if (game.specialistUsed) return note ? '사용됨 — 아래에 결과가 있습니다' : '사용됨'
+
+  const vote = game.specialistVote
+  if (!vote) return '아직 쓰지 않았습니다'
+  const nameOf = (id: string) =>
+    game.players.find((player) => player.id === id)?.displayName ?? '누군가'
+  if (vote.decided) return `${nameOf(vote.decided)}님이 쓸 차례입니다`
+  const voters = game.players.filter((player) => player.connected).length
+  return `누가 쓸지 고르는 중 (${vote.votes.length}/${voters})`
 }
 
 /** 도전자 카드가 지금 어떤 상태인지. 스캔처럼 결과가 남는 카드가 있다. */
@@ -234,6 +129,7 @@ interface TileProps {
   status: string
   note?: CardNote | null
   onUse?: () => void
+  useLabel?: string
 }
 
 /**
@@ -247,7 +143,7 @@ interface TileProps {
  * 「눌러서 뒤집기」는 단추에 내준다 — 쓰기 전에 확인창이 카드 설명을 다시 보여주므로,
  * 뒤집지 않고 눌러도 무엇을 하는 카드인지 모르고 쓰게 되지는 않는다.
  */
-export function ExtraTile({ kind, card, status, note, onUse }: TileProps) {
+export function ExtraTile({ kind, card, status, note, onUse, useLabel = '이 카드 사용' }: TileProps) {
   const [flipped, setFlipped] = useState(false)
   const [tip, setTip] = useState<{ x: number; y: number } | null>(null)
 
@@ -281,7 +177,7 @@ export function ExtraTile({ kind, card, status, note, onUse }: TileProps) {
                   onUse()
                 }}
               >
-                이 카드 사용
+                {useLabel}
               </button>
             ) : (
               <span className="extra-card__hint">눌러서 뒤집기</span>
@@ -316,7 +212,7 @@ export function ExtraTile({ kind, card, status, note, onUse }: TileProps) {
                   onUse()
                 }}
               >
-                이 카드 사용
+                {useLabel}
               </button>
             )}
           </div>

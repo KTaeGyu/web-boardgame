@@ -14,9 +14,24 @@
 import { useState } from 'react'
 import { CHALLENGES, SPECIALISTS, type GameView } from '@the-gang/shared'
 
-import { ExtraTile, challengeStatus, type CardNote } from './ExtrasDrawer.tsx'
+import { ExtraTile, challengeStatus, specialistStatus, type CardNote } from './ExtrasDrawer.tsx'
 
-export function TableSpecialist({ game, note }: { game: GameView; note: CardNote | null }) {
+/**
+ * 여기 서는 해결사는 **드로어 안의 그 카드와 같은 한 벌**이다 — 같은 `ExtraTile`,
+ * 같은 상태 문구, 같은 사용 손잡이(`useSpecialistUse`). 넓은 화면에서는 이쪽이
+ * 눈에 먼저 들어오므로, 여기에 사용 단추가 없으면 못 쓰는 카드로 읽힌다.
+ */
+export function TableSpecialist({
+  game,
+  note,
+  onUse,
+  useLabel,
+}: {
+  game: GameView
+  note: CardNote | null
+  onUse?: () => void
+  useLabel?: string
+}) {
   if (game.specialist === null) return null
   const card = SPECIALISTS[game.specialist]
 
@@ -26,8 +41,10 @@ export function TableSpecialist({ game, note }: { game: GameView; note: CardNote
       <ExtraTile
         kind="specialist"
         card={card}
-        status={game.specialistUsed ? '사용됨' : '아직 쓰지 않았습니다'}
+        status={specialistStatus(game, note)}
         note={note}
+        onUse={onUse}
+        useLabel={useLabel}
       />
     </aside>
   )

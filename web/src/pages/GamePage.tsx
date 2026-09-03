@@ -22,6 +22,7 @@ import { ScanVote } from '../components/ScanVote.tsx'
 import { Toast } from '../components/Toast.tsx'
 import { SetupStep } from '../components/SetupStep.tsx'
 import { TableChallenges, TableSpecialist } from '../components/TableExtras.tsx'
+import { useSpecialistUse } from '../components/SpecialistUse.tsx'
 import { TutorialTip, type TipPayload } from '../components/TutorialTip.tsx'
 import { ConfirmModal } from '../components/Modal.tsx'
 import { CommunityBoard } from '../components/Board.tsx'
@@ -683,6 +684,35 @@ export function GamePage({ spectating = false }: { spectating?: boolean } = {}) 
     setTimeout(() => setRejected(null), 450)
   }
 
+  /*
+   * 해결사를 쓰는 한 벌. 드로어 안의 카드와 테이블 옆의 카드가 **같은 것**이어야 하므로
+   * 손잡이와 물음창을 이 화면이 들고 두 카드에 나눠 준다. 물음창은 여기 한 번만 그린다.
+   *
+   * 거절을 조용히 삼키지 않는다. 확인창은 누르는 순간 닫히므로, 실패하면
+   * 「눌렀는데 아무 일도 안 일어났다」로만 남는다. 실제로 두 갈래가 있다 —
+   * 남이 한발 먼저 눌렀을 때, 그리고 창을 열어둔 사이에 라운드가 넘어갔을 때
+   * (마지막 라운드에서는 그대로 쇼다운으로 간다).
+   */
+  const specialistUse = useSpecialistUse({
+    game,
+    playerId,
+    hand,
+    onVote: (pick) => {
+      void call<null>('game:voteSpecialist', { pick }).then((result) => {
+        if (result.ok) return
+        sfx('deny')
+        showToast(result.message)
+      })
+    },
+    onUse: (input) => {
+      void call<null>('game:useSpecialist', input).then((result) => {
+        if (result.ok) return
+        sfx('deny')
+        showToast(result.message)
+      })
+    },
+  })
+
   if (notice) {
     return (
       <main className="page page--narrow">
@@ -702,20 +732,6 @@ export function GamePage({ spectating = false }: { spectating?: boolean } = {}) 
 
   const me = game.players.find((player) => player.id === playerId)
   const others = game.players.filter((player) => player.id !== playerId)
-  /*
-   * 뒤의 자리도 모달과 같은 순서로 열린다.
-   *
-   * 서버는 판이 끝나는 순간 모두의 홀카드를 공개 상태에 싣는다. 그대로 그리면 덮개
-   * 뒤에서 전원의 카드가 한꺼번에 뒤집혀, 모달이 한 명씩 여는 연출이 시작부터 무너진다.
-   * 공개된 사람만 앞면으로 둔다 — 순서는 모달이 쓰는 것과 같은 배열(토큰 오름차순)이다.
-   *
-   * 스캔 중은 그대로 둔다. 그때는 지목된 사람 말고는 이미 다 공개된 자리이고,
-   * 그 사람의 카드는 서버가 아예 보내지 않는다.
-   */
-  const revealing = game.phase === 'showdown' || game.phase === 'gameOver'
-  const openSeats = new Set(
-    (game.showdown?.reveals ?? []).slice(0, revealed).map((reveal) => reveal.playerId),
-  )
   const picking = game.phase === 'picking'
   /*
    * 마지막 5초만 크게 센다. 그전에는 발밑의 한 줄로 충분하다 —
@@ -816,7 +832,7 @@ export function GamePage({ spectating = false }: { spectating?: boolean } = {}) 
               player={player}
               round={game.round}
               phase={game.phase}
-              hideCards={revealing && !openSeats.has(player.id)}
+              holeCount={game.holeCount}
               lockedTokens={game.lockedTokens}
               stuckTokens={game.stuckTokens}
               rejected={rejected}
@@ -833,7 +849,12 @@ export function GamePage({ spectating = false }: { spectating?: boolean } = {}) 
         무엇이 걸렸는지 매번 드로어를 열어 확인하게 두면 잊은 채로 두는 쪽을 고르게 된다.
       */}
       <div className="table-row">
-        <TableSpecialist game={game} note={notes.find((n) => n.specialist === game.specialist) ?? null} />
+        <TableSpecialist
+          game={game}
+          note={notes.find((n) => n.specialist === game.specialist) ?? null}
+          onUse={specialistUse.start}
+          useLabel={specialistUse.label}
+        />
 
       <section className="table">
         <CommunityBoard game={game} slots lit={lit} delayStep={90} base="table__community" me={playerId} />
@@ -953,23 +974,12 @@ export function GamePage({ spectating = false }: { spectating?: boolean } = {}) 
 
       <ExtrasDrawer
         game={game}
-        playerId={playerId}
-        hand={hand}
         notes={notes}
-        /*
-         * 거절을 조용히 삼키지 않는다. 확인창은 누르는 순간 닫히므로, 실패하면
-         * 「눌렀는데 아무 일도 안 일어났다」로만 남는다. 실제로 두 갈래가 있다 —
-         * 남이 한발 먼저 눌렀을 때, 그리고 창을 열어둔 사이에 라운드가 넘어갔을 때
-         * (마지막 라운드에서는 그대로 쇼다운으로 간다).
-         */
-        onUse={(input) => {
-          void call<null>('game:useSpecialist', input).then((result) => {
-            if (result.ok) return
-            sfx('deny')
-            showToast(result.message)
-          })
-        }}
+        onUse={specialistUse.start}
+        useLabel={specialistUse.label}
       />
+
+      {specialistUse.ask}
 
       {tip && (
         <TutorialTip
@@ -1108,25 +1118,30 @@ interface SeatProps {
   busy: boolean
   /** 내 자리인가. 내 토큰은 누르면 가져오는 것이 아니라 내려놓는 것이다. */
   mine?: boolean
-  /** 아직 차례가 오지 않은 자리. 공개 상태에는 카드가 실려 있어도 뒷면으로 둔다. */
-  hideCards?: boolean
+  /** 이 판에 한 사람이 몇 장을 쥐고 있나. 자리에 그 수만큼 뒷면을 세운다. */
+  holeCount?: number
   tokenRef: (token: number) => (node: HTMLElement | null) => void
   onTakeToken: (token: number) => void
 }
 
+/**
+ * 남의 자리.
+ *
+ * **카드는 장식이다.** 몇 장 쥐고 있는지만 보이고 앞면은 그리지 않는다 — 남의 카드를
+ * 화면에 그리는 길을 아예 두지 않는 것이 목적이다. 공개되는 두 순간(스캔·쇼다운)은
+ * 각각 제 창이 화면을 덮고 필요한 카드를 그 안에 다시 그리므로, 여기서 뒤집을 일이 없다.
+ *
+ * 2026-09-03 에 조율가가 걸린 판에서 전원의 홀카드가 새어 나갔다. 서버와 화면이 공개
+ * 조건을 똑같이 「picking 이 아니면 공개」로 적고 있었고, 딜 직후 단계가 그 자리에 딸려
+ * 들어갔기 때문이다. 서버 쪽은 고쳤고, 여기서는 조건 자체를 없앤다.
+ */
 function PlayerSeat(props: SeatProps) {
-  const { player, phase, hideCards = false } = props
+  const { player, holeCount = 2 } = props
   return (
     <div className={`seat ${player.connected ? '' : 'seat--offline'} ${player.ready ? 'seat--ready' : ''}`}>
       <div className="seat__cards">
-        {(player.hole ?? [null, null]).map((card, index) => (
-          <PlayingCard
-            key={card ?? `back-${index}`}
-            card={card}
-            faceDown={phase === 'picking' || hideCards}
-            size="sm"
-            delay={index * 120}
-          />
+        {Array.from({ length: holeCount }, (_, index) => (
+          <PlayingCard key={`back-${index}`} card={null} faceDown size="sm" delay={index * 120} />
         ))}
       </div>
       <span className="seat__name">{player.displayName}</span>

@@ -722,6 +722,20 @@ describe('해결사 카드 효과', () => {
     return game
   }
 
+  /**
+   * 「누가 쓸까」를 정해 둔다.
+   *
+   * 쓰는 사람은 **투표로 정해진다**(2026-09-03). 카드 효과를 보려면 표가 먼저 한 사람으로
+   * 모여 있어야 하므로, 여기서는 셋이 같은 사람을 고른 상태를 만들어 둔다.
+   */
+  function elect(game: Game, who: string) {
+    for (const player of players) {
+      const voted = game.voteSpecialist(player.id, who)
+      assert.equal(voted.ok, true, `${player.id} 의 표가 들어가지 않았다`)
+    }
+    assert.equal(game.view().specialistVote?.decided, who, '만장일치가 되지 않았다')
+  }
+
   it('투자자 — 각자의 그림카드 수가 모두에게 공개된다', () => {
     const game = gameWithSpecialist(3)
     const view = game.view()
@@ -763,6 +777,7 @@ describe('해결사 카드 효과', () => {
     const game = gameWithSpecialist(2)
     assert.equal(game.view().specialistUsed, false, '누군가 눌러야 쓰인다')
 
+    elect(game, 'p1')
     const used = game.useSpecialist('p1', {})
     assert.equal(used.ok, true)
 
@@ -777,6 +792,7 @@ describe('해결사 카드 효과', () => {
     const value = 14 // A
     const expected = hole.filter((card) => card[0] === 'A').length
 
+    elect(game, 'p1')
     const used = game.useSpecialist('p1', { targetId: 'p2', value })
     assert.equal(used.ok, true)
     assert.match(game.view().announcements[0].text, new RegExp(`A ${expected}장`))
@@ -784,6 +800,7 @@ describe('해결사 카드 효과', () => {
 
   it('두뇌 — 대상이나 숫자를 빠뜨리면 거절한다', () => {
     const game = gameWithSpecialist(4)
+    elect(game, 'p1')
     assert.equal(game.useSpecialist('p1', { value: 14 }).ok, false)
     assert.equal(game.useSpecialist('p1', { targetId: 'p2' }).ok, false)
     assert.equal(game.useSpecialist('p1', { targetId: 'p2', value: 99 }).ok, false)
@@ -794,6 +811,7 @@ describe('해결사 카드 효과', () => {
     const game = gameWithSpecialist(1)
     const mine = game.handOf('p1')!
 
+    elect(game, 'p1')
     const used = game.useSpecialist('p1', { targetId: 'p2', cardIndex: 1 })
     assert.equal(used.ok, true)
     if (!used.ok) return
@@ -812,6 +830,7 @@ describe('해결사 카드 효과', () => {
 
   it('정보원 — 없는 카드를 고르면 거절한다', () => {
     const game = gameWithSpecialist(1)
+    elect(game, 'p1')
     assert.equal(game.useSpecialist('p1', { targetId: 'p2', cardIndex: 9 }).ok, false)
     assert.equal(game.useSpecialist('p1', { targetId: 'p2' }).ok, false)
   })
@@ -820,6 +839,7 @@ describe('해결사 카드 효과', () => {
     const game = gameWithSpecialist(10)
     assert.equal(game.view().muscleId, null)
 
+    elect(game, 'p3')
     const used = game.useSpecialist('p3', {})
     assert.equal(used.ok, true)
     assert.equal(game.view().muscleId, 'p3')
@@ -827,11 +847,100 @@ describe('해결사 카드 효과', () => {
 
   it('한 판에 한 번만 쓸 수 있다', () => {
     const game = gameWithSpecialist(2)
+    elect(game, 'p1')
     assert.equal(game.useSpecialist('p1', {}).ok, true)
 
     const again = game.useSpecialist('p2', {})
     assert.equal(again.ok, false)
     if (!again.ok) assert.match(again.message, /이미 쓴/)
+  })
+
+  it('누가 쓸지 정해지기 전에는 아무도 쓸 수 없다', () => {
+    const game = gameWithSpecialist(2)
+    const early = game.useSpecialist('p1', {})
+    assert.equal(early.ok, false)
+    if (!early.ok) assert.match(early.message, /아직 정해지지 않았습니다/)
+  })
+
+  it('표가 갈리면 정해지지 않는다', () => {
+    const game = gameWithSpecialist(2)
+    assert.equal(game.voteSpecialist('p1', 'p1').ok, true)
+    assert.equal(game.voteSpecialist('p2', 'p1').ok, true)
+    assert.equal(game.voteSpecialist('p3', 'p2').ok, true)
+    assert.equal(game.view().specialistVote?.decided, null, '한 사람으로 모이지 않았다')
+    assert.equal(game.useSpecialist('p1', {}).ok, false)
+  })
+
+  it('표는 정해지기 전까지 바꿀 수 있다', () => {
+    const game = gameWithSpecialist(2)
+    game.voteSpecialist('p1', 'p1')
+    game.voteSpecialist('p2', 'p2')
+    game.voteSpecialist('p3', 'p2')
+    assert.equal(game.view().specialistVote?.decided, null)
+
+    // p1 이 마음을 바꾸면 그 자리에서 만장일치가 된다.
+    game.voteSpecialist('p1', 'p2')
+    assert.equal(game.view().specialistVote?.decided, 'p2')
+  })
+
+  it('표는 서로 보인다 — 말 없이 한 사람으로 모아가는 것이 이 투표다', () => {
+    const game = gameWithSpecialist(2)
+    game.voteSpecialist('p1', 'p3')
+    assert.deepEqual(game.view().specialistVote?.votes, [{ voterId: 'p1', pick: 'p3' }])
+  })
+
+  it('정해진 뒤에는 뽑힌 사람만 쓴다', () => {
+    const game = gameWithSpecialist(2)
+    elect(game, 'p2')
+    const other = game.useSpecialist('p1', {})
+    assert.equal(other.ok, false)
+    if (!other.ok) assert.match(other.message, /p2님이 쓸 차례/)
+    assert.equal(game.useSpecialist('p2', {}).ok, true)
+  })
+
+  it('정해진 뒤에는 표를 다시 낼 수 없다', () => {
+    const game = gameWithSpecialist(2)
+    elect(game, 'p2')
+    const again = game.voteSpecialist('p1', 'p1')
+    assert.equal(again.ok, false)
+    if (!again.ok) assert.match(again.message, /이미 p2님으로 정해졌습니다/)
+  })
+
+  it('자리를 비운 사람은 고를 수 없다', () => {
+    const game = gameWithSpecialist(2)
+    game.setConnected('p3', false)
+    const voted = game.voteSpecialist('p1', 'p3')
+    assert.equal(voted.ok, false)
+    if (!voted.ok) assert.match(voted.message, /자리를 비운/)
+  })
+
+  it('끊긴 사람은 표를 기다려주지 않는다', () => {
+    const game = gameWithSpecialist(2)
+    game.setConnected('p3', false)
+    game.voteSpecialist('p1', 'p1')
+    game.voteSpecialist('p2', 'p1')
+    assert.equal(game.view().specialistVote?.decided, 'p1', '접속 중인 둘이 모이면 정해진다')
+  })
+
+  it('뽑힌 사람이 자리를 비우면 투표를 다시 연다', () => {
+    const game = gameWithSpecialist(2)
+    elect(game, 'p2')
+    game.setConnected('p2', false)
+    assert.equal(game.view().specialistVote, null, '그 사람만 쓸 수 있는 채로 굳으면 아무도 못 쓴다')
+    assert.equal(game.useSpecialist('p1', {}).ok, false, '다시 정해야 한다')
+  })
+
+  it('판에 없는 사람은 투표할 수 없다', () => {
+    const game = gameWithSpecialist(2)
+    assert.equal(game.voteSpecialist('구경꾼', 'p1').ok, false)
+    assert.equal(game.voteSpecialist('p1', '구경꾼').ok, false)
+  })
+
+  it('저절로 발동하는 카드는 투표도 열리지 않는다', () => {
+    const game = gameWithSpecialist(3)
+    const voted = game.voteSpecialist('p1', 'p1')
+    assert.equal(voted.ok, false)
+    if (!voted.ok) assert.match(voted.message, /이미 쓴/)
   })
 
   it('판에 없는 사람은 쓸 수 없다', () => {
@@ -843,6 +952,7 @@ describe('해결사 카드 효과', () => {
     const game = gameWithSpecialist(5)
     const before = game.handOf('p1')!
 
+    elect(game, 'p1')
     const used = game.useSpecialist('p1', {})
     assert.equal(used.ok, true)
     assert.equal(game.handOf('p1')?.length, 3, '먼저 늘어난다')
@@ -862,6 +972,7 @@ describe('해결사 카드 효과', () => {
 
   it('해커 — 차례가 아닌 사람은 버릴 수 없다', () => {
     const game = gameWithSpecialist(5)
+    elect(game, 'p1')
     game.useSpecialist('p1', {})
     assert.equal(game.discard('p2', 0).ok, false)
     assert.equal(game.discard('p1', 9).ok, false)
@@ -869,6 +980,7 @@ describe('해결사 카드 효과', () => {
 
   it('잭 — 무늬 없는 J 가 손에 들어온다', () => {
     const game = gameWithSpecialist(7)
+    elect(game, 'p2')
     assert.equal(game.useSpecialist('p2', {}).ok, true)
 
     const hand = game.handOf('p2')!
@@ -915,6 +1027,27 @@ describe('해결사 카드 효과', () => {
     assert.ok(game.handOf('p2')!.includes(before.get('p1')![0]))
     assert.equal(game.handOf('p1')!.includes(before.get('p1')![0]), false)
     for (const p of players) assert.equal(game.handOf(p.id)?.length, 2, '장수는 그대로다')
+  })
+
+  /*
+   * 딜 직후 단계는 「아직 아무것도 안 벌어진 자리」다. 그런데 공개 여부를 「picking 이
+   * 아니면 공개」로 재던 시절에는 이 단계가 공개 쪽에 들어가, 넘길 카드를 고르는 동안
+   * 전원의 홀카드가 모두에게 나갔다. 카드 한 장 값이 아니라 판 전체가 무너지는 자리다.
+   */
+  it('조율가 — 카드를 고르는 동안 남의 홀카드가 공개 상태에 실리지 않는다', () => {
+    const game = gameWithSpecialist(6)
+    assert.equal(game.view().phase, 'setup')
+    for (const seat of game.view().players) assert.equal(seat.hole, null, `${seat.id} 의 카드가 샜다`)
+
+    // 한 명이 낸 뒤에도 마찬가지다 — 그 사이에도 상태는 계속 나간다.
+    game.submitSetup('p1', 0)
+    for (const seat of game.view().players) assert.equal(seat.hole, null)
+  })
+
+  it('사기꾼 — 외우는 동안에도 남의 홀카드는 나가지 않는다', () => {
+    const game = gameWithSpecialist(9)
+    assert.equal(game.view().phase, 'setup')
+    for (const seat of game.view().players) assert.equal(seat.hole, null, `${seat.id} 의 카드가 샜다`)
   })
 
   it('조율가 — 카드를 고르지 않으면 거절한다', () => {

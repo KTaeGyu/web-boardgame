@@ -196,6 +196,8 @@ export class Game {
   private sensorFired: { challenge: ChallengeId; playerId: string } | null = null
   /** 딜 직후 다 같이 하는 단계. 「조율가」와 「사기꾼」이 쓴다. */
   private setup: { kind: 'pass' | 'memorize'; picks: Map<string, number>; done: Set<string> } | null = null
+  /** 해결사를 누가 쓸지 정하는 투표. 첫 표가 열고, 만장일치로 닫힌다. */
+  private specialistVote: { votes: Map<string, string>; decided: string | null } | null = null
   /** 한 장을 더 받아 지금 버릴 카드를 고르고 있는 사람. */
   private discardingId: string | null = null
   /**
@@ -284,6 +286,7 @@ export class Game {
     this.scan = null
     this.sensorFired = null
     this.setup = null
+    this.specialistVote = null
     this.discardingId = null
 
     // 한 판 안에서 같은 카드가 두 번 나오지 않도록 매 판 새 덱을 섞는다.
@@ -477,6 +480,43 @@ export class Game {
    * 합의 절차를 따로 만들어야 한다. 지금은 먼저 누른 사람이 쓰고 한 판에 한 번만 쓰인다.
    * 결과로 무엇을 밖에 알려야 하는지 돌려준다 — 몰래 보여주는 카드가 있기 때문이다.
    */
+  /**
+   * 「누가 쓸까」에 한 표.
+   *
+   * **첫 표가 투표를 연다.** 여는 동작을 따로 두면 열어놓고 아무도 고르지 않는 자리가
+   * 생기고, 그 자리는 화면에서 「고장」으로 읽힌다. 누르는 것 자체가 「나는 이 사람」이다.
+   *
+   * 접속 중인 사람이 **모두 같은 사람**을 골라야 정해진다 — 스캔과 같은 규칙이다.
+   * 표는 언제든 바꿀 수 있고, 정해지기 전까지는 몇 번이고 오간다.
+   */
+  voteSpecialist(playerId: string, pick: string): Result<{ decided: string | null }> {
+    if (this.phase !== 'picking') return err('WRONG_PHASE', '지금은 쓸 수 없습니다.')
+    if (this.specialist === null) return err('WRONG_PHASE', '이번 판에는 해결사 카드가 없습니다.')
+    if (this.specialistUsed) return err('WRONG_PHASE', '이미 쓴 카드입니다.')
+    if (!this.seats.some((s) => s.id === playerId)) {
+      return err('NOT_IN_ROOM', '이 판에 참여하고 있지 않습니다.')
+    }
+    if (this.specialistVote?.decided) {
+      return err('WRONG_PHASE', `이미 ${this.nameOf(this.specialistVote.decided)}님으로 정해졌습니다.`)
+    }
+    /*
+     * 자리를 비운 사람은 고를 수 없다. 뽑혀도 쓸 손이 없어 그 판의 해결사가 그냥
+     * 사라진다 — 「정보원」이 대상을 접속 중인 사람으로 제한하는 것과 같은 이유다.
+     */
+    const chosen = this.seats.find((s) => s.id === pick)
+    if (!chosen) return err('INVALID_TOKEN', '이 판에 없는 사람입니다.')
+    if (!chosen.connected) return err('INVALID_TOKEN', '자리를 비운 사람은 고를 수 없습니다.')
+
+    const vote = (this.specialistVote ??= { votes: new Map(), decided: null })
+    vote.votes.set(playerId, pick)
+
+    const voters = this.seats.filter((s) => s.connected)
+    const picks = voters.map((s) => vote.votes.get(s.id))
+    const agreed = picks.every((one) => one !== undefined) && new Set(picks).size === 1
+    if (agreed) vote.decided = picks[0]!
+    return { ok: true, value: { decided: vote.decided } }
+  }
+
   useSpecialist(
     playerId: string,
     input: { targetId?: string; value?: number; cardIndex?: number },
@@ -487,6 +527,15 @@ export class Game {
 
     const actor = this.seats.find((s) => s.id === playerId)
     if (!actor) return err('NOT_IN_ROOM', '이 판에 참여하고 있지 않습니다.')
+
+    /*
+     * 쓰는 사람은 **투표가 정한다**(2026-09-03). 예전에는 먼저 누른 사람이 곧 쓰는
+     * 사람이었는데, 누가 쓰느냐가 판을 통째로 바꾸는 카드들이라 그 판단이 한 사람 손에
+     * 떨어져 있었다. 여기서 한 번 더 막는 것은 화면을 믿지 않기 위해서다.
+     */
+    const decided = this.specialistVote?.decided ?? null
+    if (decided === null) return err('WRONG_PHASE', '누가 쓸지 아직 정해지지 않았습니다.')
+    if (decided !== playerId) return err('WRONG_PHASE', `${this.nameOf(decided)}님이 쓸 차례입니다.`)
 
     const needs = SPECIALIST_NEEDS[this.specialist]
     const target = needs.target ? this.seats.find((s) => s.id === input.targetId) : undefined
@@ -709,6 +758,11 @@ export class Game {
   setConnected(playerId: string, connected: boolean): void {
     const seat = this.seats.find((s) => s.id === playerId)
     if (seat) seat.connected = connected
+    /*
+     * 쓰기로 정해진 사람이 자리를 비우면 투표를 통째로 다시 연다. 그 사람만 쓸 수 있는
+     * 상태로 굳어 있으면, 돌아오지 않는 한 그 판의 해결사가 아무도 못 쓰는 카드가 된다.
+     */
+    if (!connected && this.specialistVote?.decided === playerId) this.specialistVote = null
   }
 
   // ── 진행 ────────────────────────────────────────────────
@@ -1016,7 +1070,16 @@ export class Game {
     // 상태를 만드는 김에 시계를 맞춘다. 토큰이 오가는 길이 여럿이라 각각에 붙이면
     // 어느 하나를 빠뜨리게 되고, 그 라운드만 시계가 안 도는 모양으로 나타난다.
     this.syncAutoConfirm()
-    const revealed = this.phase !== 'picking'
+    /*
+     * 홀카드를 실어도 되는 단계인가.
+     *
+     * **공개할 단계를 적는다.** 예전에는 「picking 이 아니면 공개」였는데, 그 뒤에
+     * 딜 직후 단계(setup)가 생기면서 그 자리에 딸려 들어갔다 — 「조율가」·「사기꾼」이
+     * 걸린 판은 넘길 카드를 고르는 동안 **전원의 홀카드가 모두에게(관전자에게도) 나갔다**.
+     * 기본값이 「공개」면 단계가 하나 늘 때마다 같은 일이 난다.
+     */
+    const revealed =
+      this.phase === 'scanning' || this.phase === 'showdown' || this.phase === 'gameOver'
     const names = displayNames(this.seats.map((seat) => seat.nickname))
     const stuck = this.stuckTokens()
 
@@ -1064,6 +1127,10 @@ export class Game {
       setup: this.setupView(),
       discardingId: this.discardingId,
       scan: this.scanView(),
+      specialistVote: this.specialistVote && {
+        votes: [...this.specialistVote.votes].map(([voterId, pick]) => ({ voterId, pick })),
+        decided: this.specialistVote.decided,
+      },
       showdown: this.showdown,
       continued: [...this.continued],
       outcome: this.outcome,

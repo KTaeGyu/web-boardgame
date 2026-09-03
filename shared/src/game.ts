@@ -127,6 +127,24 @@ export interface ScanState {
   questions: ScanQuestion[]
 }
 
+/**
+ * 해결사를 **누가 쓸까**를 정하는 투표.
+ *
+ * 해결사는 한 사람이 쓰는 카드이고, 누가 쓰느냐로 판이 갈린다 — 「정보원」을 누가
+ * 누구에게 쓰는지, 「근육」을 누가 맡는지가 그 판의 순서를 통째로 바꾼다. 그런데
+ * 카드 이야기는 금지이므로 **먼저 누른 사람이 곧 쓰는 사람**이면 그 판단이 한 사람
+ * 손에 떨어진다. 표를 서로 보이게 두면, 말 없이도 「나에게 오는 게 낫다」를 주고받을 수 있다.
+ *
+ * 스캔과 같은 규칙이다 — **접속 중인 사람이 모두 같은 사람을 고르면** 정해진다.
+ * 「쓸까 말까」는 묻지 않는다. 쓰고 싶지 않으면 표가 모이지 않을 뿐이다.
+ */
+export interface SpecialistVoteState {
+  /** 지금까지의 표. 서로 보이므로 말 없이도 한 사람으로 모아갈 수 있다. */
+  votes: { voterId: string; pick: string }[]
+  /** 만장일치로 정해진 사람. 정해지면 그 사람만 카드를 쓴다. */
+  decided: string | null
+}
+
 export interface GamePlayerView {
   id: string
   nickname: string
@@ -206,6 +224,8 @@ export interface GameView {
   discardingId: string | null
   /** 스캔이 걸린 판이면 마지막 사람 차례에 이것이 열린다. */
   scan: ScanState | null
+  /** 해결사를 누가 쓸지 정하는 투표. 아직 아무도 표를 내지 않았으면 null 이다. */
+  specialistVote: SpecialistVoteState | null
   showdown: ShowdownResult | null
   /** 쇼다운을 확인하고 다음 판으로 넘어가겠다고 누른 사람들. */
   continued: string[]

@@ -742,6 +742,16 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
       })
     })
 
+    socket.on('game:voteSpecialist', ({ pick }, ack) => {
+      withGame(ack, (game, code, playerId) => {
+        const result = game.voteSpecialist(playerId, String(pick))
+        if (!result.ok) return ack(result)
+        ack({ ok: true, value: null })
+        // 표는 서로 보여야 뜻이 있다. 한 표마다 모두에게 나간다.
+        sendGame(code)
+      })
+    })
+
     socket.on('game:rematch', ({ agree }, ack) => {
       withGame(ack, (game, code, playerId) => {
         const result = game.proposeRematch(playerId, Boolean(agree))

@@ -367,6 +367,11 @@ export interface ClientToServerEvents {
   'game:toLobby': (ack: (result: Result<null>) => void) => void
   /** 딜 직후 다 같이 하는 단계에서 내 몫을 마친다. 넘길 카드가 필요하면 함께 보낸다. */
   'game:setupCard': (payload: { cardIndex?: number }, ack: (result: Result<null>) => void) => void
+  /**
+   * 해결사를 **누가 쓸지** 한 표를 낸다. 첫 표가 투표를 열고, 접속 중인 사람이 모두
+   * 같은 사람을 고르면 정해진다. 정해진 사람만 `game:useSpecialist` 를 부를 수 있다.
+   */
+  'game:voteSpecialist': (payload: { pick: string }, ack: (result: Result<null>) => void) => void
   /** 한 장을 더 받은 뒤 버릴 카드를 고른다. */
   'game:discard': (payload: { cardIndex: number }, ack: (result: Result<null>) => void) => void
   /** 스캔에 답한다. 접속 중인 사람이 모두 같은 답을 고르면 확정된다. */

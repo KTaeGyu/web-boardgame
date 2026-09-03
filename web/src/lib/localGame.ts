@@ -226,6 +226,12 @@ function handle(event: string, payload: Record<string, unknown>): Result<unknown
       return result
     }
 
+    case 'game:voteSpecialist': {
+      const result = game.voteSpecialist(humanId, String(payload.pick))
+      if (result.ok) sendGame()
+      return result
+    }
+
     case 'game:useSpecialist': {
       const result = game.useSpecialist(humanId, payload as never)
       if (!result.ok) return result
