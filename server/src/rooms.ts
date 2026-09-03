@@ -437,6 +437,22 @@ export class RoomStore {
     return toView(room)
   }
 
+  /**
+   * 방을 접는다. 남은 사람이 있어도 접는다 — 부르는 쪽이 이미 「여기서 끝」이라고
+   * 판단한 자리이고, `room:closed` 를 함께 보낸다.
+   *
+   * **사람의 자리표(whereIs)도 같이 지운다.** 방만 지우면 그 사람들은 없는 방에 속한
+   * 채로 남아, 다음 입장에서 옛 방을 정리하려다 엉킨다. `sweep` 이 시간에 밀려 접을
+   * 때와 같은 정리다.
+   */
+  closeRoom(code: string): boolean {
+    const room = this.rooms.get(code.toUpperCase())
+    if (!room) return false
+    for (const left of [...room.players, ...room.spectators]) this.whereIs.delete(left.id)
+    this.rooms.delete(room.code)
+    return true
+  }
+
   /** 유예를 넘긴 자리와, 아무 일도 없는 방을 실제로 치운다. 소켓 계층이 주기적으로 부른다. */
   sweep(): { changed: RoomView[]; closedCodes: string[]; idleCodes: string[] } {
     const now = this.now()

@@ -391,6 +391,72 @@ describe('판이 도는 중의 이탈', () => {
   })
 })
 
+describe('재경기를 거절하면', () => {
+  /** 금고 하나로 끝나는 판을 세운다. 거절 뒤의 뒷정리를 보려는 것이지 규칙을 보려는 것이 아니다. */
+  async function playToGameOver() {
+    const seated = await seatThree()
+    unwrap(
+      await call<RoomView>(seated.host.socket, 'room:settings', {
+        mode: 'custom',
+        pickedChallenges: [1],
+        specialistRounds: [null],
+        specialistRandomRounds: [false],
+        randomChallenges: 0,
+        vaultsToWin: 1,
+        alarmsToLose: 1,
+      }),
+    )
+    unwrap(await call<GameView>(seated.host.socket, 'game:start'))
+    // 「빠른 접근」이 1라운드를 건너뛰므로 몇 바퀴인지는 세지 않는다. 단계로 끊는다.
+    for (let round = 0; round < 4; round++) {
+      await new Promise((resolve) => setTimeout(resolve, 120))
+      if (seated.people[0].states.at(-1)?.phase !== 'picking') break
+      await passRound(seated.people)
+    }
+    const over = await waitState(seated.people[0], (v) => v.phase === 'gameOver', 6000)
+    assert.equal(over.phase, 'gameOver')
+    return seated
+  }
+
+  /*
+   * 방까지 접혀야 한다.
+   *
+   * 예전에는 판만 지우고 방을 `playing` 인 채로 남겼다. 그러면 room:closed 를 놓친
+   * 사람이 다시 들어올 때 **방은 있고 판만 없는** 자리에 떨어져, 화면이 「테이블을
+   * 차리는 중」에서 영영 멈췄다(2026-09-03). 새로고침·재접속이 모두 이 길로 온다.
+   */
+  it('방이 남지 않는다 — 다시 들어오려 해도 없는 방이다', async () => {
+    const { people, host, guests, code } = await playToGameOver()
+
+    const closed = until<{ reason: string }>(people[2].socket, 'room:closed', () => true)
+    unwrap(await call<null>(host.socket, 'game:rematch', { agree: true }))
+    unwrap(await call<null>(guests[0].socket, 'game:rematch', { agree: false }))
+    assert.equal((await closed).reason, 'rematchDeclined')
+
+    assert.equal(app.store.view(code), null, '방이 남아 있으면 좀비 방이 된다')
+
+    const back = await call<unknown>(people[2].socket, 'room:join', {
+      playerId: people[2].playerId,
+      nickname: people[2].nickname,
+      code,
+    })
+    assert.equal(back.ok, false)
+    if (!back.ok) assert.equal(back.code, 'ROOM_NOT_FOUND')
+  })
+
+  it('접힌 방은 목록에서도 사라진다', async () => {
+    const { host, guests, code } = await playToGameOver()
+    unwrap(await call<null>(host.socket, 'game:rematch', { agree: true }))
+    unwrap(await call<null>(guests[0].socket, 'game:rematch', { agree: false }))
+    await new Promise((resolve) => setTimeout(resolve, 100))
+    assert.equal(
+      app.store.list().some((room) => room.code === code),
+      false,
+      '목록에 남으면 눌러 들어갔다가 같은 자리에 빠진다',
+    )
+  })
+})
+
 describe('관전', () => {
   /** 자리 없이 붙는 사람. 손패와 대화가 어디까지 오는지 지켜본다. */
   async function watcherFor(code: string, tag: string) {
