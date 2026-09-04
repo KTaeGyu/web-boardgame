@@ -12,10 +12,21 @@
  * 찾아 그린다(`web/public/avatars/…`). 파일 경로를 값으로 저장하면 나중에 그림을
  * 갈 때 이미 저장된 차림이 죽는다.
  *
- * **가격은 슬롯의 무게를 따른다**(1승 = 1골드). 얼굴이 곧 그 사람이라 아바타가 제일
- * 비싸고(20~50), 줄 전체를 덮는 배너가 그다음(22~35), 움직임인 이펙트(12~18),
- * 색 하나인 프로필 배경이 제일 싸다(3~10). 눈에 띄는 크기 순서와 가격 순서가 같아야
- * 「비싼 것을 샀다」가 화면에서 보인다.
+ * **가격은 두 축으로 정한다**(1승 = 1골드).
+ *
+ * **슬롯끼리는 무게 순이다.** 얼굴이 곧 그 사람이라 아바타가 제일 비싸고(30~42), 줄
+ * 전체를 덮는 배너가 그다음(20~25), 움직임인 이펙트(12~16), 색 하나인 프로필 배경이
+ * 제일 싸다(4~6). 눈에 띄는 크기 순서와 가격 순서가 같아야 「비싼 것을 샀다」가 화면에서
+ * 보인다.
+ *
+ * **한 슬롯 안에서는 좁게 벌린다.** 같은 자리에 걸치는 것끼리 값이 두 배 세 배로 갈리면
+ * 고르는 축이 「무엇이 나다운가」가 아니라 「무엇을 살 수 있나」가 된다. 슬롯마다 제일 싼
+ * 것과 제일 비싼 것의 차를 1.5배 안쪽으로 둔다.
+ *
+ * **그 안의 순서는 화려함이다** — 조각이 몇이고, 얼마나 넓게 덮고, **실루엣이 바뀌는가.**
+ * 셋째 것이 제일 무겁다. 상자 밖으로 나가는 망토와 귀는 색을 갈아입는 것과 다른 종류의
+ * 변화다. 조각 수만 세면 어긋난다 — 「체리 블로섬」은 조각이 열여덟으로 제일 많지만 가늘게
+ * 흩어져 제일 조용하다.
  *
  * 가격이 짜거나 후하면 **이 표의 숫자만** 고치면 된다. 서버가 이 표로 판정하고 화면은
  * 같은 표를 보여줄 뿐이라, 고친 순간 양쪽이 함께 갈린다. 이름도 마찬가지다.
@@ -47,44 +58,55 @@ export interface CosmeticItem {
 export const COSMETICS: CosmeticItem[] = [
   // ── 아바타 ────────────────────────────────
   { id: 'square', kind: 'avatar', name: '루키', price: 0 },
-  { id: 'mask', kind: 'avatar', name: '섀도우 마스크', price: 20 },
-  { id: 'bat', kind: 'avatar', name: '나이트 카울', price: 25 },
-  { id: 'spider', kind: 'avatar', name: '레드 웹', price: 32 },
-  { id: 'dracula', kind: 'avatar', name: '블러드 로드', price: 40 },
-  { id: 'driver', kind: 'avatar', name: '겟어웨이 드라이버', price: 50 },
-  // 치즈·토끼 두 갈래. 강도단 얼굴만 늘어놓으면 고를 결이 하나뿐이다.
-  { id: 'cheddar', kind: 'avatar', name: '체다', price: 22 },
-  { id: 'rabbit', kind: 'avatar', name: '화이트 래빗', price: 30 },
+  // 눈가리개 하나. 상자도 이목구비도 그대로라 제일 적게 바뀐다.
+  { id: 'mask', kind: 'avatar', name: '섀도우 마스크', price: 30 },
+  { id: 'bat', kind: 'avatar', name: '나이트 카울', price: 32 },
+  // 여기부터는 얼굴이 통째로 바뀐다.
+  { id: 'cheddar', kind: 'avatar', name: '체다', price: 34 },
+  { id: 'driver', kind: 'avatar', name: '겟어웨이 드라이버', price: 36 },
+  { id: 'spider', kind: 'avatar', name: '레드 웹', price: 38 },
+  // 귀와 망토는 상자 밖으로 나간다 — 실루엣이 바뀌는 둘이라 제일 비싸다.
+  { id: 'rabbit', kind: 'avatar', name: '화이트 래빗', price: 40 },
+  { id: 'dracula', kind: 'avatar', name: '블러드 로드', price: 42 },
 
   // ── 프로필 배경 ───────────────────────────
   // 그림이 아니라 색이다. 아바타 뒤에 깔리는 작은 자리라 그림은 읽히지 않고,
   // 그림의 몫은 배너가 맡는다. 색이면 파일도 필요 없다.
   //
   // 금빛을 「골드」로 부르지 않는 것은 재화 이름과 겹쳐서다 — 「골드 10 G」가 된다.
+  //
+  // 값이 거의 붙어 있다. 이 슬롯은 색 하나라 화려함에 차이를 둘 자리가 없다 —
+  // 밝아서 눈에 먼저 드는 둘만 위로 올린다.
   { id: 'slate', kind: 'bg', name: '스틸 그레이', price: 0 },
-  { id: 'crimson', kind: 'bg', name: '크림슨', price: 3 },
-  { id: 'forest', kind: 'bg', name: '에메랄드', price: 3 },
-  { id: 'night', kind: 'bg', name: '미드나잇', price: 6 },
-  { id: 'gold', kind: 'bg', name: '앰버', price: 10 },
-  { id: 'mustard', kind: 'bg', name: '머스터드', price: 3 },
+  { id: 'crimson', kind: 'bg', name: '크림슨', price: 4 },
+  { id: 'forest', kind: 'bg', name: '에메랄드', price: 4 },
+  { id: 'night', kind: 'bg', name: '미드나잇', price: 4 },
+  { id: 'mustard', kind: 'bg', name: '머스터드', price: 4 },
+  { id: 'gold', kind: 'bg', name: '앰버', price: 6 },
   { id: 'carrot', kind: 'bg', name: '캐럿', price: 6 },
 
   // ── 이펙트 ────────────────────────────────
   { id: 'none-effect', kind: 'effect', name: '미장착', price: 0 },
+  // 한 겹짜리 둘.
   { id: 'flame', kind: 'effect', name: '플레임', price: 12 },
   { id: 'dash', kind: 'effect', name: '스피드 라인', price: 12 },
-  { id: 'petal', kind: 'effect', name: '블로섬', price: 18 },
-  { id: 'melt', kind: 'effect', name: '멜팅', price: 12 },
-  { id: 'hop', kind: 'effect', name: '홉', price: 18 },
+  // 조각이 둘이고 생겼다 사라지는 둘.
+  { id: 'petal', kind: 'effect', name: '블로섬', price: 14 },
+  { id: 'melt', kind: 'effect', name: '멜팅', price: 14 },
+  // 아바타 «전체»가 움직인다. 이 슬롯에서 제일 눈에 든다.
+  { id: 'hop', kind: 'effect', name: '홉', price: 16 },
 
   // ── 배너 ──────────────────────────────────
+  //
+  // 줄을 얼마나 덮는가로 세운다. 「더 볼트」가 아래쪽인 것이 어색해 보이지만 금고 하나에
+  // 금괴 몇이 전부다 — 이야기의 무게가 아니라 눈에 드는 무게로 매긴다.
   { id: 'none-banner', kind: 'banner', name: '미장착', price: 0 },
-  { id: 'night-city', kind: 'banner', name: '네온 시티', price: 22 },
-  { id: 'castle', kind: 'banner', name: '고딕 캐슬', price: 22 },
-  { id: 'blossom', kind: 'banner', name: '체리 블로섬', price: 28 },
-  { id: 'vault', kind: 'banner', name: '더 볼트', price: 35 },
+  { id: 'moonlit-hill', kind: 'banner', name: '문라이트 힐', price: 20 },
+  { id: 'vault', kind: 'banner', name: '더 볼트', price: 21 },
   { id: 'cheese-factory', kind: 'banner', name: '치즈 팩토리', price: 22 },
-  { id: 'moonlit-hill', kind: 'banner', name: '문라이트 힐', price: 28 },
+  { id: 'blossom', kind: 'banner', name: '체리 블로섬', price: 23 },
+  { id: 'castle', kind: 'banner', name: '고딕 캐슬', price: 24 },
+  { id: 'night-city', kind: 'banner', name: '네온 시티', price: 25 },
 ]
 
 /** 지금 장착 중인 슬롯 넷. */

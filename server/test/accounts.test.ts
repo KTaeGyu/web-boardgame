@@ -7,7 +7,7 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 
-import { DEFAULT_EQUIPPED, balanceOf } from '@the-gang/shared'
+import { DEFAULT_EQUIPPED, balanceOf, cosmeticOf } from '@the-gang/shared'
 
 import { Accounts } from '../src/accounts.ts'
 import type { AccountStore, StoredAccount } from '../src/accountStore.ts'
@@ -284,6 +284,16 @@ describe('밖에 둔 계정', () => {
   })
 })
 
+/*
+ * **값은 표에서 읽는다.** 가격은 고치라고 있는 숫자라(`cosmetics.ts`) 시험에 박아 두면
+ * 값을 손볼 때마다 관계없는 시험이 무더기로 깨진다. 아래가 보려는 것은 「25가 맞는가」가
+ * 아니라 「모자라면 막는가 · 쓴 만큼만 느는가」다.
+ */
+const price = (id: string) => cosmeticOf(id)?.price ?? 0
+/** 「나이트 카울」과 「섀도우 마스크」. 값이 다른 아이템 둘이면 아래는 다 성립한다. */
+const COWL = price('bat')
+const MASK = price('mask')
+
 /**
  * 코스메틱 — 골드가 걸린 자리라 판정이 서버에 있어야 한다.
  *
@@ -312,31 +322,32 @@ describe('코스메틱', () => {
   })
 
   it('골드가 부족하면 구매할 수 없다', async () => {
-    const { accounts, token } = await signedIn(24)
-    // 「나이트 카울」은 25 다.
+    // 「나이트 카울」에 딱 1 모자란 계정.
+    const { accounts, token } = await signedIn(COWL - 1)
     const bought = await accounts.buy(token, 'bat')
     assert.equal(bought.ok, false)
     if (!bought.ok) assert.match(bought.message, /골드가 1 부족합니다/)
   })
 
   it('구매하면 사용한 만큼만 늘고 누적 승리는 그대로다', async () => {
-    const { accounts, token } = await signedIn(30)
+    const wins = COWL + 5
+    const { accounts, token } = await signedIn(wins)
     const bought = await accounts.buy(token, 'bat')
     assert.equal(bought.ok, true)
     if (!bought.ok) return
 
     assert.deepEqual(bought.value.owned, ['bat'])
-    assert.equal(bought.value.spent, 25)
+    assert.equal(bought.value.spent, COWL)
 
     const me = accounts.resume(token)
     assert.equal(me.ok, true)
     if (!me.ok) return
-    assert.equal(me.value.record.wins, 30, '전적은 깎이지 않는다')
+    assert.equal(me.value.record.wins, wins, '전적은 깎이지 않는다')
     assert.equal(balanceOf(me.value.record.wins, me.value.cosmetics.spent), 5)
   })
 
   it('같은 것을 두 번 구매할 수 없다', async () => {
-    const { accounts, token } = await signedIn(60)
+    const { accounts, token } = await signedIn(COWL * 2)
     assert.equal((await accounts.buy(token, 'bat')).ok, true)
     const again = await accounts.buy(token, 'bat')
     assert.equal(again.ok, false)
@@ -349,8 +360,8 @@ describe('코스메틱', () => {
   })
 
   it('보유한 것만 장착할 수 있다 — 미보유 슬롯은 기본으로 되돌린다', async () => {
-    const { accounts, token } = await signedIn(30)
-    await accounts.buy(token, 'bat')
+    const { accounts, token } = await signedIn(COWL)
+    assert.equal((await accounts.buy(token, 'bat')).ok, true)
 
     const worn = await accounts.equip(token, { avatar: 'bat', banner: 'castle' })
     assert.equal(worn.ok, true)
@@ -446,13 +457,13 @@ describe('꾸미기 동시 요청', () => {
    * 두 번 깎였다고 읽힌다 — 말이 값을 잘못 일러 주는 자리다.
    */
   it('같은 것을 동시에 사면 한 번만 성공한다', async () => {
-    const { accounts, token } = await rich(100)
+    const { accounts, token } = await rich(500)
     const both = await Promise.all([accounts.buy(token, 'bat'), accounts.buy(token, 'bat')])
 
     assert.equal(both.filter((one) => one.ok).length, 1, '한 쪽만 성공해야 한다')
     const failed = both.find((one) => !one.ok)
     if (failed && !failed.ok) assert.match(failed.message, /이미 보유한/)
-    assert.equal(worn(accounts, token).spent, 25)
+    assert.equal(worn(accounts, token).spent, COWL)
   })
 
   /*
@@ -460,18 +471,18 @@ describe('꾸미기 동시 요청', () => {
    * 쪽이 먼저 끝난 쪽을 지운다 — 「구매 완료」라고 답해 놓고 아이템도 골드도 없다.
    */
   it('다른 것을 동시에 사면 둘 다 남는다', async () => {
-    const { accounts, token } = await rich(100)
+    const { accounts, token } = await rich(500)
     const both = await Promise.all([accounts.buy(token, 'bat'), accounts.buy(token, 'mask')])
 
     assert.equal(both.every((one) => one.ok), true)
     const after = worn(accounts, token)
     assert.deepEqual([...after.owned].sort(), ['bat', 'mask'])
-    assert.equal(after.spent, 45)
+    assert.equal(after.spent, COWL + MASK)
   })
 
   /** 장착도 통째로 덮어쓴다. 줄 밖에 두면 그 사이에 끝난 구매를 지운다. */
   it('사는 사이에 장착해도 구매가 지워지지 않는다', async () => {
-    const { accounts, token } = await rich(100)
+    const { accounts, token } = await rich(500)
     const both = await Promise.all([
       accounts.buy(token, 'bat'),
       accounts.equip(token, { bg: 'slate' }),
@@ -480,18 +491,20 @@ describe('꾸미기 동시 요청', () => {
     assert.equal(both.every((one) => one.ok), true)
     const after = worn(accounts, token)
     assert.deepEqual(after.owned, ['bat'])
-    assert.equal(after.spent, 25)
+    assert.equal(after.spent, COWL)
   })
 
   /** 잔액도 줄 안에서 다시 세야 한다. 밖에서 한 번만 보면 둘 다 통과한다. */
   it('둘을 살 만큼은 없는 골드로 동시에 사면 한 쪽만 나간다', async () => {
-    // 30 골드. 「나이트 카울」 25 와 「섀도우 마스크」 20 을 함께는 못 산다.
-    const { accounts, token } = await rich(30)
+    // 둘 중 비싼 것 하나는 사고 둘을 함께는 못 사는 딱 그만큼.
+    const purse = Math.max(COWL, MASK)
+    assert.equal(purse < COWL + MASK, true, '둘을 함께는 못 사는 액수여야 시험이 성립한다')
+    const { accounts, token } = await rich(purse)
     const both = await Promise.all([accounts.buy(token, 'bat'), accounts.buy(token, 'mask')])
 
     assert.equal(both.filter((one) => one.ok).length, 1, '한 쪽만 성공해야 한다')
     const failed = both.find((one) => !one.ok)
     if (failed && !failed.ok) assert.match(failed.message, /골드가 .* 부족합니다/)
-    assert.equal(worn(accounts, token).spent <= 30, true, '가진 것보다 더 쓸 수 없다')
+    assert.equal(worn(accounts, token).spent <= purse, true, '가진 것보다 더 쓸 수 없다')
   })
 })
