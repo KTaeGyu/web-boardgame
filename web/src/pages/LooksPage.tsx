@@ -180,9 +180,15 @@ export function LooksPage() {
                             />
                           )}
                           <Avatar equipped={worn} size="sm" label={item.name} />
-                          <span className="looks-item__name">{item.name}</span>
-                          <span className="looks-item__price">
-                            {on ? '장착 중' : mine ? '보유' : `${item.price} G`}
+                          {/*
+                            이름과 값을 **한 덩이로 왼쪽에 세운다.** 값을 오른쪽 끝에 두면
+                            배너 그림 위에 얹힌다 — 그림은 오른쪽 정렬이고 그쪽이 제일 진하다.
+                          */}
+                          <span className="looks-banner__label">
+                            <span className="looks-item__name">{item.name}</span>
+                            <span className="looks-item__price">
+                              {on ? '장착 중' : mine ? '보유' : `${item.price} G`}
+                            </span>
                           </span>
                         </span>
                       ) : (

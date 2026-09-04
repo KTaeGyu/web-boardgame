@@ -1183,8 +1183,19 @@ a.btn {
   z-index: 1;
 }
 
-.looks-banner .looks-item__name {
+/*
+ * 배너 줄의 글자는 **왼쪽에 모인다.**
+ *
+ * 그림은 오른쪽 정렬(`background-position: right`)이고 마스크가 왼쪽 20%를 비우고
+ * 오른쪽 66%부터를 다 채운다 — 제일 진한 자리가 오른쪽 끝이다. 값을 그 끝에 두었더니
+ * 「35 G」가 「더 볼트」의 금고 원과 겹쳤다. 배너 그림들이 무늬를 오른쪽으로 몬 것이
+ * 애초에 왼쪽을 글자 자리로 비워 둔 것이라, 값도 그 자리로 옮긴다.
+ */
+.looks-banner__label {
   flex: 1;
+  display: grid;
+  gap: 1px;
+  min-width: 0;
   text-align: left;
 }
 
