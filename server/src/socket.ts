@@ -33,6 +33,7 @@ import {
   SWEEP_INTERVAL_MS,
 } from './config.ts'
 import { Accounts } from './accounts.ts'
+import { logLine } from './log.ts'
 import type { AccountStore } from './accountStore.ts'
 import { Game } from '@the-gang/shared/engine'
 import { Tutorial } from '@the-gang/shared/tutorial'
@@ -49,6 +50,44 @@ const PLAYER_ID_PATTERN = /^[A-Za-z0-9_-]{8,64}$/
 
 function fail<T>(message: string): Result<T> {
   return { ok: false, code: 'INVALID_NICKNAME', message }
+}
+
+/**
+ * 기다렸다가 답하는 자리. **넘어져도 답한다.**
+ *
+ * `.then(ack)` 만 두면 거부가 아무 데도 닿지 않아 「미처리 거부」가 된다. Node 는 그것을
+ * 예외로 바꿔 던지고, 받는 사람이 없으면 프로세스를 끝낸다 — 이 서버는 방도 판도
+ * 메모리에만 있으므로 재시작이 곧 전멸이다. `log.ts` 의 그물이 마지막으로 받아 주지만
+ * **그물은 마지막이지 첫째가 아니다.** 여기서 받으면 그 사람만 한 번 실패하고 나머지
+ * 판은 그대로 돌고, 무엇보다 물어본 사람이 답을 받는다 — 그물만 있으면 화면은 영영
+ * 기다린다(`web/src/lib/socket.ts` 의 `call` 은 거부하지도 시간제한도 없다).
+ *
+ * @param after 성공했을 때 ack 뒤에 더 할 일. 실패하면 부르지 않는다.
+ */
+function answer<T>(
+  what: string,
+  work: Promise<Result<T>>,
+  ack: (result: Result<T>) => void,
+  after?: (result: Result<T>) => void,
+): void {
+  void work
+    .then(
+      (result) => {
+        ack(result)
+        if (result.ok) after?.(result)
+      },
+      (trouble) => {
+        logLine('error', `${what} 가 넘어졌다`, trouble)
+        console.error(`[the-gang] ${what} 가 넘어졌다`, trouble)
+        ack({
+          ok: false,
+          code: 'INVALID_SETTINGS',
+          message: '지금은 처리할 수 없습니다. 잠시 뒤에 다시 시도해 주세요.',
+        })
+      },
+    )
+    // 답하는 것조차 넘어졌다. 여기서 멈추지 않으면 방금 막은 것이 도로 새어 나간다.
+    .catch((worse) => logLine('error', `${what} 의 답조차 보내지 못했다`, worse))
 }
 
 /** playerId 는 브라우저가 만들어 보내는 값이므로 형태를 확인한다. */
@@ -558,9 +597,11 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
      * 때문이다 — 순서를 뒤집으면 「가입됐다」고 말해 놓고 서버가 다시 뜨는 순간 없어진다.
      */
     socket.on('auth:signup', ({ email, password, nickname }, ack) => {
-      void accounts
-        .signup(String(email ?? ''), String(password ?? ''), String(nickname ?? ''))
-        .then(ack)
+      answer(
+        'auth:signup',
+        accounts.signup(String(email ?? ''), String(password ?? ''), String(nickname ?? '')),
+        ack,
+      )
     })
 
     socket.on('auth:login', ({ email, password }, ack) => {
@@ -584,14 +625,12 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
     })
 
     socket.on('cosmetics:buy', ({ token, id }, ack) => {
-      void accounts.buy(String(token ?? ''), String(id ?? '')).then(ack)
+      answer('cosmetics:buy', accounts.buy(String(token ?? ''), String(id ?? '')), ack)
     })
 
     socket.on('cosmetics:equip', ({ token, equipped }, ack) => {
       const key = String(token ?? '')
-      void accounts.equip(key, equipped ?? {}).then((result) => {
-        ack(result)
-        if (!result.ok) return
+      answer('cosmetics:equip', accounts.equip(key, equipped ?? {}), ack, () => {
         /*
          * 대기실에 앉은 채로 바꿀 수 있다. 그때는 그 줄이 그 자리에서 갈려야 한다 —
          * 방을 나갔다 들어와야 반영되면 「안 바뀌었다」로 읽힌다.

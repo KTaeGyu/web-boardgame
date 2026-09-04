@@ -1,7 +1,10 @@
 import { accountStore } from './accountStore.ts'
 import { createApp } from './app.ts'
 import { CORS_ORIGINS, PORT } from './config.ts'
-import { logLine, startFileLog } from './log.ts'
+import { guardCrashes, logLine, startFileLog } from './log.ts'
+
+// 그물이 먼저다. 부팅 중에 넘어지는 것도 받아야 한다.
+guardCrashes()
 
 // 방을 만들기 전에 켠다. 부팅에서 나는 것도 파일에 있어야 한다.
 const logFile = startFileLog()

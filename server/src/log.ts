@@ -10,13 +10,26 @@
  * 온전한 편이 낫다 — 서버를 다시 띄우면 어차피 방이 전부 사라지므로, 재부팅
  * 이전의 줄은 지금 벌어지는 일과 이어지지도 않는다.
  *
- * 운영에서는 아무 일도 하지 않는다. Render 의 디스크는 배포마다 사라져 남길
+ * 운영에서는 파일을 남기지 않는다. Render 의 디스크는 배포마다 사라져 남길
  * 자리가 아니고, 그쪽은 대시보드의 로그가 이미 같은 것을 들고 있다.
+ *
+ * **여기 사는 것이 하나 더 있다** — `guardCrashes()`, 아무도 받지 않은 오류를 받는
+ * 마지막 그물이다. 그쪽은 로컬·운영을 가리지 않는다. 전에는 파일 로그 안에 딸려 있어
+ * 운영에서만 빠져 있었는데, 죽으면 안 되는 쪽이 운영이라 거꾸로였다.
  */
 
 import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+
+/**
+ * 감싸이기 전의 진짜 console.
+ *
+ * 파일 로그가 `console.error` 를 감싸므로, 나중에 붙잡으면 감싼 것을 붙잡게 되어
+ * 한 번의 오류가 파일에 두 줄로 남는다. 모듈이 실린 순간에 붙잡아 둔다.
+ */
+const rawError = console.error
+const rawWarn = console.warn
 
 /** 저장소 뿌리. 이 파일이 server/src 에 있으므로 두 칸 올라간다. */
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
@@ -78,26 +91,39 @@ export function startFileLog(): string | null {
    * console 을 가로채지 않고 감싼다. 터미널에도 그대로 나와야 한다 —
    * 파일로 옮겨버리면 서버를 띄워둔 사람이 아무것도 못 본다.
    */
-  const realError = console.error
-  const realWarn = console.warn
   console.error = (...args: unknown[]) => {
     logLine('error', ...args)
-    realError(...args)
+    rawError(...args)
   }
   console.warn = (...args: unknown[]) => {
     logLine('warn', ...args)
-    realWarn(...args)
+    rawWarn(...args)
   }
 
-  // 여기까지 온 것은 아무도 받지 않은 오류다. 남기지 않으면 그대로 사라진다.
+  return FILE
+}
+
+/**
+ * 마지막 그물 — 아무도 받지 않은 오류를 여기서 받는다.
+ *
+ * **운영에서도 건다.** 이것이 없으면 Node 는 미처리 거부를 예외로 바꿔 던지고, 받는
+ * 사람이 없으므로 **프로세스를 끝낸다.** 전에는 이 등록이 파일 로그 안에 들어 있어
+ * `if (!LOCAL) return null` 에 걸렸다 — 로컬은 살아남고 운영만 죽는 거꾸로였다.
+ *
+ * **받고 나서 계속 돈다.** 죽는 쪽이 정석이라는 말이 있지만 그것은 다시 세우면 상태가
+ * 돌아오는 서버의 이야기다. 여기는 방도 판도 메모리에만 있어 재시작이 곧 전멸이고,
+ * 하던 판 열 개를 잃는 값이 「의심스러운 상태로 계속 도는」 값보다 크다.
+ *
+ * 그래서 **삼키지는 않는다.** 로컬이면 `logs/server.log` 에, 운영이면 Render 대시보드에
+ * 남는다. 조용히 넘어가면 이 그물이 버그를 가리는 물건이 된다.
+ */
+export function guardCrashes(): void {
   process.on('uncaughtException', (error) => {
     logLine('crash', error)
-    realError(error)
+    rawError('[the-gang] 아무도 받지 않은 예외 — 계속 돈다', error)
   })
   process.on('unhandledRejection', (reason) => {
     logLine('crash', reason)
-    realError(reason)
+    rawError('[the-gang] 아무도 받지 않은 거부 — 계속 돈다', reason)
   })
-
-  return FILE
 }
