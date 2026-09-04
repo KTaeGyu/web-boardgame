@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from 'react'
+import { useCallback, useEffect, type ReactNode } from 'react'
 
 import { useBackClose } from '../lib/back.ts'
 import { useScrollLock } from '../lib/useScrollLock.ts'
@@ -32,19 +32,31 @@ export function ConfirmModal({
   busy = false,
   busyLabel = '들어가는 중…',
 }: Props) {
+  /*
+   * **일하는 동안에는 닫는 길을 전부 막는다.**
+   *
+   * 단추 둘만 잠그면 나머지 넷으로 새어 나간다 — Esc · 배경 클릭 · 휴대폰 뒤로가기 ·
+   * 시트 끌어내림. 그 넷으로 닫아도 이미 나간 요청은 계속 돌아서, 되돌릴 수 없는 일
+   * (상점의 구매가 그렇다)이라면 「취소했는데 사졌다」가 된다. 요청을 물릴 수는 없으므로
+   * 막을 수 있는 것은 「취소했다」고 읽히는 길뿐이다.
+   */
+  const dismiss = useCallback(() => {
+    if (!busy) onCancel()
+  }, [busy, onCancel])
+
   // 휴대폰의 뒤로가기는 화면을 떠나는 것이 아니라 이 창을 닫는 것이어야 한다.
-  useBackClose(onCancel)
+  useBackClose(dismiss)
   // 떠 있는 동안 뒤 페이지는 움직이지 않는다.
   useScrollLock()
   // 작은 화면에서는 아래에서 올라온 시트다. 끌어내려 닫는다.
-  const drag = useSheetDrag(onCancel)
+  const drag = useSheetDrag(dismiss)
 
   // 손이 마우스로 가지 않아도 끝낼 수 있게. Esc 는 물러나기, Enter 는 밀고 나가기.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.preventDefault()
-        onCancel()
+        dismiss()
         return
       }
       if (event.key === 'Enter' && !busy) {
@@ -54,10 +66,10 @@ export function ConfirmModal({
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [onCancel, onConfirm, busy])
+  }, [dismiss, onConfirm, busy])
 
   return (
-    <div className="modal-backdrop" onClick={onCancel} role="presentation">
+    <div className="modal-backdrop" onClick={dismiss} role="presentation">
       <div
         className={`modal ${drag.className}`}
         onClick={(event) => event.stopPropagation()}
@@ -68,7 +80,7 @@ export function ConfirmModal({
         <h2 className="modal__title">{title}</h2>
         <div className="modal__body">{children}</div>
         <div className="btn-row">
-          <button type="button" className="btn btn--ghost" onClick={onCancel} disabled={busy}>
+          <button type="button" className="btn btn--ghost" onClick={dismiss} disabled={busy}>
             {cancelLabel}
           </button>
           <button type="button" className="btn btn--primary" onClick={onConfirm} disabled={busy}>
