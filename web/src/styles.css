@@ -1213,6 +1213,95 @@ a.btn {
   text-align: center;
 }
 
+/*
+ * 상점의 두 칸.
+ *
+ * **좁은 화면이 기본이다** — 한 줄로 흐르고 폭은 다른 화면과 같은 420px 다. 넓은
+ * 화면에서만 왼쪽에 붙박이 칸이 서고 폭이 .page 본래의 960px 로 풀린다. 720/721 은
+ * 이 저장소가 이미 쓰는 경계다.
+ */
+.looks-page {
+  max-width: 420px;
+}
+
+.looks-layout {
+  display: grid;
+  gap: 16px;
+}
+
+.looks-main {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+@media (min-width: 721px) {
+  .looks-page {
+    max-width: 960px;
+  }
+
+  .looks-layout {
+    grid-template-columns: 260px minmax(0, 1fr);
+    gap: 24px;
+    /*
+     * start 가 아니면 왼쪽 칸이 오른쪽 높이만큼 늘어나고, 늘어난 칸에는 sticky 가
+     * 붙을 자리가 없다 — 이미 다 보이는 것은 따라다니지 않는다.
+     */
+    align-items: start;
+  }
+
+  .looks-side {
+    position: sticky;
+    top: 24px;
+  }
+
+  /* 붙박이 칸에서는 가운데 정렬이 뜻을 잃는다. 왼쪽 모서리에 맞춘다. */
+  .looks-side .looks-foot {
+    text-align: left;
+  }
+}
+
+/*
+ * 사기 전에 보는 자리. **제 크기로 한 번은 보여준다** — 목록의 작은 칸에서 고른 것이라,
+ * 되돌릴 수 없는 값을 치르기 전에 크게 볼 기회가 여기 한 번뿐이다.
+ */
+.buy-preview {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.buy-preview .looks-banner {
+  flex: 1;
+}
+
+.buy-preview__side {
+  min-width: 0;
+}
+
+.buy-preview__name {
+  margin: 0 0 2px;
+  font-weight: 700;
+}
+
+.buy-preview__price {
+  margin: 0;
+  color: var(--gold);
+  font-size: 13px;
+}
+
+/* 치르고 나면 얼마가 남는가. 판단에 쓰이는 값은 지금 잔액이 아니라 이쪽이다. */
+.buy-after {
+  margin: 14px 0 0;
+  font-size: 13px;
+  color: var(--ink-dim);
+}
+
+.buy-after strong {
+  color: var(--gold);
+  font-size: 16px;
+}
+
 .player--offline {
   opacity: 0.45;
 }

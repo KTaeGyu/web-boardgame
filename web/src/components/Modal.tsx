@@ -12,6 +12,13 @@ interface Props {
   onConfirm: () => void
   onCancel: () => void
   busy?: boolean
+  /**
+   * 기다리는 동안 밀고 나가는 단추에 뜨는 말.
+   *
+   * 기본값이 「들어가는 중…」인 것은 이 창이 방에 들어갈 때 먼저 쓰였기 때문이다.
+   * 다른 일에 쓰면 그 일의 말로 바꾼다 — 사는 자리에서 「들어가는 중」은 딴소리다.
+   */
+  busyLabel?: string
 }
 
 /** 예/아니오 확인창. Esc 로 닫히고, 배경을 눌러도 닫힌다. */
@@ -23,6 +30,7 @@ export function ConfirmModal({
   onConfirm,
   onCancel,
   busy = false,
+  busyLabel = '들어가는 중…',
 }: Props) {
   // 휴대폰의 뒤로가기는 화면을 떠나는 것이 아니라 이 창을 닫는 것이어야 한다.
   useBackClose(onCancel)
@@ -64,7 +72,7 @@ export function ConfirmModal({
             {cancelLabel}
           </button>
           <button type="button" className="btn btn--primary" onClick={onConfirm} disabled={busy}>
-            {busy ? '들어가는 중…' : confirmLabel}
+            {busy ? busyLabel : confirmLabel}
           </button>
         </div>
       </div>
