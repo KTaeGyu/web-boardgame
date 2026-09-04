@@ -11,7 +11,9 @@
  * 목록 안에 설명을 깔면 다섯 줄이 열다섯 줄이 되어, 펼치는 뜻이 반쯤 사라진다.
  */
 
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+
+import { useEscape } from '../lib/useEscape.ts'
 
 import { tipPosition, useCardTip } from '../lib/tooltip.ts'
 
@@ -39,7 +41,13 @@ export function PickList({ label, hint, options, picked, disabled, onPick }: Pro
   const current = options.find((option) => option.id === picked) ?? options[0]
 
   /*
-   * 바깥을 누르거나 Esc 를 누르면 닫는다.
+   * Esc 는 **줄에 세워서** 받는다(`useEscape`). 전에는 여기서 문서에 직접 매달아,
+   * 화면이 매단 것과 함께 울려 목록이 닫히면서 「방을 나가시겠습니까?」가 떴다.
+   */
+  useEscape(open, useCallback(() => setOpen(false), []))
+
+  /*
+   * 바깥을 누르면 닫는다.
    *
    * 문서에 한 번만 매단다 — 열려 있을 때만 붙이므로, 닫혀 있는 목록이 여럿이어도
    * 듣는 자리는 늘 하나뿐이다. `mousedown` 인 것은 `click` 이면 바깥의 단추가
@@ -51,14 +59,9 @@ export function PickList({ label, hint, options, picked, disabled, onPick }: Pro
     const away = (event: MouseEvent) => {
       if (!box.current?.contains(event.target as Node)) setOpen(false)
     }
-    const key = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setOpen(false)
-    }
     document.addEventListener('mousedown', away)
-    document.addEventListener('keydown', key)
     return () => {
       document.removeEventListener('mousedown', away)
-      document.removeEventListener('keydown', key)
     }
   }, [open])
 

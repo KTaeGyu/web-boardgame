@@ -35,7 +35,7 @@ import { sfx } from '../lib/sfx.ts'
 import { socket } from '../lib/socket.ts'
 // 사람들과 하는 판은 서버에서, 혼자 해보기는 화면 안에서 돈다. 이 화면은 그 차이를 모른다.
 import { call, useServerEvent } from '../lib/transport.ts'
-import { useEscape } from '../lib/useEscape.ts'
+import { useEscapeFallback } from '../lib/useEscape.ts'
 import { useTokenFlight } from '../lib/useTokenFlight.ts'
 import { useScrollLock } from '../lib/useScrollLock.ts'
 
@@ -277,8 +277,9 @@ export function GamePage({ spectating = false }: { spectating?: boolean } = {}) 
     }
   }, [])
 
-  useEscape(
-    !confirmLeave,
+  /* 덮개가 하나도 없을 때만 받는다. 무엇이 떠 있는지 여기서 셀 필요가 없다. */
+  useEscapeFallback(
+    true,
     useCallback(() => setConfirmLeave(true), []),
   )
 

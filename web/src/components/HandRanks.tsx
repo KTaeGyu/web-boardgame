@@ -17,6 +17,7 @@ import { CATEGORY_LABEL, HandCategory, type Card } from '@the-gang/shared'
 
 import { useBackClose } from '../lib/back.ts'
 import { useScrollLock } from '../lib/useScrollLock.ts'
+import { useEscape } from '../lib/useEscape.ts'
 import { useSheetDrag } from '../lib/useSheetDrag.ts'
 import { PlayingCard } from './PlayingCard.tsx'
 
@@ -78,15 +79,7 @@ function RanksModal({ onClose }: { onClose: () => void }) {
   useScrollLock()
   const drag = useSheetDrag(onClose)
 
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return
-      event.preventDefault()
-      onClose()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
+  useEscape(true, onClose)
 
   return (
     <div className="modal-backdrop" onClick={onClose} role="presentation">

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, type ReactNode } from 'react'
 
 import { useBackClose } from '../lib/back.ts'
+import { useEscape } from '../lib/useEscape.ts'
 import { useScrollLock } from '../lib/useScrollLock.ts'
 import { useSheetDrag } from '../lib/useSheetDrag.ts'
 
@@ -52,21 +53,16 @@ export function ConfirmModal({
   const drag = useSheetDrag(dismiss)
 
   // 손이 마우스로 가지 않아도 끝낼 수 있게. Esc 는 물러나기, Enter 는 밀고 나가기.
+  useEscape(true, dismiss)
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        event.preventDefault()
-        dismiss()
-        return
-      }
-      if (event.key === 'Enter' && !busy) {
-        event.preventDefault()
-        onConfirm()
-      }
+      if (event.key !== 'Enter' || busy) return
+      event.preventDefault()
+      onConfirm()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [dismiss, onConfirm, busy])
+  }, [onConfirm, busy])
 
   return (
     <div className="modal-backdrop" onClick={dismiss} role="presentation">
@@ -119,15 +115,7 @@ export function ChoiceModal({
   useScrollLock()
   const drag = useSheetDrag(onClose)
 
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return
-      event.preventDefault()
-      onClose()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
+  useEscape(true, onClose)
 
   return (
     <div className="modal-backdrop" onClick={onClose} role="presentation">

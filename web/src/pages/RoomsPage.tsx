@@ -7,7 +7,7 @@ import { session } from '../lib/auth.ts'
 import { getNickname, getPlayerId } from '../lib/identity.ts'
 import { createRoom } from '../lib/rooms.ts'
 import { call, socket, useConnected, useServerEvent } from '../lib/socket.ts'
-import { useEscape } from '../lib/useEscape.ts'
+import { useEscapeFallback } from '../lib/useEscape.ts'
 
 export function RoomsPage() {
   const navigate = useNavigate()
@@ -76,7 +76,8 @@ export function RoomsPage() {
   )
 
   // 입장 확인창이 떠 있으면 Esc 는 그쪽 몫이다.
-  useEscape(asking === null, useCallback(() => navigate('/'), [navigate]))
+  /* 덮개가 하나도 없을 때만 받는다. 「asking」 창은 제 Esc 를 들고 있다. */
+  useEscapeFallback(true, useCallback(() => navigate('/'), [navigate]))
 
   /** 내 자리가 어느 방에 남아 있는지 서버에 묻는다. 답이 없으면 없는 것으로 둔다. */
   async function askWhere() {

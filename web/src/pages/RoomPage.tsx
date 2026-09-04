@@ -38,7 +38,7 @@ import { useBackIntercept } from '../lib/back.ts'
 import { getNickname, getPlayerId } from '../lib/identity.ts'
 import { call, socket, useServerEvent } from '../lib/socket.ts'
 import { tipPosition, useCardTip } from '../lib/tooltip.ts'
-import { useEscape } from '../lib/useEscape.ts'
+import { useEscapeFallback } from '../lib/useEscape.ts'
 
 /** 방이 닫힌 사유를 사람 말로. 아무 설명 없이 튕겨나가면 고장으로 느껴진다. */
 const CLOSED_MESSAGE: Record<string, string> = {
@@ -207,8 +207,9 @@ export function RoomPage() {
     ),
   )
 
-  useEscape(
-    !confirmLeave && !confirmWatch,
+  /* 덮개가 하나도 없을 때만 받는다. 무엇이 떠 있는지 여기서 셀 필요가 없다. */
+  useEscapeFallback(
+    true,
     useCallback(() => setConfirmLeave(true), []),
   )
 
