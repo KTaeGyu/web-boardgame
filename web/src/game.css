@@ -485,6 +485,11 @@
   max-width: 100%;
 }
 
+/* 내 자리는 가로 배치라 이름 위가 비어 있다. 그 자리를 그대로 쓴다. */
+.my-seat__name {
+  position: relative;
+}
+
 .seat__name {
   font-size: 14px;
   font-weight: 600;
@@ -512,6 +517,199 @@
  * 한다 — 「망막 스캔에 뭐라고 답할까」를 묻는 자리가 정작 그 창 때문에 막히면 안 된다.
  * 서버가 없을 때의 덮개(--z-tip)만 이 위에 선다.
  */
+/*
+ * 감정표현.
+ *
+ * 대화 단추 **왼쪽**에 나란히 선다. 둘 다 「남에게 무언가 보내는」 자리라 함께 있는
+ * 편이 찾기 쉽고, 대화가 이미 잡은 오른쪽 아래 모서리를 흔들지 않는다.
+ */
+.emote-picker {
+  position: fixed;
+  right: 78px;
+  bottom: 24px;
+  z-index: var(--z-chat);
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.emote-picker__toggle {
+  flex: none;
+  width: 52px;
+  height: 52px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--gold-dim);
+  border-radius: 50%;
+  background: var(--card);
+  color: var(--gold);
+  font-size: 22px;
+  line-height: 1;
+  box-shadow: 0 8px 24px rgba(var(--shadow-rgb), 0.5);
+  cursor: pointer;
+}
+
+.emote-picker--open .emote-picker__toggle {
+  color: var(--ink-dim);
+  border-color: var(--line);
+}
+
+/* 목록은 단추 왼쪽으로 펼친다. 위로 세우면 화면이 낮을 때 판을 세로로 가로지른다. */
+.emote-picker__list {
+  display: grid;
+  grid-template-columns: repeat(4, auto);
+  gap: 4px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+  box-shadow: 0 8px 24px rgba(var(--shadow-rgb), 0.5);
+  animation: toast-in 0.16s ease-out backwards;
+}
+
+.emote-picker__one {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding: 6px 8px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.emote-picker__one:hover {
+  background: rgba(var(--gold-rgb), 0.16);
+}
+
+.emote-picker__name {
+  font-size: 10px;
+  color: var(--ink-dim);
+}
+
+/*
+ * 그 사람 옆에 뜨는 한 마디.
+ *
+ * 자리를 차지하지 않는다(absolute) — 뜰 때마다 줄이 밀리면 읽던 자리가 흔들린다.
+ * 튀어올랐다가 천천히 사라진다.
+ */
+.emote-bubble {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 2;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--tip-bg, var(--card));
+  font-size: 18px;
+  line-height: 1.2;
+  white-space: nowrap;
+  pointer-events: none;
+  animation: emote-pop 0.28s cubic-bezier(0.2, 1.4, 0.4, 1) backwards;
+}
+
+/* 자리를 차지하지 않는다. 뜰 때마다 줄이 밀리면 읽던 자리가 흔들린다. */
+@keyframes emote-pop {
+  from {
+    transform: translate(-50%, -30%) scale(0.6);
+    opacity: 0;
+  }
+  to {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+  }
+}
+
+/* 끝난 뒤에도 가운데에 머문다. 애니메이션이 끝나면 transform 이 풀려 오른쪽 아래로 밀린다. */
+.emote-bubble {
+  transform: translate(-50%, -50%);
+}
+
+/*
+ * 내려가는 중.
+ *
+ * **다음 것이 와도 그림만 갈아치우지 않는다** — 그러면 한 마디가 두 마디였다는 것이
+ * 보이지 않아, 연달아 누른 것이 한 번 누른 것처럼 읽힌다. 앞의 것이 다 내려간 뒤에
+ * 새로 올라온다(`EMOTE_EXIT_MS`).
+ */
+.emote-bubble--out {
+  animation-name: emote-pop-out;
+  animation-duration: 0.17s;
+  animation-timing-function: ease-in;
+  animation-fill-mode: forwards;
+}
+
+@keyframes emote-pop-out {
+  from {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+  }
+  to {
+    transform: translate(-50%, -50%) scale(0.6);
+    opacity: 0;
+  }
+}
+
+.seat > .emote-bubble--out,
+.my-seat__name .emote-bubble--out {
+  animation-name: emote-pop-out-up;
+}
+
+@keyframes emote-pop-out-up {
+  from {
+    transform: translate(-50%, 0) scale(1);
+    opacity: 1;
+  }
+  to {
+    transform: translate(-50%, 6px) scale(0.6);
+    opacity: 0;
+  }
+}
+
+/*
+ * 판의 자리에서는 **자리 위로** 떠오른다.
+ *
+ * 대기실 줄은 가로라 이름 옆에 빈 칸을 두었지만, 자리는 세로라 옆에 둘 자리가 없다.
+ * 이름 칸 안에 두지 않는 것은 그쪽에 `overflow: hidden` 이 걸려 있기 때문이고
+ * (긴 이름을 자르는 자리다), 이름 위에 겹쳐 두면 그 2.6초 동안 누구인지 알 수 없다.
+ */
+.seat > .emote-bubble,
+.my-seat__name .emote-bubble {
+  top: auto;
+  bottom: 100%;
+  margin-bottom: 4px;
+  transform: translate(-50%, 0);
+  animation-name: emote-pop-up;
+}
+
+/* 자리 위로 살짝 삐져나온다. 자리들은 가로로 서므로 위에서 겹칠 것이 없다. */
+.seat {
+  position: relative;
+}
+
+.seat > .emote-bubble {
+  bottom: auto;
+  top: -12px;
+  margin-bottom: 0;
+  z-index: 3;
+}
+
+@keyframes emote-pop-up {
+  from {
+    transform: translate(-50%, 6px) scale(0.6);
+    opacity: 0;
+  }
+  to {
+    transform: translate(-50%, 0) scale(1);
+    opacity: 1;
+  }
+}
+
 .chat-fab {
   position: fixed;
   right: 16px;
@@ -2341,8 +2539,20 @@ button.token:hover:not(:disabled) {
    * 홈 인디케이터가 있는 기기에서는 아래 막대도 그만큼 커지므로 함께 올린다.
    */
   .chat-fab,
-  .chat {
+  .chat,
+  /* 감정표현도 같은 줄에 선다. 하나만 아래 남으면 확정 바에 가리고 짝이 갈린다. */
+  .emote-picker {
     bottom: calc(116px + env(safe-area-inset-bottom, 0px));
+  }
+
+  /*
+   * 좁은 화면에서는 목록을 단추 위로 올린다. 옆으로 펴면 네 칸이 화면 폭을 넘어
+   * 왼쪽이 잘린다.
+   */
+  .emote-picker__list {
+    position: absolute;
+    right: 0;
+    bottom: 60px;
   }
 
   .chat-peek {

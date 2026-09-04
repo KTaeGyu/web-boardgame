@@ -1,5 +1,5 @@
 /**
- * 지난 기록.
+ * 대전기록.
  *
  * **계정의 것만 보여준다.** 예전에는 기기(localStorage)에 닉네임을 열쇠로 쌓았는데,
  * 계정이 생기면서 같은 것이 두 곳에 있게 됐다. 두 벌을 두면 어느 쪽이 진짜인지 매번
@@ -24,7 +24,7 @@ export function HistoryPage() {
         ← 방 목록으로
       </Link>
 
-      <h1 className="section-title">지난 기록</h1>
+      <h1 className="section-title">대전기록</h1>
 
       {me ? (
         <section className="panel record">

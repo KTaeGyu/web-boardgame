@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="거미네모">
+  <rect x="12" y="12" width="40" height="40" rx="9" fill="#c2422f" stroke="#3b3222" stroke-width="3"/>
+  <g stroke="#7d2418" stroke-width="1.6" fill="none" opacity="0.85">
+    <path d="M32 12v40M12 32h40M17 17l30 30M47 17L17 47"/>
+    <path d="M32 20 24 32l8 12 8-12z"/>
+  </g>
+  <path d="M18 28q7-7 12 0-3 8-12 5z" fill="#f2ead8" stroke="#3b3222" stroke-width="2"/>
+  <path d="M46 28q-7-7-12 0 3 8 12 5z" fill="#f2ead8" stroke="#3b3222" stroke-width="2"/>
+</svg>

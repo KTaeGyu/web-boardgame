@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="박쥐네모">
+  <path d="M12 18l7 6 6-6 7 6 7-6 6 6 7-6v6H12z" fill="#2f3550"/>
+  <rect x="12" y="18" width="40" height="34" rx="9" fill="#f2ead8" stroke="#3b3222" stroke-width="3"/>
+  <path d="M12 22h40v9a5 5 0 0 1-5 5H17a5 5 0 0 1-5-5z" fill="#2f3550"/>
+  <path d="M20 29l6-3 5 3-5 3z" fill="#f2ead8"/>
+  <path d="M44 29l-6-3-5 3 5 3z" fill="#f2ead8"/>
+  <path d="M25 45q7 4 14 0" stroke="#3b3222" stroke-width="3" stroke-linecap="round" fill="none"/>
+</svg>

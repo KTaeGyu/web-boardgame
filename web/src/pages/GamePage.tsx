@@ -15,8 +15,9 @@ import {
   type Round,
 } from '@the-gang/shared'
 
-import { recordPlay } from '../lib/auth.ts'
+import { recordPlay, session } from '../lib/auth.ts'
 import { Chat } from '../components/Chat.tsx'
+import { EmoteBubble, EmotePicker, useEmotes, type LiveEmote } from '../components/Emotes.tsx'
 import { ExtrasDrawer, NoteCard, type CardNote } from '../components/ExtrasDrawer.tsx'
 import { ScanVote } from '../components/ScanVote.tsx'
 import { Toast } from '../components/Toast.tsx'
@@ -81,6 +82,7 @@ export function GamePage({ spectating = false }: { spectating?: boolean } = {}) 
   const navigate = useNavigate()
   const playerId = getPlayerId()
   const nickname = getNickname()
+  const emotes = useEmotes()
 
   const [game, setGame] = useState<GameView | null>(null)
   const [hand, setHand] = useState<Card[]>([])
@@ -208,7 +210,7 @@ export function GamePage({ spectating = false }: { spectating?: boolean } = {}) 
       // 보러 온 사람은 자리에 앉지 않는다. 같은 화면이지만 들어가는 문이 다르다.
       const result = await call<{ hostId: string; phase: string; tutorial: boolean }>(
         spectating ? 'room:spectate' : 'room:join',
-        { playerId, nickname, code },
+        { playerId, nickname, code, token: session()?.token },
       )
       if (!alive) return
 
@@ -833,6 +835,7 @@ export function GamePage({ spectating = false }: { spectating?: boolean } = {}) 
               round={game.round}
               phase={game.phase}
               holeCount={game.holeCount}
+              emote={emotes.live[player.id]}
               lockedTokens={game.lockedTokens}
               stuckTokens={game.stuckTokens}
               rejected={rejected}
@@ -906,6 +909,7 @@ export function GamePage({ spectating = false }: { spectating?: boolean } = {}) 
           </div>
           <div className="my-seat__info">
             <span className="my-seat__name">
+              <EmoteBubble emote={emotes.live[playerId]} />
               {me.displayName} (나)
               {me.ready && <em className="my-seat__ready">확정</em>}
               {myHolding && (
@@ -995,6 +999,8 @@ export function GamePage({ spectating = false }: { spectating?: boolean } = {}) 
         대화. 접힌 채로도 새 말 한 줄은 단추 옆에 잠깐 붙는다.
         연습판에는 말할 상대가 없다 — 봇은 읽지 않는다.
       */}
+      {/* 연습판에는 상대가 없다. 보낼 곳이 없는 단추를 두지 않는다. */}
+      {!tutorial && <EmotePicker onPick={emotes.send} />}
       {!tutorial && <Chat code={code} />}
 
       {fresh && <NoteCard note={fresh} onClose={() => setFresh(null)} />}
@@ -1120,6 +1126,8 @@ interface SeatProps {
   mine?: boolean
   /** 이 판에 한 사람이 몇 장을 쥐고 있나. 자리에 그 수만큼 뒷면을 세운다. */
   holeCount?: number
+  /** 지금 이 사람 위에 떠 있는 한 마디. 없으면 아무것도 그리지 않는다. */
+  emote?: LiveEmote
   tokenRef: (token: number) => (node: HTMLElement | null) => void
   onTakeToken: (token: number) => void
 }
@@ -1136,9 +1144,14 @@ interface SeatProps {
  * 들어갔기 때문이다. 서버 쪽은 고쳤고, 여기서는 조건 자체를 없앤다.
  */
 function PlayerSeat(props: SeatProps) {
-  const { player, holeCount = 2 } = props
+  const { player, holeCount = 2, emote } = props
   return (
     <div className={`seat ${player.connected ? '' : 'seat--offline'} ${player.ready ? 'seat--ready' : ''}`}>
+      {/*
+        자리 위로 떠오른다. **이름 칸에 두지 않는다** — 그쪽은 긴 이름을 자르려고
+        overflow: hidden 이 걸려 있어 말풍선이 통째로 잘린다(실제로 그랬다).
+      */}
+      <EmoteBubble emote={emote} />
       <div className="seat__cards">
         {Array.from({ length: holeCount }, (_, index) => (
           <PlayingCard key={`back-${index}`} card={null} faceDown size="sm" delay={index * 120} />

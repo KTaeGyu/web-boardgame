@@ -26,6 +26,9 @@ import {
   type RoomView,
 } from '@the-gang/shared'
 
+import { session } from '../lib/auth.ts'
+import { Avatar } from '../components/Avatar.tsx'
+import { EmoteBubble, EmotePicker, useEmotes } from '../components/Emotes.tsx'
 import { CardPicker } from '../components/CardPicker.tsx'
 import { PickList } from '../components/PickList.tsx'
 import { Chat } from '../components/Chat.tsx'
@@ -45,9 +48,19 @@ const CLOSED_MESSAGE: Record<string, string> = {
   hostClosed: '방장이 방을 닫았습니다.',
 }
 
+/**
+ * 그 사람이 걸친 배너. 「없음」과 안 꾸민 사람은 똑같이 없는 것으로 친다 —
+ * 그림 파일이 없는 이름이라 깔 것이 없다.
+ */
+function bannerOf(player: { equipped?: { banner: string } }): string | null {
+  const banner = player.equipped?.banner
+  return !banner || banner === 'none-banner' ? null : banner
+}
+
 export function RoomPage() {
   const { code = '' } = useParams()
   const navigate = useNavigate()
+  const emotes = useEmotes()
   /*
    * 자리 없이 보고만 있는가. 주소에 남겨 둔다 — 새로고침해도 자리에 앉혀지지 않아야 한다.
    * 상태로만 들고 있으면 F5 한 번에 구경꾼이 선수가 된다.
@@ -97,7 +110,12 @@ export function RoomPage() {
 
   /** 자리에서 물러나 보기만 한다. 성공해야 주소를 바꾼다 — 거절당하면 자리는 그대로다. */
   async function becomeWatcher() {
-    const result = await call<RoomView>('room:spectate', { playerId, nickname, code })
+    const result = await call<RoomView>('room:spectate', {
+      playerId,
+      nickname,
+      code,
+      token: session()?.token,
+    })
     if (!result.ok) {
       setError(result.message)
       return
@@ -159,6 +177,8 @@ export function RoomPage() {
         playerId,
         nickname,
         code,
+        // 표는 꾸민 차림을 자리에 붙이려고 함께 간다. 게스트에게는 없다.
+        token: session()?.token,
       })
       if (!alive) return
       if (result.ok) {
@@ -314,11 +334,22 @@ export function RoomPage() {
                   'player',
                   player.connected ? '' : 'player--offline',
                   player.id === playerId ? 'player--me' : '',
+                  bannerOf(player) ? 'player--banner' : '',
                 ]
                   .filter(Boolean)
                   .join(' ')}
               >
+                {/* 제일 바깥 겹. 줄 전체에 깔리고 오른쪽에서 왼쪽으로 옅어진다. */}
+                {bannerOf(player) && (
+                  <span
+                    className="player__banner"
+                    style={{ backgroundImage: `url(/banners/${bannerOf(player)}.svg)` }}
+                    aria-hidden="true"
+                  />
+                )}
                 <span className="player__seat">{index + 1}</span>
+                {/* 이름 바로 앞에 선다. 게스트도 기본 네모라 자리가 늘 차 있다. */}
+                <Avatar equipped={player.equipped} label={player.displayName} />
                 {/*
                   이름은 자리에 맞춰 잘린다. 짚으면 전체 이름과 지금 상태가 뜬다 —
                   예전에는 방장이 아니면 아무것도 뜨지 않고 금지 표시만 났다.
@@ -326,6 +357,13 @@ export function RoomPage() {
                 <span className="player__name" {...tipOn(describePlayer(player, playerId))}>
                   {player.displayName}
                   {player.id === playerId && ' (나)'}
+                </span>
+                {/*
+                  말풍선 자리. **늘 비워 둔다** — 감정이 올 때마다 칸이 생겼다 사라지면
+                  줄 안의 것들이 좌우로 흔들린다. 폭은 고정이고 안에서만 튀어오른다.
+                */}
+                <span className="player__emote">
+                  <EmoteBubble emote={emotes.live[player.id]} />
                 </span>
                 {player.isHost && <span className="player__tag">방장</span>}
                 {!player.connected && <span className="player__tag--waiting">자리 비움</span>}
@@ -690,6 +728,8 @@ export function RoomPage() {
           구역에서 멀리 떨어져 혼자 노는데, 줄 안에 있으면 오른쪽 끝이 본문과 같은 선에 선다.
           좁은 화면에서는 제자리에 떠 있는다(position: fixed).
         */}
+        {/* 대화 단추 옆에 나란히. 둘 다 남에게 무언가 보내는 자리다. */}
+        <EmotePicker onPick={emotes.send} />
         <Chat code={code} />
       </div>
 

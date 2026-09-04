@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import type { RoomSummary, RoomView } from '@the-gang/shared'
 
 import { ChoiceModal } from '../components/Modal.tsx'
+import { session } from '../lib/auth.ts'
 import { getNickname, getPlayerId } from '../lib/identity.ts'
 import { createRoom } from '../lib/rooms.ts'
 import { call, socket, useConnected, useServerEvent } from '../lib/socket.ts'
@@ -101,6 +102,8 @@ export function RoomsPage() {
       playerId: getPlayerId(),
       nickname,
       code: room.code,
+      // 표는 꾸민 차림을 자리에 붙이려고 함께 간다. 게스트에게는 없다.
+      token: session()?.token,
     })
     setBusy(false)
     setAsking(null)
@@ -118,9 +121,37 @@ export function RoomsPage() {
         <Link className="link-back" to="/">
           ← 처음으로
         </Link>
-        {/* 기록은 이 기기에만 남는다. 자랑할 곳이 아니라 스스로 보는 자리다. */}
+        {/* 꾸미는 자리와 보는 자리를 나란히 둔다. 둘 다 방에 들어가기 전에 들르는 곳이다. */}
+        <Link className="link-back" to="/looks">
+          <svg className="link-icon" viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
+            {/* 차양을 얹은 가게. 선 하나로 그려 글자 색을 그대로 따라간다. */}
+            <path
+              d="M3 8h18M4 8V6h16v2M5 8v12h14V8M9 20v-6h6v6"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.7"
+              strokeLinejoin="round"
+              strokeLinecap="round"
+            />
+          </svg>
+          상점
+        </Link>
         <Link className="link-back" to="/history">
-          지난 기록 →
+          <svg className="link-icon" viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
+            {/*
+              적어 두는 장부. **트로피를 쓰지 않는다** — 이 화면은 순위표가 아니라
+              스스로 보는 자리라, 트로피를 달면 남과 견주는 자리로 읽힌다.
+            */}
+            <path
+              d="M6 3h8l4 4v14H6zM14 3v4h4M9.5 12h5M9.5 16h3"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.7"
+              strokeLinejoin="round"
+              strokeLinecap="round"
+            />
+          </svg>
+          대전기록
         </Link>
       </div>
 

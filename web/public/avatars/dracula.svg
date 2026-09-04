@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="드라큘라네모">
+  <path d="M6 52q10-16 26-16t26 16z" fill="#5b1420"/>
+  <rect x="14" y="10" width="36" height="38" rx="9" fill="#efe3d0" stroke="#3b3222" stroke-width="3"/>
+  <path d="M14 19q9 5 18 0t18 0v-3a6 6 0 0 0-6-6H20a6 6 0 0 0-6 6z" fill="#1d1a22"/>
+  <circle cx="25" cy="30" r="3.2" fill="#8c1c28"/>
+  <circle cx="39" cy="30" r="3.2" fill="#8c1c28"/>
+  <path d="M26 39h12l-2 4-4-3-4 3z" fill="#3b3222"/>
+  <path d="M27 41l1.5 4 1.5-4zM37 41l-1.5 4-1.5-4z" fill="#ffffff"/>
+</svg>

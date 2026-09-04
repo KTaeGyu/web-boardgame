@@ -15,6 +15,7 @@ import { SignupPage } from './pages/SignupPage.tsx'
 import { RoomPage } from './pages/RoomPage.tsx'
 import { RoomsPage } from './pages/RoomsPage.tsx'
 import { GamePage } from './pages/GamePage.tsx'
+import { LooksPage } from './pages/LooksPage.tsx'
 import { HistoryPage } from './pages/HistoryPage.tsx'
 import { useBackgroundMusic } from './lib/music.ts'
 import { useClickSound } from './lib/sfx.ts'
@@ -61,6 +62,7 @@ export function App() {
         <Route path="/guest" element={<GuestPage />} />
         <Route path="/rooms" element={<RoomsPage />} />
         <Route path="/history" element={<HistoryPage />} />
+        <Route path="/looks" element={<LooksPage />} />
         <Route path="/rooms/:code" element={<RoomPage />} />
         <Route path="/rooms/:code/game" element={<GamePage />} />
         {/* 자리 없이 보기만 하는 길. 같은 화면이되 내 자리와 단추가 없다. */}

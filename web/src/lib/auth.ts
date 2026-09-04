@@ -12,7 +12,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react'
-import type { PlayOutcome, PlayRecord, Session } from '@the-gang/shared'
+import type { Cosmetics, Equipped, PlayOutcome, PlayRecord, Session } from '@the-gang/shared'
 
 import { call, socket } from './socket.ts'
 import { setNickname } from './identity.ts'
@@ -124,4 +124,29 @@ export function useResumeSession(): void {
       socket.off('connect', again)
     }
   }, [again])
+}
+
+/**
+ * 꾸미기 하나를 산다. 값은 분배금(= 이긴 판 − 쓴 값)으로 낸다.
+ *
+ * 살 수 있는지는 **서버가 정한다** — 여기서 미리 막는 것은 손이 헛돌지 않게 하려는
+ * 것뿐이고, 거절 사유는 서버 말을 그대로 옮긴다.
+ */
+export async function buyCosmetic(id: string): Promise<string | null> {
+  const token = current?.token
+  if (!token) return '로그인한 뒤에 살 수 있습니다.'
+  const result = await call<Cosmetics>('cosmetics:buy', { token, id })
+  if (!result.ok) return result.message
+  if (current) put({ ...current, cosmetics: result.value })
+  return null
+}
+
+/** 걸치는 것을 바꾼다. 가지지 않은 겹은 서버가 기본으로 되돌려 보낸다. */
+export async function equipCosmetic(equipped: Partial<Equipped>): Promise<string | null> {
+  const token = current?.token
+  if (!token) return '로그인한 뒤에 바꿀 수 있습니다.'
+  const result = await call<Cosmetics>('cosmetics:equip', { token, equipped })
+  if (!result.ok) return result.message
+  if (current) put({ ...current, cosmetics: result.value })
+  return null
 }
