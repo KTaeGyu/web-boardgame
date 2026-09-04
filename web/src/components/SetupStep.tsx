@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { Card, GameView } from '@the-gang/shared'
 
 import { PlayingCard } from './PlayingCard.tsx'
+import { useEscapeBlock } from '../lib/useEscape.ts'
 import { useScrollLock } from '../lib/useScrollLock.ts'
 
 interface Props {
@@ -82,6 +83,8 @@ export function SetupStep({ game, playerId, hand, onSubmit, onDiscard }: Props) 
 
 function Panel({ title, hint, children }: { title: string; hint: string; children: React.ReactNode }) {
   useScrollLock()
+  // 답해야 넘어가는 자리다. Esc 를 여기서 멈춘다.
+  useEscapeBlock(true)
   return (
     <div className="modal-backdrop">
       <div className="modal" role="dialog" aria-modal="true">

@@ -35,7 +35,7 @@ import { sfx } from '../lib/sfx.ts'
 import { socket } from '../lib/socket.ts'
 // 사람들과 하는 판은 서버에서, 혼자 해보기는 화면 안에서 돈다. 이 화면은 그 차이를 모른다.
 import { call, useServerEvent } from '../lib/transport.ts'
-import { useEscapeFallback } from '../lib/useEscape.ts'
+import { useEscapeBlock, useEscapeFallback } from '../lib/useEscape.ts'
 import { useTokenFlight } from '../lib/useTokenFlight.ts'
 import { useScrollLock } from '../lib/useScrollLock.ts'
 
@@ -1266,6 +1266,8 @@ function Showdown({
   const waitingOn = game.players.filter((player) => player.connected).length
   // 재경기는 같은 사람들이 다시 하는 것이라 앉은 사람들이 정한다. 구경꾼에게는 묻지 않는다.
   const askedToRematch = over && game.rematch.proposed && !iAgreed && !spectating
+  // 답해야 넘어가는 자리다. Esc 를 여기서 멈춘다.
+  useEscapeBlock(askedToRematch)
 
   /*
    * 짚고 있는 사람이 실제로 쓴 다섯 장. 공개된 홀카드와 공용 카드로 다시 구해도

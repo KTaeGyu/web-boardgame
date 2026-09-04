@@ -2,6 +2,7 @@ import { CATEGORY_LABEL, RANKS, ROUNDS, rankLabel, type GameView, type ScanQuest
 
 import { CommunityBoard } from './Board.tsx'
 
+import { useEscapeBlock } from '../lib/useEscape.ts'
 import { useScrollLock } from '../lib/useScrollLock.ts'
 import { Token, TokenBlank } from './Token.tsx'
 
@@ -40,6 +41,8 @@ export function ScanVote({ game, playerId, onVote }: Props) {
   const scan = game.scan
   // 훅은 조건부로 부를 수 없다. 이른 return 앞에서 「지금 덮고 있는가」로 가른다.
   useScrollLock(scan !== null && game.phase === 'scanning')
+  // 답해야 넘어가는 자리다. Esc 가 밑으로 흘러 「나가시겠습니까?」가 되지 않게 여기서 멈춘다.
+  useEscapeBlock(scan !== null && game.phase === 'scanning')
   if (!scan || game.phase !== 'scanning') return null
 
   const target = game.players.find((player) => player.id === scan.targetId)
