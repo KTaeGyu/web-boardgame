@@ -9,8 +9,9 @@ import {
   type GameView,
 } from '@the-gang/shared'
 
-import { useBackIntercept } from '../lib/back.ts'
+import { useBackClose, useBackIntercept } from '../lib/back.ts'
 import { useScrollLock } from '../lib/useScrollLock.ts'
+import { useEscape } from '../lib/useEscape.ts'
 import { useSheetDrag } from '../lib/useSheetDrag.ts'
 import { tipPosition } from '../lib/tooltip.ts'
 import { PlayingCard } from './PlayingCard.tsx'
@@ -48,6 +49,7 @@ export function ExtrasDrawer({ game, notes, onUse, useLabel }: Props) {
   const [open, setOpen] = useState(false)
   // 펼쳐 둔 채 뒤로가기를 누르면 판을 떠나는 것이 아니라 서랍을 접는다.
   useBackIntercept(open, () => setOpen(false))
+  useEscape(open, () => setOpen(false))
 
   const specialist = game.specialist === null ? null : SPECIALISTS[game.specialist]
   const count = game.challenges.length + (specialist ? 1 : 0)
@@ -230,6 +232,8 @@ export function ExtraTile({ kind, card, status, note, onUse, useLabel = '이 카
 
 /** 카드가 나에게만 알려준 것. 처음 도착했을 때 한 번 뜨고, 뒤에는 드로어에서 본다. */
 export function NoteCard({ note, onClose }: { note: CardNote; onClose: () => void }) {
+  useBackClose(onClose)
+  useEscape(true, onClose)
   useScrollLock()
   const drag = useSheetDrag(onClose)
   return (

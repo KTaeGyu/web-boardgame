@@ -15,7 +15,7 @@
  * 창은 화면 어디에 그려도 되지만 **한 번만** 그린다.
  */
 
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import {
   SPECIALISTS,
   SPECIALIST_NEEDS,
@@ -25,6 +25,8 @@ import {
 } from '@the-gang/shared'
 
 import { useScrollLock } from '../lib/useScrollLock.ts'
+import { useBackIntercept } from '../lib/back.ts'
+import { useEscape } from '../lib/useEscape.ts'
 import { useSheetDrag } from '../lib/useSheetDrag.ts'
 import { PlayingCard } from './PlayingCard.tsx'
 
@@ -160,6 +162,14 @@ export function useSpecialistUse({ game, playerId, hand, onVote, onUse }: Args):
   // 창이 떠 있는 동안 뒤 판은 움직이지 않는다.
   useScrollLock(open !== null && specialist !== null)
   const drag = useSheetDrag(() => setOpen(null))
+  /*
+   * 배경 클릭과 끌어내림으로 이미 닫히는 창이다 — 「답해야 넘어가는 자리」가 아니므로
+   * 나머지 두 길도 같이 연다. 넷 중 둘만 열려 있으면 그 둘을 모르는 사람에게는
+   * 닫히지 않는 창이 된다.
+   */
+  const shut = useCallback(() => setOpen(null), [])
+  useEscape(open !== null, shut)
+  useBackIntercept(open !== null, shut)
 
   const shell = (title: string, body: ReactNode) => (
     <div className="modal-backdrop" onClick={() => setOpen(null)} role="presentation">

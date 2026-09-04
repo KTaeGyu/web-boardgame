@@ -9,6 +9,7 @@
  */
 
 import { useBackClose } from '../lib/back.ts'
+import { useEscape } from '../lib/useEscape.ts'
 
 export interface TipPayload {
   step: number
@@ -22,6 +23,7 @@ export interface TipPayload {
 export function TutorialTip({ tip, onClose }: { tip: TipPayload; onClose: () => void }) {
   // 안내가 떠 있는 동안의 뒤로가기는 「알겠습니다」와 같다.
   useBackClose(onClose)
+  useEscape(true, onClose)
 
   return (
     <aside className="tip" role="dialog" aria-live="polite" aria-label={tip.title}>

@@ -14,6 +14,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { TRACKS, useAudio } from '../lib/audio.ts'
 import { sfx } from '../lib/sfx.ts'
 import { useEscape } from '../lib/useEscape.ts'
+import { useBackIntercept } from '../lib/back.ts'
 import { useSheetDrag } from '../lib/useSheetDrag.ts'
 
 export function SoundPanel() {
@@ -25,6 +26,8 @@ export function SoundPanel() {
   // 작은 화면에서는 아래에서 올라온 시트다. 끌어내려 닫는다.
   const drag = useSheetDrag(close)
   useEscape(open, close)
+  // 휴대폰 뒤로가기도 이 시트를 닫는 것이어야 한다. 없으면 화면이 통째로 물러난다.
+  useBackIntercept(open, close)
 
   // 바깥을 누르면 닫힌다. 단추도 상자 안에 있으므로 여는 그 손짓에 곧바로 닫히지 않는다.
   useEffect(() => {

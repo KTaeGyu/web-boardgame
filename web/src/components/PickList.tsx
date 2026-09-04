@@ -13,6 +13,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 
+import { useBackIntercept } from '../lib/back.ts'
 import { useEscape } from '../lib/useEscape.ts'
 
 import { tipPosition, useCardTip } from '../lib/tooltip.ts'
@@ -45,6 +46,7 @@ export function PickList({ label, hint, options, picked, disabled, onPick }: Pro
    * 화면이 매단 것과 함께 울려 목록이 닫히면서 「방을 나가시겠습니까?」가 떴다.
    */
   useEscape(open, useCallback(() => setOpen(false), []))
+  useBackIntercept(open, useCallback(() => setOpen(false), []))
 
   /*
    * 바깥을 누르면 닫는다.

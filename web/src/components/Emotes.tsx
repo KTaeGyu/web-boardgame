@@ -16,7 +16,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { EMOTES, EMOTE_EXIT_MS, EMOTE_SHOW_MS, emoteOf } from '@the-gang/shared'
 
+import { useBackIntercept } from '../lib/back.ts'
 import { call, useServerEvent } from '../lib/transport.ts'
+import { useEscape } from '../lib/useEscape.ts'
 
 /**
  * 지금 누구 위에 무엇이 떠 있나.
@@ -156,6 +158,11 @@ export function EmoteBubble({ emote }: { emote?: LiveEmote }) {
  */
 export function EmotePicker({ onPick }: { onPick: (id: string) => void }) {
   const [open, setOpen] = useState(false)
+  const close = useCallback(() => setOpen(false), [])
+
+  // 펼쳐 놓고 마음이 바뀔 수 있다. 닫는 길은 다른 덮개와 같아야 한다.
+  useBackIntercept(open, close)
+  useEscape(open, close)
 
   return (
     <div className={`emote-picker ${open ? 'emote-picker--open' : ''}`}>
