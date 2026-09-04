@@ -121,7 +121,7 @@ export function RoomsPage() {
         <Link className="link-back" to="/">
           ← 처음으로
         </Link>
-        {/* 꾸미는 자리와 보는 자리를 나란히 둔다. 둘 다 방에 들어가기 전에 들르는 곳이다. */}
+        {/* 상점과 전적을 나란히 둔다. 둘 다 방에 들어가기 전에 들르는 곳이다. */}
         <Link className="link-back" to="/looks">
           <svg className="link-icon" viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
             {/* 차양을 얹은 가게. 선 하나로 그려 글자 색을 그대로 따라간다. */}

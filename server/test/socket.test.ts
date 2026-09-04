@@ -275,11 +275,11 @@ describe('방 설정', () => {
  * 꾸민 차림이 대기실 줄까지 오는가.
  *
  * **차림 값은 화면이 보내지 않는다.** 표만 보내고 서버가 계정에서 꺼낸다 — 보내게
- * 두면 사지 않은 것도 걸쳤다고 우길 수 있다. 그래서 여기서 보는 것은 「표를 냈더니
+ * 두면 구매하지 않은 것도 장착했다고 우길 수 있다. 그래서 여기서 보는 것은 「표를 냈더니
  * 그 사람의 차림이 자리에 붙었는가」와 「표가 없으면 안 붙는가」 둘이다.
  */
-describe('꾸민 차림이 자리에 붙는다', () => {
-  /** 가입하고 몇 판 이겨 분배금을 쌓아 둔 사람 하나. 표를 돌려준다. */
+describe('장착한 차림이 자리에 붙는다', () => {
+  /** 가입하고 몇 판 이겨 골드를 쌓아 둔 사람 하나. 표를 돌려준다. */
   async function signedIn(socket: Socket, email: string, wins: number) {
     const made = unwrap(
       await call<Session>(socket, 'auth:signup', { email, password: 'pass1234', nickname: '태규' }),

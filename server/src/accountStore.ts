@@ -68,8 +68,8 @@ export interface AccountStore {
   /** 전적. 뒤에서 보내고 실패는 삼킨다. */
   saveRecord(email: string, wins: number, losses: number): Promise<void>
   /**
-   * 꾸미기 차림. **전적과 달리 기다렸다가 성공을 확인한다** — 분배금이 걸려 있어
-   * 실패를 삼키면 값은 깎였는데 산 것이 없는 일이 난다.
+   * 코스메틱 차림. **전적과 달리 기다렸다가 성공을 확인한다** — 골드가 걸려 있어
+   * 실패를 삼키면 골드는 깎였는데 아이템이 없는 일이 난다.
    */
   saveCosmetics(email: string, cosmetics: Cosmetics): Promise<void>
 }

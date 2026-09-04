@@ -289,7 +289,7 @@ export interface Session {
   /** 테이블에서 불릴 이름. **유일하지 않다** — 같은 이름이 둘 앉으면 [1] [2] 가 붙는다. */
   nickname: string
   record: PlayRecord
-  /** 산 것과 걸친 것. 분배금 잔액은 `balanceOf(record.wins, cosmetics.spent)` 다. */
+  /** 구매한 것과 장착한 것. 골드 잔액은 `balanceOf(record.wins, cosmetics.spent)` 다. */
   cosmetics: Cosmetics
 }
 
@@ -368,16 +368,16 @@ export interface ClientToServerEvents {
     ack: (result: Result<PlayRecord>) => void,
   ) => void
   /**
-   * 꾸미기 하나를 산다. 값은 분배금(= 이긴 판 − 쓴 값)으로 낸다.
+   * 코스메틱 하나를 구매한다. 가격은 골드(= 누적 획득 − 사용)로 낸다.
    *
    * 가격표는 `shared` 에 한 벌이지만 **판정은 서버가 한다** — 화면이 든 표를 고쳐
-   * 부를 수 있으므로 잔액도 소유도 서버가 다시 센다.
+   * 부를 수 있으므로 잔액도 보유 여부도 서버가 다시 센다.
    */
   'cosmetics:buy': (
     payload: { token: string; id: string },
     ack: (result: Result<Cosmetics>) => void,
   ) => void
-  /** 걸치는 것을 바꾼다. 가지지 않은 겹은 서버가 기본으로 되돌린다. */
+  /** 장착한 것을 바꾼다. 미보유 슬롯은 서버가 기본으로 되돌린다. */
   'cosmetics:equip': (
     payload: { token: string; equipped: Partial<Equipped> },
     ack: (result: Result<Cosmetics>) => void,

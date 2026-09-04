@@ -51,9 +51,9 @@ export interface Account {
   hash: string
   record: PlayRecord
   /**
-   * 걸치고 있는 것과 산 것들.
+   * 장착 중인 것과 구매한 것들.
    *
-   * **분배금은 여기서만 줄어든다.** `record.wins` 는 누적이라 손대지 않는다 —
+   * **골드는 여기서만 줄어든다.** `record.wins` 는 누적이라 손대지 않는다 —
    * 거기서 깎으면 많이 이기고 많이 쓴 사람의 전적이 0승이 된다.
    */
   cosmetics: Cosmetics
@@ -277,26 +277,26 @@ export class Accounts {
   }
 
   /**
-   * 꾸미기 하나를 산다.
+   * 코스메틱 하나를 구매한다.
    *
    * **판정은 여기서 한다.** 가격표를 화면이 들고 있으므로 값을 고쳐 부를 수 있다 —
-   * 잔액도 소유도 서버가 표를 보고 다시 센다.
+   * 잔액도 보유 여부도 서버가 표를 보고 다시 센다.
    *
    * **밖에 쓰고 성공을 확인한 뒤에야 메모리에 넣는다.** 전적과 반대다. 전적은 늦게
-   * 맞아도 되지만 이쪽은 분배금이 걸려 있어, 순서를 뒤집으면 「샀다」고 말해 놓고
-   * 서버가 다시 뜨는 순간 값만 깎인 채로 남는다.
+   * 맞아도 되지만 이쪽은 골드가 걸려 있어, 순서를 뒤집으면 「구매 완료」라고 말해 놓고
+   * 서버가 다시 뜨는 순간 골드만 깎인 채로 남는다.
    */
   async buy(token: string, id: string): Promise<Result<Cosmetics>> {
     const account = this.find(token)
     if (!account) return err('NOT_SIGNED_IN', '다시 로그인해 주세요.')
 
     const item = cosmeticOf(id)
-    if (!item) return err('INVALID_SETTINGS', '없는 물건입니다.')
-    if (owns(account.cosmetics, id)) return err('INVALID_SETTINGS', '이미 가지고 있습니다.')
+    if (!item) return err('INVALID_SETTINGS', '존재하지 않는 아이템입니다.')
+    if (owns(account.cosmetics, id)) return err('INVALID_SETTINGS', '이미 보유한 아이템입니다.')
 
     const left = balanceOf(account.record.wins, account.cosmetics.spent)
     if (left < item.price) {
-      return err('INVALID_SETTINGS', `분배금이 ${item.price - left} 모자랍니다.`)
+      return err('INVALID_SETTINGS', `골드가 ${item.price - left} 부족합니다.`)
     }
 
     const next: Cosmetics = {
@@ -308,8 +308,8 @@ export class Accounts {
       try {
         await this.store.saveCosmetics(account.email, next)
       } catch (trouble) {
-        logLine('error', `산 것을 남기지 못했다: ${account.email}`, trouble)
-        return err('INVALID_SETTINGS', '지금은 살 수 없습니다. 잠시 뒤에 다시 시도해 주세요.')
+        logLine('error', `구매 내역을 남기지 못했다: ${account.email}`, trouble)
+        return err('INVALID_SETTINGS', '구매에 실패했습니다. 잠시 뒤에 다시 시도해 주세요.')
       }
     }
     account.cosmetics = next
@@ -317,10 +317,10 @@ export class Accounts {
   }
 
   /**
-   * 걸치는 것을 바꾼다.
+   * 장착한 것을 바꾼다.
    *
-   * 가지지 않은 것을 걸치려 하면 **그 겹만 기본으로 되돌린다**(`sanitizeEquipped`).
-   * 통째로 거절하지 않는 것은, 한 겹이 어긋났다고 나머지 세 겹까지 잃을 이유가 없어서다.
+   * 보유하지 않은 것을 장착하려 하면 **그 슬롯만 기본으로 되돌린다**(`sanitizeEquipped`).
+   * 통째로 거절하지 않는 것은, 슬롯 하나가 어긋났다고 나머지 셋까지 잃을 이유가 없어서다.
    */
   async equip(token: string, worn: Partial<Equipped>): Promise<Result<Cosmetics>> {
     const account = this.find(token)

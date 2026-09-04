@@ -285,12 +285,12 @@ describe('밖에 둔 계정', () => {
 })
 
 /**
- * 꾸미기 — 분배금이 걸린 자리라 판정이 서버에 있어야 한다.
+ * 코스메틱 — 골드가 걸린 자리라 판정이 서버에 있어야 한다.
  *
- * 「이긴 판」은 누적이라 줄지 않고, 쓴 만큼(`spent`)을 따로 센다. 그 둘의 차가 분배금이다.
+ * 누적 승리는 줄지 않고, 사용한 만큼(`spent`)을 따로 센다. 그 둘의 차가 보유 골드다.
  */
-describe('꾸미기', () => {
-  /** 이긴 판을 원하는 수만큼 쌓아 둔 계정 하나. 분배금은 곧 이긴 판 수다. */
+describe('코스메틱', () => {
+  /** 승리를 원하는 수만큼 쌓아 둔 계정 하나. 보유 골드는 곧 승리 수다. */
   async function signedIn(wins: number) {
     const accounts = new Accounts(null)
     const made = await accounts.signup('tk@example.com', 'pass1234', '태규')
@@ -301,7 +301,7 @@ describe('꾸미기', () => {
     return { accounts, token }
   }
 
-  it('처음에는 아무것도 사지 않았고 기본 차림이다', async () => {
+  it('처음에는 아무것도 구매하지 않았고 기본 차림이다', async () => {
     const { accounts, token } = await signedIn(0)
     const me = accounts.resume(token)
     assert.equal(me.ok, true)
@@ -311,15 +311,15 @@ describe('꾸미기', () => {
     assert.deepEqual(me.value.cosmetics.equipped, DEFAULT_EQUIPPED)
   })
 
-  it('분배금이 모자라면 살 수 없다', async () => {
+  it('골드가 부족하면 구매할 수 없다', async () => {
     const { accounts, token } = await signedIn(24)
-    // 「박쥐네모」는 25 다.
+    // 「나이트 카울」은 25 다.
     const bought = await accounts.buy(token, 'bat')
     assert.equal(bought.ok, false)
-    if (!bought.ok) assert.match(bought.message, /분배금이 1 모자랍니다/)
+    if (!bought.ok) assert.match(bought.message, /골드가 1 부족합니다/)
   })
 
-  it('사면 쓴 만큼만 늘고 이긴 판은 그대로다', async () => {
+  it('구매하면 사용한 만큼만 늘고 누적 승리는 그대로다', async () => {
     const { accounts, token } = await signedIn(30)
     const bought = await accounts.buy(token, 'bat')
     assert.equal(bought.ok, true)
@@ -335,20 +335,20 @@ describe('꾸미기', () => {
     assert.equal(balanceOf(me.value.record.wins, me.value.cosmetics.spent), 5)
   })
 
-  it('같은 것을 두 번 살 수 없다', async () => {
+  it('같은 것을 두 번 구매할 수 없다', async () => {
     const { accounts, token } = await signedIn(60)
     assert.equal((await accounts.buy(token, 'bat')).ok, true)
     const again = await accounts.buy(token, 'bat')
     assert.equal(again.ok, false)
-    if (!again.ok) assert.match(again.message, /이미 가지고/)
+    if (!again.ok) assert.match(again.message, /이미 보유한/)
   })
 
-  it('없는 물건은 살 수 없다', async () => {
+  it('존재하지 않는 아이템은 구매할 수 없다', async () => {
     const { accounts, token } = await signedIn(99)
     assert.equal((await accounts.buy(token, '없는것')).ok, false)
   })
 
-  it('산 것만 걸칠 수 있다 — 안 산 겹은 기본으로 되돌린다', async () => {
+  it('보유한 것만 장착할 수 있다 — 미보유 슬롯은 기본으로 되돌린다', async () => {
     const { accounts, token } = await signedIn(30)
     await accounts.buy(token, 'bat')
 
@@ -374,10 +374,10 @@ describe('꾸미기', () => {
   })
 
   /*
-   * 밖에 남기지 못하면 사지 않은 것으로 둔다. 순서를 뒤집으면 「샀다」고 말해 놓고
-   * 서버가 다시 뜨는 순간 분배금만 깎인 채로 남는다.
+   * 밖에 남기지 못하면 구매하지 않은 것으로 둔다. 순서를 뒤집으면 「구매 완료」라고
+   * 말해 놓고 서버가 다시 뜨는 순간 골드만 깎인 채로 남는다.
    */
-  it('밖에 남기지 못하면 사지 않은 것이 된다', async () => {
+  it('밖에 남기지 못하면 구매하지 않은 것이 된다', async () => {
     const { store, rows } = fake({
       saveCosmetics: async () => {
         throw new Error('저장소가 안 된다')
@@ -397,7 +397,7 @@ describe('꾸미기', () => {
     const me = accounts.resume(token)
     assert.equal(me.ok, true)
     if (!me.ok) return
-    assert.deepEqual(me.value.cosmetics.owned, [], '가진 것이 없어야 한다')
-    assert.equal(me.value.cosmetics.spent, 0, '분배금도 그대로여야 한다')
+    assert.deepEqual(me.value.cosmetics.owned, [], '보유한 것이 없어야 한다')
+    assert.equal(me.value.cosmetics.spent, 0, '골드도 그대로여야 한다')
   })
 })
