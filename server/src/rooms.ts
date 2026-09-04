@@ -6,6 +6,7 @@
  */
 
 import {
+  type Equipped,
   CHAT_KEEP,
   CHAT_MAX,
   DEFAULT_SETTINGS,
@@ -55,6 +56,13 @@ interface Player {
   joinedAt: number
   /** 사람이 아니다. 튜토리얼에서만 앉는다. */
   bot?: boolean
+  /**
+   * 걸치고 있는 차림. **로그인한 사람만 있다** — 게스트는 계정이 없어 기본 차림이다.
+   *
+   * 이 값은 **소켓 계층이 계정에서 꺼내 넣어준다.** 방은 계정을 모르고 알 이유도 없다.
+   * 화면이 보내온 것을 그대로 담으면 사지 않은 것도 걸쳤다고 우길 수 있다.
+   */
+  equipped?: Equipped
 }
 
 interface Room {
@@ -453,6 +461,20 @@ export class RoomStore {
     return true
   }
 
+  /**
+   * 그 사람의 차림을 자리에 얹는다. 방에 앉아 있지 않으면 아무 일도 하지 않는다.
+   *
+   * 방은 계정을 모르므로 값을 **받아서** 담기만 한다 — 무엇을 걸칠 수 있는지는
+   * 계정을 든 쪽(`Accounts.equip`)이 이미 판정했다.
+   */
+  dressUp(playerId: string, equipped: Equipped | undefined): RoomView | null {
+    const room = this.roomOf(playerId)
+    const seat = room?.players.find((p) => p.id === playerId)
+    if (!room || !seat) return null
+    seat.equipped = equipped
+    return toView(room)
+  }
+
   /** 유예를 넘긴 자리와, 아무 일도 없는 방을 실제로 치운다. 소켓 계층이 주기적으로 부른다. */
   sweep(): { changed: RoomView[]; closedCodes: string[]; idleCodes: string[] } {
     const now = this.now()
@@ -679,6 +701,7 @@ function toView(room: Room): RoomView {
       displayName: names[index],
       isHost: p.id === room.hostId,
       connected: p.connected,
+      equipped: p.equipped,
     })),
     settings: {
       ...room.settings,

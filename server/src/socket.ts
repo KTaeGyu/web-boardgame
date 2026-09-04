@@ -7,8 +7,12 @@
 
 import type { Server, Socket } from 'socket.io'
 import {
+  EMOTE_COOLDOWN_MS,
   MIN_PLAYERS,
   TOKEN_LOCK_MS,
+  emoteOf,
+  sanitizeEquipped,
+  type Equipped,
   type ClientToServerEvents,
   type GameView,
   type Identity,
@@ -90,6 +94,8 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
   const tutorials = new Map<string, Tutorial>()
   /** 사람마다의 최근 말수. 도배를 막는 데만 쓴다. */
   const chatRate = new Map<string, { times: number[]; blockedUntil: number }>()
+  /** 감정표현을 마지막으로 낸 시각. 도배만 막는 자리라 대화처럼 창을 세지 않는다. */
+  const emoteAt = new Map<string, number>()
   /**
    * 계정. 이메일로 사람을 가리키고 전적을 이어 준다.
    *
@@ -201,6 +207,24 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
     autoTimers.set(code, timer)
   }
 
+  /**
+   * 표를 들고 온 사람의 차림. 게스트이거나 표가 낡았으면 없다 — 그때는 기본 차림이다.
+   *
+   * **차림은 화면이 아니라 계정에서 꺼낸다.** 화면이 보내온 것을 그대로 쓰면 사지
+   * 않은 것도 걸쳤다고 우길 수 있다. 표만 받고 값은 여기서 정한다.
+   */
+  function equippedOf(token: unknown): Equipped | undefined {
+    if (typeof token !== 'string' || token === '') return undefined
+    const account = accounts.accountOf(token)
+    return account ? sanitizeEquipped(account.cosmetics) : undefined
+  }
+
+  /** 자리에 차림을 얹고 방에 알린다. 방에 앉아 있지 않으면 아무 일도 하지 않는다. */
+  function dressUp(playerId: string, token: unknown): void {
+    const room = store.dressUp(playerId, equippedOf(token))
+    if (room) announce(room)
+  }
+
   /** 방이 사라졌다. 딸려 있던 판과 타이머도 함께 정리한다. */
   function forgetRoom(code: string): void {
     tutorials.get(code)?.stop()
@@ -244,7 +268,9 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
 
       if (previous) leftRoom(previous, playerId)
       bind(socket, playerId, result.value.code)
-      ack(result)
+      // 응답 전에 얹는다. 방을 막 만든 자리에는 알릴 남이 없으므로 알림도 필요 없다.
+      const dressed = store.dressUp(playerId, equippedOf(payload.token))
+      ack(dressed ? { ok: true, value: dressed } : result)
       sendRoomList()
       socket.emit('chat:history', {
         messages: store.chatOf(result.value.code),
@@ -274,7 +300,9 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
       store.touch(code)
       bind(socket, playerId, code)
       ack(result)
-      announce(result.value)
+      // 알리기 전에 얹는다. 뒤에 얹으면 얼굴 없는 줄이 한 번 지나간다.
+      store.dressUp(playerId, equippedOf(payload.token))
+      announce(store.view(code) ?? result.value)
       // 새로고침·재접속도 이 길로 온다. 앞의 흐름이 없으면 대화가 매번 끊긴다.
       socket.emit('chat:history', { messages: store.chatOf(code), since: store.openedAt(code) })
 
@@ -351,6 +379,32 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
       store.touch(code)
       tutorial.resume()
       ack({ ok: true, value: null })
+    })
+
+    socket.on('emote:send', ({ id }, ack) => {
+      const playerId = playerOfSocket.get(socket.id)
+      const code = playerId ? store.codeOf(playerId) : null
+      if (!playerId || !code) {
+        return ack({ ok: false, code: 'NOT_IN_ROOM', message: '방에 들어와 있지 않습니다.' })
+      }
+      /*
+       * **목록에 있는 것만 나간다.** 화면이 아무 글자나 보내면 그것이 그대로 남의
+       * 화면에 뜬다 — 이름표만 받고 무엇을 띄울지는 표가 정한다.
+       */
+      const emote = emoteOf(String(id ?? ''))
+      if (!emote) return ack({ ok: false, code: 'INVALID_TOKEN', message: '없는 표현입니다.' })
+
+      // 도배만 막는다. 사람이 손으로 누르는 속도는 방해하지 않는 값이다.
+      const now = Date.now()
+      const last = emoteAt.get(playerId) ?? 0
+      if (now - last < EMOTE_COOLDOWN_MS) {
+        return ack({ ok: false, code: 'TOO_FAST', message: '조금 뒤에 다시 누를 수 있습니다.' })
+      }
+      emoteAt.set(playerId, now)
+
+      store.touch(code)
+      ack({ ok: true, value: null })
+      io.to(code).emit('emote', { playerId, id: emote.id })
     })
 
     socket.on('chat:send', ({ text }, ack) => {
@@ -527,6 +581,24 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
         return ack({ ok: false, code: 'INVALID_SETTINGS', message: '알 수 없는 결과입니다.' })
       }
       ack(accounts.record(String(token ?? ''), outcome, String(once ?? '')))
+    })
+
+    socket.on('cosmetics:buy', ({ token, id }, ack) => {
+      void accounts.buy(String(token ?? ''), String(id ?? '')).then(ack)
+    })
+
+    socket.on('cosmetics:equip', ({ token, equipped }, ack) => {
+      const key = String(token ?? '')
+      void accounts.equip(key, equipped ?? {}).then((result) => {
+        ack(result)
+        if (!result.ok) return
+        /*
+         * 대기실에 앉은 채로 바꿀 수 있다. 그때는 그 줄이 그 자리에서 갈려야 한다 —
+         * 방을 나갔다 들어와야 반영되면 「안 바뀌었다」로 읽힌다.
+         */
+        const playerId = playerOfSocket.get(socket.id)
+        if (playerId) dressUp(playerId, key)
+      })
     })
 
     socket.on('room:where', ({ playerId }, ack) => {
@@ -782,7 +854,10 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
 
     socket.on('disconnect', () => {
       const playerId = playerOfSocket.get(socket.id)
-      if (playerId) chatRate.delete(playerId)
+      if (playerId) {
+        chatRate.delete(playerId)
+        emoteAt.delete(playerId)
+      }
       unbind(socket.id, playerId)
       // 방에 들지 않은 사람이 나가도 「지금 몇 명」은 달라진다.
       setImmediate(sendLobbyStats)

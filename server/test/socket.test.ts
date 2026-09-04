@@ -8,7 +8,14 @@ import assert from 'node:assert/strict'
 import type { AddressInfo } from 'node:net'
 
 import { io as connect, type Socket } from 'socket.io-client'
-import type { Result, RoomSummary, RoomView } from '@the-gang/shared'
+import {
+  DEFAULT_EQUIPPED,
+  type Cosmetics,
+  type Result,
+  type RoomSummary,
+  type RoomView,
+  type Session,
+} from '@the-gang/shared'
 
 import { createApp, type GameApp } from '../src/app.ts'
 
@@ -76,6 +83,10 @@ function until<T>(socket: Socket, event: string, match: (payload: T) => boolean,
 }
 
 const identity = (playerId: string, nickname: string) => ({ playerId, nickname })
+
+/** 이메일은 유일해야 한다. 한 파일 안에서 겹치지 않게 번호를 붙인다. */
+let emailSeq = 0
+const seq = () => (emailSeq += 1)
 
 function unwrap<T>(result: Result<T>): T {
   assert.equal(result.ok, true, result.ok ? '' : `${result.code}: ${result.message}`)
@@ -257,5 +268,124 @@ describe('방 설정', () => {
     const result = await call<RoomView>(stray, 'room:settings', { maxPlayers: 8 })
     assert.equal(result.ok, false)
     if (!result.ok) assert.equal(result.code, 'NOT_IN_ROOM')
+  })
+})
+
+/**
+ * 꾸민 차림이 대기실 줄까지 오는가.
+ *
+ * **차림 값은 화면이 보내지 않는다.** 표만 보내고 서버가 계정에서 꺼낸다 — 보내게
+ * 두면 사지 않은 것도 걸쳤다고 우길 수 있다. 그래서 여기서 보는 것은 「표를 냈더니
+ * 그 사람의 차림이 자리에 붙었는가」와 「표가 없으면 안 붙는가」 둘이다.
+ */
+describe('꾸민 차림이 자리에 붙는다', () => {
+  /** 가입하고 몇 판 이겨 분배금을 쌓아 둔 사람 하나. 표를 돌려준다. */
+  async function signedIn(socket: Socket, email: string, wins: number) {
+    const made = unwrap(
+      await call<Session>(socket, 'auth:signup', { email, password: 'pass1234', nickname: '태규' }),
+    )
+    for (let at = 0; at < wins; at += 1) {
+      unwrap(await call(socket, 'auth:record', { token: made.token, outcome: 'win', once: `h${at}` }))
+    }
+    return made.token
+  }
+
+  it('산 것을 걸치고 방에 들어가면 그 줄에 차림이 실린다', async () => {
+    const socket = await client()
+    const token = await signedIn(socket, `dress1-${seq()}@example.com`, 60)
+
+    unwrap(await call(socket, 'cosmetics:buy', { token, id: 'bat' }))
+    unwrap(await call(socket, 'cosmetics:equip', { token, equipped: { avatar: 'bat' } }))
+
+    const room = unwrap(
+      await call<RoomView>(socket, 'room:create', { playerId: 'dresser-01', nickname: '태규', token }),
+    )
+    assert.equal(room.players[0].equipped?.avatar, 'bat', '만든 그 응답에 이미 실려 있어야 한다')
+  })
+
+  it('사지 않은 것은 걸쳐지지 않는다 — 그 겹만 기본으로 돌아간다', async () => {
+    const socket = await client()
+    const token = await signedIn(socket, `dress2-${seq()}@example.com`, 0)
+
+    const worn = unwrap(await call<Cosmetics>(socket, 'cosmetics:equip', { token, equipped: { avatar: 'bat' } }))
+    assert.equal(worn.equipped.avatar, DEFAULT_EQUIPPED.avatar)
+  })
+
+  it('표 없이 들어온 사람(게스트)에게는 차림이 없다', async () => {
+    const socket = await client()
+    const room = unwrap(
+      await call<RoomView>(socket, 'room:create', { playerId: 'guest-0001', nickname: '손님' }),
+    )
+    assert.equal(room.players[0].equipped, undefined)
+  })
+
+  it('대기실에 앉은 채로 바꾸면 그 자리에서 갈린다', async () => {
+    const host = await client()
+    const token = await signedIn(host, `dress3-${seq()}@example.com`, 60)
+    unwrap(await call(host, 'cosmetics:buy', { token, id: 'mask' }))
+
+    unwrap(await call<RoomView>(host, 'room:create', { playerId: 'dresser-02', nickname: '태규', token }))
+    const changed = until<RoomView>(
+      host,
+      'room:updated',
+      (view) => view.players[0]?.equipped?.avatar === 'mask',
+    )
+    unwrap(await call(host, 'cosmetics:equip', { token, equipped: { avatar: 'mask' } }))
+    assert.equal((await changed).players[0].equipped?.avatar, 'mask')
+  })
+})
+
+/**
+ * 감정표현.
+ *
+ * **상태가 아니라 사건이다.** 서버는 「누가 무엇을」만 한 번 쏘고 아무것도 남기지
+ * 않는다 — 뒤늦게 들어온 사람에게 지난 감정이 뜨면 그건 말이 아니라 표지판이 된다.
+ */
+describe('감정표현', () => {
+  it('같은 방 사람들에게 간다', async () => {
+    const host = await client()
+    const guest = await client()
+    const room = unwrap(
+      await call<RoomView>(host, 'room:create', identity(`emote-host-${seq()}`, '가')),
+    )
+    unwrap(
+      await call<RoomView>(guest, 'room:join', {
+        ...identity(`emote-guest-${seq()}`, '나'),
+        code: room.code,
+      }),
+    )
+
+    const heard = next<{ playerId: string; id: string }>(guest, 'emote')
+    unwrap(await call<null>(host, 'emote:send', { id: 'good' }))
+    const got = await heard
+    assert.equal(got.id, 'good')
+    assert.equal(got.playerId, room.players[0].id)
+  })
+
+  /* 화면이 아무 글자나 보내면 그것이 그대로 남의 화면에 뜬다. 이름표만 받는다. */
+  it('목록에 없는 것은 나가지 않는다', async () => {
+    const socket = await client()
+    unwrap(await call<RoomView>(socket, 'room:create', identity(`emote-solo-${seq()}`, '가')))
+
+    const bad = await call<null>(socket, 'emote:send', { id: '<img onerror=1>' })
+    assert.equal(bad.ok, false)
+    if (!bad.ok) assert.equal(bad.code, 'INVALID_TOKEN')
+  })
+
+  it('방에 들어와 있지 않으면 보낼 수 없다', async () => {
+    const socket = await client()
+    const out = await call<null>(socket, 'emote:send', { id: 'good' })
+    assert.equal(out.ok, false)
+    if (!out.ok) assert.equal(out.code, 'NOT_IN_ROOM')
+  })
+
+  it('연달아 누르면 잠깐 막는다 — 도배만 막는 정도다', async () => {
+    const socket = await client()
+    unwrap(await call<RoomView>(socket, 'room:create', identity(`emote-fast-${seq()}`, '가')))
+
+    unwrap(await call<null>(socket, 'emote:send', { id: 'good' }))
+    const again = await call<null>(socket, 'emote:send', { id: 'laugh' })
+    assert.equal(again.ok, false)
+    if (!again.ok) assert.equal(again.code, 'TOO_FAST')
   })
 })

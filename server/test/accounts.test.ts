@@ -7,6 +7,8 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 
+import { DEFAULT_EQUIPPED, balanceOf } from '@the-gang/shared'
+
 import { Accounts } from '../src/accounts.ts'
 import type { AccountStore, StoredAccount } from '../src/accountStore.ts'
 
@@ -148,8 +150,7 @@ describe('전적', () => {
  * 밖에 둔 계정(운영에서는 Contentful). 여기서는 가짜 저장소로 걸음의 순서만 본다 —
  * 실물에 붙는 부분은 자격증명이 있어야 해서 이 파일이 볼 수 있는 자리가 아니다.
  */
-describe('밖에 둔 계정', () => {
-  function fake(overrides: Partial<AccountStore> = {}) {
+function fake(overrides: Partial<AccountStore> = {}) {
     const rows: StoredAccount[] = []
     const calls: string[] = []
     const store: AccountStore = {
@@ -170,11 +171,17 @@ describe('밖에 둔 계정', () => {
         const row = rows.find((one) => one.email === email)
         if (row) Object.assign(row, { wins, losses })
       },
+      saveCosmetics: async (email, cosmetics) => {
+        calls.push('saveCosmetics')
+        const row = rows.find((one) => one.email === email)
+        if (row) row.cosmetics = cosmetics
+      },
       ...overrides,
     }
-    return { store, rows, calls }
-  }
+  return { store, rows, calls }
+}
 
+describe('밖에 둔 계정', () => {
   const quick = { retryWaitMs: 1, holdMs: 1 }
 
   it('부팅 때 읽어 온 계정으로 곧바로 로그인된다', async () => {
@@ -267,11 +274,130 @@ describe('밖에 둔 계정', () => {
       passwordSalt: 'y',
       wins: 0,
       losses: 0,
+      cosmetics: null,
     })
 
     const accounts = new Accounts(store, quick)
     assert.equal((await accounts.signup('tk@example.com', 'pass1234', '태규')).ok, false)
     assert.equal(calls.includes('has'), true)
     assert.equal(calls.includes('create'), false)
+  })
+})
+
+/**
+ * 꾸미기 — 분배금이 걸린 자리라 판정이 서버에 있어야 한다.
+ *
+ * 「이긴 판」은 누적이라 줄지 않고, 쓴 만큼(`spent`)을 따로 센다. 그 둘의 차가 분배금이다.
+ */
+describe('꾸미기', () => {
+  /** 이긴 판을 원하는 수만큼 쌓아 둔 계정 하나. 분배금은 곧 이긴 판 수다. */
+  async function signedIn(wins: number) {
+    const accounts = new Accounts(null)
+    const made = await accounts.signup('tk@example.com', 'pass1234', '태규')
+    assert.equal(made.ok, true)
+    if (!made.ok) throw new Error('unreachable')
+    const token = made.value.token
+    for (let at = 0; at < wins; at += 1) accounts.record(token, 'win', `heist-${at}`)
+    return { accounts, token }
+  }
+
+  it('처음에는 아무것도 사지 않았고 기본 차림이다', async () => {
+    const { accounts, token } = await signedIn(0)
+    const me = accounts.resume(token)
+    assert.equal(me.ok, true)
+    if (!me.ok) return
+    assert.deepEqual(me.value.cosmetics.owned, [])
+    assert.equal(me.value.cosmetics.spent, 0)
+    assert.deepEqual(me.value.cosmetics.equipped, DEFAULT_EQUIPPED)
+  })
+
+  it('분배금이 모자라면 살 수 없다', async () => {
+    const { accounts, token } = await signedIn(24)
+    // 「박쥐네모」는 25 다.
+    const bought = await accounts.buy(token, 'bat')
+    assert.equal(bought.ok, false)
+    if (!bought.ok) assert.match(bought.message, /분배금이 1 모자랍니다/)
+  })
+
+  it('사면 쓴 만큼만 늘고 이긴 판은 그대로다', async () => {
+    const { accounts, token } = await signedIn(30)
+    const bought = await accounts.buy(token, 'bat')
+    assert.equal(bought.ok, true)
+    if (!bought.ok) return
+
+    assert.deepEqual(bought.value.owned, ['bat'])
+    assert.equal(bought.value.spent, 25)
+
+    const me = accounts.resume(token)
+    assert.equal(me.ok, true)
+    if (!me.ok) return
+    assert.equal(me.value.record.wins, 30, '전적은 깎이지 않는다')
+    assert.equal(balanceOf(me.value.record.wins, me.value.cosmetics.spent), 5)
+  })
+
+  it('같은 것을 두 번 살 수 없다', async () => {
+    const { accounts, token } = await signedIn(60)
+    assert.equal((await accounts.buy(token, 'bat')).ok, true)
+    const again = await accounts.buy(token, 'bat')
+    assert.equal(again.ok, false)
+    if (!again.ok) assert.match(again.message, /이미 가지고/)
+  })
+
+  it('없는 물건은 살 수 없다', async () => {
+    const { accounts, token } = await signedIn(99)
+    assert.equal((await accounts.buy(token, '없는것')).ok, false)
+  })
+
+  it('산 것만 걸칠 수 있다 — 안 산 겹은 기본으로 되돌린다', async () => {
+    const { accounts, token } = await signedIn(30)
+    await accounts.buy(token, 'bat')
+
+    const worn = await accounts.equip(token, { avatar: 'bat', banner: 'castle' })
+    assert.equal(worn.ok, true)
+    if (!worn.ok) return
+    assert.equal(worn.value.equipped.avatar, 'bat', '산 것은 걸친다')
+    assert.equal(worn.value.equipped.banner, DEFAULT_EQUIPPED.banner, '안 산 겹만 되돌아간다')
+  })
+
+  it('0원짜리는 사지 않아도 걸칠 수 있다', async () => {
+    const { accounts, token } = await signedIn(0)
+    const worn = await accounts.equip(token, { avatar: 'square' })
+    assert.equal(worn.ok, true)
+    if (!worn.ok) return
+    assert.equal(worn.value.equipped.avatar, 'square')
+  })
+
+  it('로그인하지 않았으면 사지도 걸치지도 못한다', async () => {
+    const accounts = new Accounts(null)
+    assert.equal((await accounts.buy('없는표', 'bat')).ok, false)
+    assert.equal((await accounts.equip('없는표', { avatar: 'bat' })).ok, false)
+  })
+
+  /*
+   * 밖에 남기지 못하면 사지 않은 것으로 둔다. 순서를 뒤집으면 「샀다」고 말해 놓고
+   * 서버가 다시 뜨는 순간 분배금만 깎인 채로 남는다.
+   */
+  it('밖에 남기지 못하면 사지 않은 것이 된다', async () => {
+    const { store, rows } = fake({
+      saveCosmetics: async () => {
+        throw new Error('저장소가 안 된다')
+      },
+    })
+    void rows
+    const accounts = new Accounts(store, { retryWaitMs: 1, holdMs: 1 })
+    const made = await accounts.signup('tk@example.com', 'pass1234', '태규')
+    assert.equal(made.ok, true)
+    if (!made.ok) return
+    const token = made.value.token
+    for (let at = 0; at < 30; at += 1) accounts.record(token, 'win', `heist-${at}`)
+
+    const bought = await accounts.buy(token, 'bat')
+    assert.equal(bought.ok, false)
+
+    const me = accounts.resume(token)
+    assert.equal(me.ok, true)
+    if (!me.ok) return
+    assert.deepEqual(me.value.cosmetics.owned, [], '가진 것이 없어야 한다')
+    assert.equal(me.value.cosmetics.spent, 0, '분배금도 그대로여야 한다')
   })
 })

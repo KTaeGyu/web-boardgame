@@ -14,7 +14,31 @@
  * 만들 만큼 의존성을 아낀다.
  */
 
+import { DEFAULT_EQUIPPED, type Cosmetics } from '@the-gang/shared'
+
 import { logLine } from './log.ts'
+
+/**
+ * 밖에서 돌아온 차림을 우리 모양으로.
+ *
+ * 저장소의 값은 우리가 마지막에 쓴 그대로가 아닐 수 있다 — 대시보드에서 손으로
+ * 고쳤을 수도, 옛 판이 남았을 수도 있다. 모양이 어긋나면 그 칸만 기본으로 두고
+ * 통째로 버리지 않는다. 「무엇을 걸칠 수 있는가」는 여기서 보지 않는다 —
+ * 그 판정은 표를 든 `sanitizeEquipped` 의 몫이다.
+ */
+function readCosmetics(value: unknown): Cosmetics | null {
+  if (!value || typeof value !== 'object') return null
+  const raw = value as { owned?: unknown; equipped?: unknown; spent?: unknown }
+  const owned = Array.isArray(raw.owned) ? raw.owned.filter((one) => typeof one === 'string') : []
+  const worn = (raw.equipped ?? {}) as Record<string, unknown>
+  const at = (key: keyof typeof DEFAULT_EQUIPPED) =>
+    typeof worn[key] === 'string' ? (worn[key] as string) : DEFAULT_EQUIPPED[key]
+  return {
+    owned,
+    equipped: { avatar: at('avatar'), bg: at('bg'), effect: at('effect'), banner: at('banner') },
+    spent: typeof raw.spent === 'number' && raw.spent >= 0 ? raw.spent : 0,
+  }
+}
 
 /** 밖에 남는 한 줄. 필드 이름이 Contentful 의 것과 같아야 해서 여기서 정한다. */
 export interface StoredAccount {
@@ -24,6 +48,14 @@ export interface StoredAccount {
   passwordSalt: string
   wins: number
   losses: number
+  /**
+   * 꾸미기 차림. **아직 아무것도 안 한 계정은 null 이다** — 옛 줄에는 이 칸이 없고,
+   * 없는 것과 기본 차림은 같은 뜻이라 굳이 채워 넣지 않는다.
+   *
+   * 네 겹을 각각 칸으로 두지 않고 한 칸에 묶는 것은, 겹이 늘 때마다 저장소 스키마를
+   * 손대지 않기 위해서다.
+   */
+  cosmetics: Cosmetics | null
 }
 
 export interface AccountStore {
@@ -35,6 +67,11 @@ export interface AccountStore {
   create(account: StoredAccount): Promise<void>
   /** 전적. 뒤에서 보내고 실패는 삼킨다. */
   saveRecord(email: string, wins: number, losses: number): Promise<void>
+  /**
+   * 꾸미기 차림. **전적과 달리 기다렸다가 성공을 확인한다** — 분배금이 걸려 있어
+   * 실패를 삼키면 값은 깎였는데 산 것이 없는 일이 난다.
+   */
+  saveCosmetics(email: string, cosmetics: Cosmetics): Promise<void>
 }
 
 const BASE = 'https://api.contentful.com'
@@ -135,19 +172,39 @@ class ContentfulAccounts implements AccountStore {
     this.refs.set(account.email, { id, version })
   }
 
+  async saveCosmetics(email: string, cosmetics: Cosmetics): Promise<void> {
+    await this.patch(email, (fields) => {
+      fields.cosmetics = { [this.locale]: cosmetics }
+    })
+  }
+
   async saveRecord(email: string, wins: number, losses: number): Promise<void> {
+    await this.patch(email, (fields) => {
+      fields.wins = { [this.locale]: wins }
+      fields.losses = { [this.locale]: losses }
+    })
+  }
+
+  /**
+   * 한 칸만 고쳐 다시 올린다.
+   *
+   * **부분 수정이 없어서 전체를 다시 실어야 한다.** 그래서 지금 값을 먼저 읽고,
+   * 고칠 칸만 얹어 통째로 올린다. 판(version)이 안 맞으면 Contentful 이 거절하므로
+   * 방금 읽은 판을 믿는다 — 우리가 들고 있던 것보다 새로울 수 있다.
+   */
+  private async patch(
+    email: string,
+    apply: (fields: Record<string, Record<string, unknown>>) => void,
+  ): Promise<void> {
     const ref = this.refs.get(email)
     if (!ref) throw new Error(`밖에 없는 계정이다: ${email}`)
 
-    // 고치는 것도 전체를 보낸다. 부분 수정이 없어서 지금 값을 다시 실어야 한다.
     const kept = (await this.send('GET', `/entries/${ref.id}`)) as {
       fields?: Record<string, Record<string, unknown>>
       sys?: { version?: number }
     }
     const fields = kept.fields ?? {}
-    fields.wins = { [this.locale]: wins }
-    fields.losses = { [this.locale]: losses }
-    // 방금 읽은 판이 우리가 들고 있던 것보다 새로울 수 있다. 그쪽을 믿는다.
+    apply(fields)
     if (typeof kept.sys?.version === 'number') ref.version = kept.sys.version
 
     const saved = (await this.send(
@@ -172,6 +229,7 @@ class ContentfulAccounts implements AccountStore {
         passwordSalt: at(account.passwordSalt),
         wins: at(account.wins),
         losses: at(account.losses),
+        ...(account.cosmetics ? { cosmetics: at(account.cosmetics) } : {}),
       },
     }
   }
@@ -218,6 +276,7 @@ class ContentfulAccounts implements AccountStore {
       passwordSalt,
       wins: typeof wins === 'number' ? wins : 0,
       losses: typeof losses === 'number' ? losses : 0,
+      cosmetics: readCosmetics(pick('cosmetics')),
     }
   }
 

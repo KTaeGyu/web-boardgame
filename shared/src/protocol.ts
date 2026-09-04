@@ -5,6 +5,7 @@
  * 타입 검사가 잡아준다. 이 파일이 서버와 화면 사이의 유일한 합의다.
  */
 
+import type { Cosmetics, Equipped } from './cosmetics.ts'
 import type { Card } from './cards.ts'
 import type { ChallengeId, SpecialistId } from './extraCards.ts'
 import { ALARMS_TO_LOSE, SPECIALIST_ROUNDS, VAULTS_TO_WIN } from './game.ts'
@@ -182,6 +183,13 @@ export interface PlayerView {
   isHost: boolean
   /** 끊긴 사람도 유예 시간 동안은 자리를 지킨다. 화면에는 흐리게 표시한다. */
   connected: boolean
+  /**
+   * 걸치고 있는 차림. **로그인한 사람만 있다** — 없으면 화면이 기본 차림으로 그린다.
+   *
+   * 판 화면(`GamePlayerView`)에는 싣지 않는다. 꾸미기는 대기실에서만 보이고,
+   * 판에서는 자리마다 봐야 할 것이 이미 많다.
+   */
+  equipped?: Equipped
 }
 
 /** 방 목록에 한 줄로 나가는 정보. */
@@ -281,6 +289,8 @@ export interface Session {
   /** 테이블에서 불릴 이름. **유일하지 않다** — 같은 이름이 둘 앉으면 [1] [2] 가 붙는다. */
   nickname: string
   record: PlayRecord
+  /** 산 것과 걸친 것. 분배금 잔액은 `balanceOf(record.wins, cosmetics.spent)` 다. */
+  cosmetics: Cosmetics
 }
 
 export const PASSWORD_MIN = 4
@@ -304,6 +314,13 @@ export interface Identity {
   /** 브라우저 sessionStorage 에 저장된 랜덤 id. 닉네임이 아니라 이것이 정체성이다. */
   playerId: string
   nickname: string
+  /**
+   * 로그인한 사람의 표. **꾸민 차림을 자리에 붙이려고 받는다.**
+   *
+   * 차림 자체를 화면이 보내지 않는 것은, 보내게 두면 사지 않은 것도 걸쳤다고 우길 수
+   * 있어서다. 표만 받고 값은 서버가 계정에서 꺼낸다. 게스트에게는 없다.
+   */
+  token?: string
 }
 
 /** 클라이언트 → 서버. 모두 ack 콜백으로 결과를 돌려받는다. */
@@ -350,7 +367,27 @@ export interface ClientToServerEvents {
     payload: { token: string; outcome: PlayOutcome; once: string },
     ack: (result: Result<PlayRecord>) => void,
   ) => void
+  /**
+   * 꾸미기 하나를 산다. 값은 분배금(= 이긴 판 − 쓴 값)으로 낸다.
+   *
+   * 가격표는 `shared` 에 한 벌이지만 **판정은 서버가 한다** — 화면이 든 표를 고쳐
+   * 부를 수 있으므로 잔액도 소유도 서버가 다시 센다.
+   */
+  'cosmetics:buy': (
+    payload: { token: string; id: string },
+    ack: (result: Result<Cosmetics>) => void,
+  ) => void
+  /** 걸치는 것을 바꾼다. 가지지 않은 겹은 서버가 기본으로 되돌린다. */
+  'cosmetics:equip': (
+    payload: { token: string; equipped: Partial<Equipped> },
+    ack: (result: Result<Cosmetics>) => void,
+  ) => void
   'room:settings': (payload: Partial<RoomSettings>, ack: (result: Result<RoomView>) => void) => void
+  /**
+   * 감정표현 하나. **이름표만 보낸다** — 무엇을 띄울지는 서버가 표에서 찾는다.
+   * 화면이 글자를 보내면 그것이 그대로 남의 화면에 뜬다.
+   */
+  'emote:send': (payload: { id: string }, ack: (result: Result<null>) => void) => void
   /** 방 목록 페이지에 머무는 동안 갱신을 받기 위해 구독한다. */
   'rooms:watch': (payload: { watching: boolean }) => void
 
@@ -449,6 +486,11 @@ export interface ServerToClientEvents {
   'room:closed': (payload: { reason: 'empty' | 'hostClosed' | 'rematchDeclined' | 'idle' }) => void
   /** 내보내진 사람에게만. 방이 닫힌 것과 구별해야 안내가 맞는다. */
   'room:kicked': (payload: { message: string }) => void
+  /**
+   * 누가 무엇을 표현했나. **잠깐 떴다 사라지는 사건이라 상태에 남지 않는다** —
+   * 뒤늦게 들어온 사람에게 지난 감정이 뜨지 않는다.
+   */
+  emote: (payload: { playerId: string; id: string }) => void
   /** 서버가 감당할 수 있는 인원을 넘겼다. 곧 연결이 끊긴다. */
   'server:full': (payload: { message: string }) => void
   'rooms:changed': (rooms: RoomSummary[]) => void

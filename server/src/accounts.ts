@@ -14,7 +14,14 @@
 
 import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto'
 import {
+  EMPTY_COSMETICS,
   NICKNAME_MAX,
+  balanceOf,
+  cosmeticOf,
+  owns,
+  sanitizeEquipped,
+  type Cosmetics,
+  type Equipped,
   PASSWORD_MAX,
   PASSWORD_MIN,
   normalizeEmail,
@@ -43,6 +50,13 @@ export interface Account {
   salt: string
   hash: string
   record: PlayRecord
+  /**
+   * 걸치고 있는 것과 산 것들.
+   *
+   * **분배금은 여기서만 줄어든다.** `record.wins` 는 누적이라 손대지 않는다 —
+   * 거기서 깎으면 많이 이기고 많이 쓴 사람의 전적이 0승이 된다.
+   */
+  cosmetics: Cosmetics
   /**
    * 이 판의 끝을 이미 셌는가.
    *
@@ -130,6 +144,7 @@ export class Accounts {
             salt: one.passwordSalt,
             hash: one.passwordHash,
             record: { wins: one.wins, losses: one.losses },
+            cosmetics: one.cosmetics ?? { ...EMPTY_COSMETICS },
             counted: new Set(),
           })
         }
@@ -178,6 +193,7 @@ export class Accounts {
       salt,
       hash: hash(password, salt),
       record: { ...EMPTY },
+      cosmetics: { ...EMPTY_COSMETICS },
       counted: new Set(),
     }
 
@@ -198,6 +214,8 @@ export class Accounts {
           passwordSalt: account.salt,
           wins: 0,
           losses: 0,
+          // 기본 차림은 없는 것과 같은 뜻이다. 굳이 채워 보내지 않는다.
+          cosmetics: null,
         })
       } catch (trouble) {
         logLine('error', '계정을 만들지 못했다', trouble)
@@ -259,6 +277,73 @@ export class Accounts {
   }
 
   /**
+   * 꾸미기 하나를 산다.
+   *
+   * **판정은 여기서 한다.** 가격표를 화면이 들고 있으므로 값을 고쳐 부를 수 있다 —
+   * 잔액도 소유도 서버가 표를 보고 다시 센다.
+   *
+   * **밖에 쓰고 성공을 확인한 뒤에야 메모리에 넣는다.** 전적과 반대다. 전적은 늦게
+   * 맞아도 되지만 이쪽은 분배금이 걸려 있어, 순서를 뒤집으면 「샀다」고 말해 놓고
+   * 서버가 다시 뜨는 순간 값만 깎인 채로 남는다.
+   */
+  async buy(token: string, id: string): Promise<Result<Cosmetics>> {
+    const account = this.find(token)
+    if (!account) return err('NOT_SIGNED_IN', '다시 로그인해 주세요.')
+
+    const item = cosmeticOf(id)
+    if (!item) return err('INVALID_SETTINGS', '없는 물건입니다.')
+    if (owns(account.cosmetics, id)) return err('INVALID_SETTINGS', '이미 가지고 있습니다.')
+
+    const left = balanceOf(account.record.wins, account.cosmetics.spent)
+    if (left < item.price) {
+      return err('INVALID_SETTINGS', `분배금이 ${item.price - left} 모자랍니다.`)
+    }
+
+    const next: Cosmetics = {
+      owned: [...account.cosmetics.owned, id],
+      equipped: { ...account.cosmetics.equipped },
+      spent: account.cosmetics.spent + item.price,
+    }
+    if (this.store) {
+      try {
+        await this.store.saveCosmetics(account.email, next)
+      } catch (trouble) {
+        logLine('error', `산 것을 남기지 못했다: ${account.email}`, trouble)
+        return err('INVALID_SETTINGS', '지금은 살 수 없습니다. 잠시 뒤에 다시 시도해 주세요.')
+      }
+    }
+    account.cosmetics = next
+    return ok({ ...next, owned: [...next.owned], equipped: { ...next.equipped } })
+  }
+
+  /**
+   * 걸치는 것을 바꾼다.
+   *
+   * 가지지 않은 것을 걸치려 하면 **그 겹만 기본으로 되돌린다**(`sanitizeEquipped`).
+   * 통째로 거절하지 않는 것은, 한 겹이 어긋났다고 나머지 세 겹까지 잃을 이유가 없어서다.
+   */
+  async equip(token: string, worn: Partial<Equipped>): Promise<Result<Cosmetics>> {
+    const account = this.find(token)
+    if (!account) return err('NOT_SIGNED_IN', '다시 로그인해 주세요.')
+
+    const wanted: Cosmetics = {
+      ...account.cosmetics,
+      equipped: { ...account.cosmetics.equipped, ...worn },
+    }
+    const next: Cosmetics = { ...wanted, equipped: sanitizeEquipped(wanted) }
+    if (this.store) {
+      try {
+        await this.store.saveCosmetics(account.email, next)
+      } catch (trouble) {
+        logLine('error', `차림을 남기지 못했다: ${account.email}`, trouble)
+        return err('INVALID_SETTINGS', '지금은 바꿀 수 없습니다. 잠시 뒤에 다시 시도해 주세요.')
+      }
+    }
+    account.cosmetics = next
+    return ok({ ...next, owned: [...next.owned], equipped: { ...next.equipped } })
+  }
+
+  /**
    * 전적을 밖으로 흘려보낸다. **사람은 기다리지 않는다.**
    *
    * 열 명이 앉은 판이 끝나면 쓰기 열 건이 한꺼번에 나가는데, CMA 는 초당 일곱 건쯤에서
@@ -314,6 +399,11 @@ export class Accounts {
       email: account.email,
       nickname: account.nickname,
       record: { ...account.record },
+      cosmetics: {
+        ...account.cosmetics,
+        owned: [...account.cosmetics.owned],
+        equipped: { ...account.cosmetics.equipped },
+      },
     }
   }
 
