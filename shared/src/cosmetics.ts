@@ -11,6 +11,14 @@
  * **그림은 여기 없다.** 여기 있는 것은 이름표뿐이고, 실제 그림은 화면이 그 이름표로
  * 찾아 그린다(`web/public/avatars/…`). 파일 경로를 값으로 저장하면 나중에 그림을
  * 갈 때 이미 저장된 차림이 죽는다.
+ *
+ * **값은 겹의 무게를 따른다**(한 판 이기면 1). 얼굴이 곧 그 사람이라 아바타가 제일
+ * 비싸고(20~50), 줄 전체를 덮는 배너가 그다음(22~35), 움직임인 이펙트(12~18),
+ * 색 하나인 아바타 배경이 제일 싸다(3~10). 눈에 띄는 크기 순서와 값 순서가 같아야
+ * 「비싼 것을 샀다」가 화면에서 보인다.
+ *
+ * 값이 짜거나 후하면 **이 표의 숫자만** 고치면 된다. 서버가 이 표로 판정하고 화면은
+ * 같은 표를 보여줄 뿐이라, 고친 순간 양쪽이 함께 갈린다.
  */
 
 /** 어느 겹인가. */
@@ -48,23 +56,23 @@ export const COSMETICS: CosmeticItem[] = [
   // 그림이 아니라 색이다. 아바타 뒤에 깔리는 작은 자리라 그림은 읽히지 않고,
   // 그림의 몫은 배너배경이 맡는다. 색이면 파일도 필요 없다.
   { id: 'slate', kind: 'bg', name: '무광 회색', price: 0 },
-  { id: 'crimson', kind: 'bg', name: '핏빛', price: 1 },
-  { id: 'forest', kind: 'bg', name: '숲빛', price: 1 },
-  { id: 'night', kind: 'bg', name: '한밤', price: 2 },
-  { id: 'gold', kind: 'bg', name: '금빛', price: 3 },
+  { id: 'crimson', kind: 'bg', name: '핏빛', price: 3 },
+  { id: 'forest', kind: 'bg', name: '숲빛', price: 3 },
+  { id: 'night', kind: 'bg', name: '한밤', price: 6 },
+  { id: 'gold', kind: 'bg', name: '금빛', price: 10 },
 
   // ── 이펙트 ────────────────────────────────
   { id: 'none-effect', kind: 'effect', name: '없음', price: 0 },
-  { id: 'flame', kind: 'effect', name: '불꽃', price: 4 },
-  { id: 'dash', kind: 'effect', name: '질주', price: 4 },
-  { id: 'petal', kind: 'effect', name: '벚꽃', price: 6 },
+  { id: 'flame', kind: 'effect', name: '불꽃', price: 12 },
+  { id: 'dash', kind: 'effect', name: '질주', price: 12 },
+  { id: 'petal', kind: 'effect', name: '벚꽃', price: 18 },
 
   // ── 배너 배경 ─────────────────────────────
   { id: 'none-banner', kind: 'banner', name: '없음', price: 0 },
-  { id: 'night-city', kind: 'banner', name: '밤의 도시', price: 8 },
-  { id: 'castle', kind: 'banner', name: '고성', price: 8 },
-  { id: 'blossom', kind: 'banner', name: '벚꽃길', price: 10 },
-  { id: 'vault', kind: 'banner', name: '금고', price: 12 },
+  { id: 'night-city', kind: 'banner', name: '밤의 도시', price: 22 },
+  { id: 'castle', kind: 'banner', name: '고성', price: 22 },
+  { id: 'blossom', kind: 'banner', name: '벚꽃길', price: 28 },
+  { id: 'vault', kind: 'banner', name: '금고', price: 35 },
 ]
 
 /** 지금 걸치고 있는 네 겹. */
