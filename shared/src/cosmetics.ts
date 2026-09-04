@@ -52,6 +52,9 @@ export const COSMETICS: CosmeticItem[] = [
   { id: 'spider', kind: 'avatar', name: '레드 웹', price: 32 },
   { id: 'dracula', kind: 'avatar', name: '블러드 로드', price: 40 },
   { id: 'driver', kind: 'avatar', name: '겟어웨이 드라이버', price: 50 },
+  // 치즈·토끼 두 갈래. 강도단 얼굴만 늘어놓으면 고를 결이 하나뿐이다.
+  { id: 'cheddar', kind: 'avatar', name: '체다', price: 22 },
+  { id: 'rabbit', kind: 'avatar', name: '화이트 래빗', price: 30 },
 
   // ── 프로필 배경 ───────────────────────────
   // 그림이 아니라 색이다. 아바타 뒤에 깔리는 작은 자리라 그림은 읽히지 않고,
@@ -63,12 +66,16 @@ export const COSMETICS: CosmeticItem[] = [
   { id: 'forest', kind: 'bg', name: '에메랄드', price: 3 },
   { id: 'night', kind: 'bg', name: '미드나잇', price: 6 },
   { id: 'gold', kind: 'bg', name: '앰버', price: 10 },
+  { id: 'mustard', kind: 'bg', name: '머스터드', price: 3 },
+  { id: 'carrot', kind: 'bg', name: '캐럿', price: 6 },
 
   // ── 이펙트 ────────────────────────────────
   { id: 'none-effect', kind: 'effect', name: '미장착', price: 0 },
   { id: 'flame', kind: 'effect', name: '플레임', price: 12 },
   { id: 'dash', kind: 'effect', name: '스피드 라인', price: 12 },
   { id: 'petal', kind: 'effect', name: '블로섬', price: 18 },
+  { id: 'melt', kind: 'effect', name: '멜팅', price: 12 },
+  { id: 'hop', kind: 'effect', name: '홉', price: 18 },
 
   // ── 배너 ──────────────────────────────────
   { id: 'none-banner', kind: 'banner', name: '미장착', price: 0 },
@@ -76,6 +83,8 @@ export const COSMETICS: CosmeticItem[] = [
   { id: 'castle', kind: 'banner', name: '고딕 캐슬', price: 22 },
   { id: 'blossom', kind: 'banner', name: '체리 블로섬', price: 28 },
   { id: 'vault', kind: 'banner', name: '더 볼트', price: 35 },
+  { id: 'cheese-factory', kind: 'banner', name: '치즈 팩토리', price: 22 },
+  { id: 'moonlit-hill', kind: 'banner', name: '문라이트 힐', price: 28 },
 ]
 
 /** 지금 장착 중인 슬롯 넷. */

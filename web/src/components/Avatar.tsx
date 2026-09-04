@@ -27,6 +27,8 @@ const BG_COLORS: Record<string, string> = {
   forest: 'linear-gradient(160deg, #4f8a5b, #23472c)',
   night: 'linear-gradient(160deg, #3b4a7a, #1a2140)',
   gold: 'linear-gradient(160deg, #d8b45a, #8a6a1e)',
+  mustard: 'linear-gradient(160deg, #b08a12, #453305)',
+  carrot: 'linear-gradient(160deg, #e8813a, #9c4a12)',
 }
 
 interface Props {

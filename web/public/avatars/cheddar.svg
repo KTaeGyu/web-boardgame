@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="체다">
+  <rect x="12" y="12" width="40" height="40" rx="9" fill="#f0b429" stroke="#7a5410" stroke-width="3"/>
+  <path d="M12 21h40v-0a9 9 0 0 0-9-9H21a9 9 0 0 0-9 9z" fill="#f7c95a"/>
+  <circle cx="19" cy="24" r="3" fill="#c98c12"/>
+  <circle cx="46" cy="21" r="2.3" fill="#c98c12"/>
+  <circle cx="18" cy="44" r="2.2" fill="#c98c12"/>
+  <circle cx="46.5" cy="43" r="3.2" fill="#c98c12"/>
+  <circle cx="26" cy="31" r="3.4" fill="#5a3d08"/>
+  <circle cx="40" cy="31" r="3.4" fill="#5a3d08"/>
+  <path d="M26 40q6 5 12 0" stroke="#5a3d08" stroke-width="3" stroke-linecap="round" fill="none"/>
+</svg>
