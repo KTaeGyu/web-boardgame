@@ -401,3 +401,97 @@ describe('코스메틱', () => {
     assert.equal(me.value.cosmetics.spent, 0, '골드도 그대로여야 한다')
   })
 })
+
+/**
+ * 같은 계정이 두 군데서 동시에 손댈 때.
+ *
+ * 화면의 잠금은 **그 창 안에서만 보인다.** 같은 계정을 두 창에 열면 서로를 모르므로,
+ * 막는 자리는 서버여야 한다. 여기서 쓰는 저장소는 **일부러 느리다** — 밖에 쓰는 동안
+ * 열리는 틈이 이 결함의 전부라, 저장소가 즉시 끝나면 재현되지 않는다.
+ */
+describe('꾸미기 동시 요청', () => {
+  /** 밖에 쓰는 데 시간이 걸리는 저장소. 운영의 Contentful 자리다. */
+  function slow(): AccountStore {
+    return {
+      loadAll: async () => [],
+      has: async () => false,
+      create: async () => {},
+      saveRecord: async () => {},
+      saveCosmetics: async () => {
+        await new Promise((done) => setTimeout(done, 5))
+      },
+    }
+  }
+
+  /** 원하는 만큼 이겨 둔 계정 하나. 저장소는 느린 것으로 준다. */
+  async function rich(wins: number) {
+    const accounts = new Accounts(slow(), { retryWaitMs: 1, holdMs: 1 })
+    const made = await accounts.signup('tk@example.com', 'pass1234', '태규')
+    assert.equal(made.ok, true)
+    if (!made.ok) throw new Error('unreachable')
+    const token = made.value.token
+    for (let at = 0; at < wins; at += 1) accounts.record(token, 'win', `heist-${at}`)
+    return { accounts, token }
+  }
+
+  function worn(accounts: Accounts, token: string) {
+    const me = accounts.resume(token)
+    assert.equal(me.ok, true)
+    if (!me.ok) throw new Error('unreachable')
+    return me.value.cosmetics
+  }
+
+  /*
+   * 「구매 완료」가 두 번 나가면 안 된다. 골드는 한 번만 깎이므로 손해는 없지만,
+   * 두 번 깎였다고 읽힌다 — 말이 값을 잘못 일러 주는 자리다.
+   */
+  it('같은 것을 동시에 사면 한 번만 성공한다', async () => {
+    const { accounts, token } = await rich(100)
+    const both = await Promise.all([accounts.buy(token, 'bat'), accounts.buy(token, 'bat')])
+
+    assert.equal(both.filter((one) => one.ok).length, 1, '한 쪽만 성공해야 한다')
+    const failed = both.find((one) => !one.ok)
+    if (failed && !failed.ok) assert.match(failed.message, /이미 보유한/)
+    assert.equal(worn(accounts, token).spent, 25)
+  })
+
+  /*
+   * 이쪽이 값을 잃는 자리다. 둘 다 자기가 읽은 값 위에 통째로 덮어쓰면, 나중에 끝난
+   * 쪽이 먼저 끝난 쪽을 지운다 — 「구매 완료」라고 답해 놓고 아이템도 골드도 없다.
+   */
+  it('다른 것을 동시에 사면 둘 다 남는다', async () => {
+    const { accounts, token } = await rich(100)
+    const both = await Promise.all([accounts.buy(token, 'bat'), accounts.buy(token, 'mask')])
+
+    assert.equal(both.every((one) => one.ok), true)
+    const after = worn(accounts, token)
+    assert.deepEqual([...after.owned].sort(), ['bat', 'mask'])
+    assert.equal(after.spent, 45)
+  })
+
+  /** 장착도 통째로 덮어쓴다. 줄 밖에 두면 그 사이에 끝난 구매를 지운다. */
+  it('사는 사이에 장착해도 구매가 지워지지 않는다', async () => {
+    const { accounts, token } = await rich(100)
+    const both = await Promise.all([
+      accounts.buy(token, 'bat'),
+      accounts.equip(token, { bg: 'slate' }),
+    ])
+
+    assert.equal(both.every((one) => one.ok), true)
+    const after = worn(accounts, token)
+    assert.deepEqual(after.owned, ['bat'])
+    assert.equal(after.spent, 25)
+  })
+
+  /** 잔액도 줄 안에서 다시 세야 한다. 밖에서 한 번만 보면 둘 다 통과한다. */
+  it('둘을 살 만큼은 없는 골드로 동시에 사면 한 쪽만 나간다', async () => {
+    // 30 골드. 「나이트 카울」 25 와 「섀도우 마스크」 20 을 함께는 못 산다.
+    const { accounts, token } = await rich(30)
+    const both = await Promise.all([accounts.buy(token, 'bat'), accounts.buy(token, 'mask')])
+
+    assert.equal(both.filter((one) => one.ok).length, 1, '한 쪽만 성공해야 한다')
+    const failed = both.find((one) => !one.ok)
+    if (failed && !failed.ok) assert.match(failed.message, /골드가 .* 부족합니다/)
+    assert.equal(worn(accounts, token).spent <= 30, true, '가진 것보다 더 쓸 수 없다')
+  })
+})

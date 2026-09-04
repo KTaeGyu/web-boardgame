@@ -104,6 +104,15 @@ export class Accounts {
   /** 아직 밖으로 못 보낸 전적. 이메일로 모아 두므로 같은 사람이 두 판 끝내도 한 번 나간다. */
   private pending = new Set<string>()
   private drain: ReturnType<typeof setTimeout> | null = null
+  /**
+   * 이메일마다 하나씩. **꾸미기 쓰기를 한 줄로 세운다.**
+   *
+   * `buy` 와 `equip` 은 지금 값을 읽고 → 밖에 쓰고(await) → 통째로 덮어쓴다. 그 사이가
+   * 열려 있어서, 같은 계정이 두 창에서 동시에 사면 나중에 끝난 쪽이 먼저 끝난 쪽을
+   * 지운다 — 「구매 완료」라고 답해 놓고 아이템도 없고 골드도 안 깎이는 자리가 난다.
+   * 한 창에서는 화면의 잠금이 막지만 **잠금은 그 창 안에서만 보인다.**
+   */
+  private chains = new Map<string, Promise<void>>()
   private retryWaitMs: number
   private holdMs: number
 
@@ -277,6 +286,29 @@ export class Accounts {
   }
 
   /**
+   * 한 계정의 꾸미기 쓰기를 줄 세운다.
+   *
+   * **판정을 이 안에서 다시 한다는 것이 요점이다.** 줄 밖에서 읽은 값은 내 차례가
+   * 올 때쯤 낡아 있다 — 앞사람이 이미 그것을 샀을 수도, 골드를 다 썼을 수도 있다.
+   *
+   * 앞사람이 넘어져도 뒷사람은 간다. 사슬에는 결과도 실패도 남기지 않는다.
+   */
+  private queue<T>(email: string, work: () => Promise<Result<T>>): Promise<Result<T>> {
+    const prior = this.chains.get(email) ?? Promise.resolve()
+    const run = prior.then(work, work)
+    const tail = run.then(
+      () => undefined,
+      () => undefined,
+    )
+    this.chains.set(email, tail)
+    // 다 지나간 줄은 치운다. 그사이 뒷사람이 붙었으면 그 줄을 건드리지 않는다.
+    void tail.then(() => {
+      if (this.chains.get(email) === tail) this.chains.delete(email)
+    })
+    return run
+  }
+
+  /**
    * 코스메틱 하나를 구매한다.
    *
    * **판정은 여기서 한다.** 가격표를 화면이 들고 있으므로 값을 고쳐 부를 수 있다 —
@@ -285,6 +317,8 @@ export class Accounts {
    * **밖에 쓰고 성공을 확인한 뒤에야 메모리에 넣는다.** 전적과 반대다. 전적은 늦게
    * 맞아도 되지만 이쪽은 골드가 걸려 있어, 순서를 뒤집으면 「구매 완료」라고 말해 놓고
    * 서버가 다시 뜨는 순간 골드만 깎인 채로 남는다.
+   *
+   * **줄을 서서 들어간다**(`queue`). 밖에 쓰는 동안 열리는 틈을 닫는다.
    */
   async buy(token: string, id: string): Promise<Result<Cosmetics>> {
     const account = this.find(token)
@@ -292,28 +326,32 @@ export class Accounts {
 
     const item = cosmeticOf(id)
     if (!item) return err('INVALID_SETTINGS', '존재하지 않는 아이템입니다.')
-    if (owns(account.cosmetics, id)) return err('INVALID_SETTINGS', '이미 보유한 아이템입니다.')
 
-    const left = balanceOf(account.record.wins, account.cosmetics.spent)
-    if (left < item.price) {
-      return err('INVALID_SETTINGS', `골드가 ${item.price - left} 부족합니다.`)
-    }
+    return this.queue(account.email, async () => {
+      // 줄을 선 사이에 앞사람이 사고 갔을 수 있다. 그래서 판정이 줄 안에 있다.
+      if (owns(account.cosmetics, id)) return err('INVALID_SETTINGS', '이미 보유한 아이템입니다.')
 
-    const next: Cosmetics = {
-      owned: [...account.cosmetics.owned, id],
-      equipped: { ...account.cosmetics.equipped },
-      spent: account.cosmetics.spent + item.price,
-    }
-    if (this.store) {
-      try {
-        await this.store.saveCosmetics(account.email, next)
-      } catch (trouble) {
-        logLine('error', `구매 내역을 남기지 못했다: ${account.email}`, trouble)
-        return err('INVALID_SETTINGS', '구매에 실패했습니다. 잠시 뒤에 다시 시도해 주세요.')
+      const left = balanceOf(account.record.wins, account.cosmetics.spent)
+      if (left < item.price) {
+        return err('INVALID_SETTINGS', `골드가 ${item.price - left} 부족합니다.`)
       }
-    }
-    account.cosmetics = next
-    return ok({ ...next, owned: [...next.owned], equipped: { ...next.equipped } })
+
+      const next: Cosmetics = {
+        owned: [...account.cosmetics.owned, id],
+        equipped: { ...account.cosmetics.equipped },
+        spent: account.cosmetics.spent + item.price,
+      }
+      if (this.store) {
+        try {
+          await this.store.saveCosmetics(account.email, next)
+        } catch (trouble) {
+          logLine('error', `구매 내역을 남기지 못했다: ${account.email}`, trouble)
+          return err('INVALID_SETTINGS', '구매에 실패했습니다. 잠시 뒤에 다시 시도해 주세요.')
+        }
+      }
+      account.cosmetics = next
+      return ok({ ...next, owned: [...next.owned], equipped: { ...next.equipped } })
+    })
   }
 
   /**
@@ -321,26 +359,31 @@ export class Accounts {
    *
    * 보유하지 않은 것을 장착하려 하면 **그 슬롯만 기본으로 되돌린다**(`sanitizeEquipped`).
    * 통째로 거절하지 않는 것은, 슬롯 하나가 어긋났다고 나머지 셋까지 잃을 이유가 없어서다.
+   *
+   * **구매와 같은 줄에 선다**(`queue`). 이쪽도 통째로 덮어쓰므로, 줄 밖에 두면 장착
+   * 하나가 그 사이에 끝난 구매를 지운다.
    */
   async equip(token: string, worn: Partial<Equipped>): Promise<Result<Cosmetics>> {
     const account = this.find(token)
     if (!account) return err('NOT_SIGNED_IN', '다시 로그인해 주세요.')
 
-    const wanted: Cosmetics = {
-      ...account.cosmetics,
-      equipped: { ...account.cosmetics.equipped, ...worn },
-    }
-    const next: Cosmetics = { ...wanted, equipped: sanitizeEquipped(wanted) }
-    if (this.store) {
-      try {
-        await this.store.saveCosmetics(account.email, next)
-      } catch (trouble) {
-        logLine('error', `차림을 남기지 못했다: ${account.email}`, trouble)
-        return err('INVALID_SETTINGS', '지금은 바꿀 수 없습니다. 잠시 뒤에 다시 시도해 주세요.')
+    return this.queue(account.email, async () => {
+      const wanted: Cosmetics = {
+        ...account.cosmetics,
+        equipped: { ...account.cosmetics.equipped, ...worn },
       }
-    }
-    account.cosmetics = next
-    return ok({ ...next, owned: [...next.owned], equipped: { ...next.equipped } })
+      const next: Cosmetics = { ...wanted, equipped: sanitizeEquipped(wanted) }
+      if (this.store) {
+        try {
+          await this.store.saveCosmetics(account.email, next)
+        } catch (trouble) {
+          logLine('error', `차림을 남기지 못했다: ${account.email}`, trouble)
+          return err('INVALID_SETTINGS', '지금은 바꿀 수 없습니다. 잠시 뒤에 다시 시도해 주세요.')
+        }
+      }
+      account.cosmetics = next
+      return ok({ ...next, owned: [...next.owned], equipped: { ...next.equipped } })
+    })
   }
 
   /**
