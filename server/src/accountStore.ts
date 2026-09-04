@@ -79,6 +79,14 @@ const CONTENT_TYPE = 'account'
 /** 한 번에 받아오는 최대치. 친구들끼리 쓰는 판이라 한 장이면 남는다. */
 const PAGE = 1000
 
+/**
+ * 한 번의 호출을 기다려 주는 시간.
+ *
+ * 넉넉히 둔다 — 짧으면 멀쩡한 쓰기가 끊겨 「구매에 실패했습니다」가 뜨고, 그쪽이 더 나쁘다.
+ * 여기서 끊는 목적은 빠른 실패가 아니라 **영영 매달리지 않는 것**이다.
+ */
+const REQUEST_TIMEOUT_MS = 20_000
+
 interface Ref {
   id: string
   /** 고칠 때 X-Contentful-Version 으로 돌려줘야 한다. 틀리면 409 로 막힌다. */
@@ -295,6 +303,11 @@ class ContentfulAccounts implements AccountStore {
     extra: Record<string, string> = {},
   ): Promise<unknown> {
     const url = `${BASE}/spaces/${this.space}/environments/${this.environment}${path}`
+    /*
+     * **기다림에 끝을 둔다.** 시간제한이 없으면 undici 기본값까지(수 분) 매달리는데,
+     * 구매·장착은 계정마다 한 줄로 서므로(`Accounts.queue`) 늘어진 한 건이 그 계정의
+     * 다음 것까지 붙잡는다. 여기서 끊으면 「잠시 뒤에 다시」로 돌아가고 줄이 풀린다.
+     */
     const answer = await fetch(url, {
       method,
       headers: {
@@ -303,6 +316,7 @@ class ContentfulAccounts implements AccountStore {
         ...extra,
       },
       body: body === undefined ? undefined : JSON.stringify(body),
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     })
 
     if (!answer.ok) {
