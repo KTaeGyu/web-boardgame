@@ -25,8 +25,8 @@ import { Link } from 'react-router-dom'
 import {
   DEFAULT_EQUIPPED,
   balanceOf,
-  cosmeticsOfKind,
   owns,
+  shopCosmetics,
   type CosmeticItem,
   type CosmeticKind,
   type Equipped,
@@ -157,7 +157,7 @@ export function LooksPage() {
               <h2 className="section-title">{layer.title}</h2>
               {/* 배너는 가로로 긴 것이라 좁은 칸에 넣으면 오른쪽 끝만 잘려 다 비슷해 보인다. */}
               <div className={`looks-grid ${layer.kind === 'banner' ? 'looks-grid--wide' : ''}`}>
-                {cosmeticsOfKind(layer.kind).map((item) => {
+                {shopCosmetics(layer.kind, me.cosmetics).map((item) => {
                   const mine = owns(me.cosmetics, item.id)
                   const on = worn[layer.slot] === item.id
                   const afford = mine || left >= item.price

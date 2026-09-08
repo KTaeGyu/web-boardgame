@@ -46,6 +46,17 @@ export interface CosmeticItem {
    * 아무것도 사지 않은 사람도 슬롯 넷을 다 채워야 하므로 슬롯마다 0골드짜리가 하나씩 있다.
    */
   price: number
+  /**
+   * **상점에서 못 산다.** 손으로 주는 것만 가질 수 있다(Contentful 의 `cosmetics` 칸에서
+   * `owned` 에 id 를 더한다).
+   *
+   * 목록에서도 빠진다 — 가진 사람에게만 보인다. 다 보이면 아무도 못 사는 칸이 늘 흐리게
+   * 남아 「언제 살 수 있나」를 묻게 된다.
+   *
+   * 이런 것에는 **값을 0으로 두면 안 된다.** 0은 「기본 지급」이라 모두의 것이 된다.
+   * 그래서 `owns` 가 이 표시를 함께 본다 — 값이 어떻든 준 사람만 갖는다.
+   */
+  grantOnly?: boolean
 }
 
 /**
@@ -71,7 +82,8 @@ export const COSMETICS: CosmeticItem[] = [
   { id: 'cat', kind: 'avatar', name: '캣 버글러', price: 40 },
   { id: 'dracula', kind: 'avatar', name: '블러드 로드', price: 42 },
   // 어깨가 상자 밖으로 나간다 — 망토와 같은 자리라 값도 같다.
-  { id: 'insider', kind: 'avatar', name: '인사이드 맨', price: 42 },
+  // 파는 물건이 아니라 주는 물건이라 목록에는 안 선다.
+  { id: 'insider', kind: 'avatar', name: '잉웅', price: 42, grantOnly: true },
 
   // ── 프로필 배경 ───────────────────────────
   // 그림이 아니라 색이다. 아바타 뒤에 깔리는 작은 자리라 그림은 읽히지 않고,
@@ -164,11 +176,25 @@ export function balanceOf(wins: number, spent: number): number {
   return Math.max(0, wins - spent)
 }
 
-/** 보유했는가. 0골드짜리는 사지 않아도 늘 보유한 것이다 — 그래야 기본 차림이 성립한다. */
+/**
+ * 보유했는가. 0골드짜리는 사지 않아도 늘 보유한 것이다 — 그래야 기본 차림이 성립한다.
+ *
+ * **선물 전용은 그 길로 새지 않는다.** 값이 0으로 적혀 있어도 받은 사람만 가진 것이다.
+ */
 export function owns(cosmetics: Cosmetics, id: string): boolean {
   const item = cosmeticOf(id)
   if (!item) return false
-  return item.price === 0 || cosmetics.owned.includes(id)
+  return (item.price === 0 && !item.grantOnly) || cosmetics.owned.includes(id)
+}
+
+/**
+ * 상점에 늘어놓을 것.
+ *
+ * `cosmeticsOfKind` 와 갈라 두는 것은, **표에 있는 것과 팔 것이 같지 않아서다.**
+ * 선물 전용은 가진 사람에게만 선다 — 안 보이면 받고도 걸칠 길이 없다.
+ */
+export function shopCosmetics(kind: CosmeticKind, cosmetics: Cosmetics): CosmeticItem[] {
+  return cosmeticsOfKind(kind).filter((item) => !item.grantOnly || owns(cosmetics, item.id))
 }
 
 /**

@@ -326,6 +326,8 @@ export class Accounts {
 
     const item = cosmeticOf(id)
     if (!item) return err('INVALID_SETTINGS', '존재하지 않는 아이템입니다.')
+    // 파는 물건이 아니다. 화면 목록에도 없지만 요청은 손으로 만들 수 있다.
+    if (item.grantOnly) return err('INVALID_SETTINGS', '상점에서 살 수 없는 아이템입니다.')
 
     return this.queue(account.email, async () => {
       // 줄을 선 사이에 앞사람이 사고 갔을 수 있다. 그래서 판정이 줄 안에 있다.

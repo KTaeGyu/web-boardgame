@@ -7,7 +7,15 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 
-import { DEFAULT_EQUIPPED, balanceOf, cosmeticOf } from '@the-gang/shared'
+import {
+  DEFAULT_EQUIPPED,
+  EMPTY_COSMETICS,
+  balanceOf,
+  cosmeticOf,
+  owns,
+  sanitizeEquipped,
+  shopCosmetics,
+} from '@the-gang/shared'
 
 import { Accounts } from '../src/accounts.ts'
 import type { AccountStore, StoredAccount } from '../src/accountStore.ts'
@@ -376,6 +384,41 @@ describe('코스메틱', () => {
     assert.equal(worn.ok, true)
     if (!worn.ok) return
     assert.equal(worn.value.equipped.avatar, 'square')
+  })
+
+  /*
+   * 선물 전용 — 파는 물건이 아니라 주는 물건이다.
+   *
+   * 상점 목록에 없으니 화면에서는 누를 수 없지만, 요청은 손으로 만들 수 있다.
+   * 막는 자리가 서버여야 하는 이유가 그것뿐이다.
+   */
+  it('선물 전용은 골드가 넘쳐도 살 수 없다', async () => {
+    const { accounts, token } = await signedIn(999)
+    const bought = await accounts.buy(token, 'insider')
+    assert.equal(bought.ok, false)
+    if (!bought.ok) assert.match(bought.message, /상점에서 살 수 없는/)
+  })
+
+  /** 값이 0이 아니어야 하는 이유. 0이면 「기본 지급」으로 새어 모두의 것이 된다. */
+  it('선물 전용은 받기 전에는 가진 것이 아니다', async () => {
+    assert.equal(owns(EMPTY_COSMETICS, 'insider'), false)
+    assert.equal(
+      shopCosmetics('avatar', EMPTY_COSMETICS).some((one) => one.id === 'insider'),
+      false,
+      '못 받은 사람의 상점에는 서지 않는다',
+    )
+  })
+
+  /** 밖에서 손으로 넣어 주면(Contentful 의 owned) 그때부터 가진 것이고 걸칠 수 있다. */
+  it('선물받으면 목록에 서고 걸칠 수 있다', async () => {
+    const given = { ...EMPTY_COSMETICS, owned: ['insider'] }
+    assert.equal(owns(given, 'insider'), true)
+    assert.equal(
+      shopCosmetics('avatar', given).some((one) => one.id === 'insider'),
+      true,
+      '받은 사람에게는 보여야 걸칠 수 있다',
+    )
+    assert.equal(sanitizeEquipped({ ...given, equipped: { ...DEFAULT_EQUIPPED, avatar: 'insider' } }).avatar, 'insider')
   })
 
   it('로그인하지 않았으면 사지도 걸치지도 못한다', async () => {
