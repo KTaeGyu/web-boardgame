@@ -70,6 +70,8 @@ export const COSMETICS: CosmeticItem[] = [
   // 토끼와 같은 종류의 변화(귀가 상자 밖으로)라 값도 나란히 둔다.
   { id: 'cat', kind: 'avatar', name: '캣 버글러', price: 40 },
   { id: 'dracula', kind: 'avatar', name: '블러드 로드', price: 42 },
+  // 어깨가 상자 밖으로 나간다 — 망토와 같은 자리라 값도 같다.
+  { id: 'insider', kind: 'avatar', name: '인사이드 맨', price: 42 },
 
   // ── 프로필 배경 ───────────────────────────
   // 그림이 아니라 색이다. 아바타 뒤에 깔리는 작은 자리라 그림은 읽히지 않고,
