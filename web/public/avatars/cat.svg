@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="캣 버글러">
+  <!--
+    귀는 상자 위로 솟는다. 토끼와 같은 이유다 — 30px 자리에서 고양이를 고양이로
+    만드는 것은 이목구비가 아니라 이 실루엣이다.
+  -->
+  <g fill="#f7f3ec" stroke="#3b3222" stroke-width="3" stroke-linejoin="round">
+    <path d="M17.5 22 19.5 6.5 30 17.5Z"/>
+    <path d="M46.5 22 44.5 6.5 34 17.5Z"/>
+  </g>
+  <path d="M20.8 18.6 21.6 11.5 26.4 16.4Z" fill="#f0a8c0"/>
+  <path d="M43.2 18.6 42.4 11.5 37.6 16.4Z" fill="#f0a8c0"/>
+  <rect x="12" y="16" width="40" height="36" rx="13" fill="#f7f3ec" stroke="#3b3222" stroke-width="3"/>
+  <!-- 볼. 수염이 그 위를 지난다 — 원본이 그렇게 겹쳐 있다. -->
+  <ellipse cx="18.5" cy="39.5" rx="4.2" ry="2.9" fill="#f6b7c8"/>
+  <ellipse cx="45.5" cy="39.5" rx="4.2" ry="2.9" fill="#f6b7c8"/>
+  <!-- 눈. 큰 검은 알에 아래쪽만 파랗고, 왼쪽 위에 반짝임 하나. -->
+  <g>
+    <ellipse cx="24" cy="32" rx="5" ry="6.4" fill="#24202b"/>
+    <ellipse cx="24" cy="34.4" rx="3.3" ry="3.1" fill="#4fc3e8"/>
+    <circle cx="21.9" cy="29.2" r="1.7" fill="#ffffff"/>
+  </g>
+  <g>
+    <ellipse cx="40" cy="32" rx="5" ry="6.4" fill="#24202b"/>
+    <ellipse cx="40" cy="34.4" rx="3.3" ry="3.1" fill="#4fc3e8"/>
+    <circle cx="37.9" cy="29.2" r="1.7" fill="#ffffff"/>
+  </g>
+  <path d="M32 35.6 29.4 38.4h5.2Z" fill="#f0a8c0"/>
+  <path d="M26.8 41.8q2.6 3.2 5.2 0 2.6 3.2 5.2 0" stroke="#24202b" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <g stroke="#24202b" stroke-width="2" stroke-linecap="round">
+    <path d="M13.6 36.6h4.8M13.2 41.6h4.8"/>
+    <path d="M50.4 36.6h-4.8M50.8 41.6h-4.8"/>
+  </g>
+</svg>

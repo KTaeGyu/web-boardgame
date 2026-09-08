@@ -65,8 +65,10 @@ export const COSMETICS: CosmeticItem[] = [
   { id: 'cheddar', kind: 'avatar', name: '체다', price: 34 },
   { id: 'driver', kind: 'avatar', name: '겟어웨이 드라이버', price: 36 },
   { id: 'spider', kind: 'avatar', name: '레드 웹', price: 38 },
-  // 귀와 망토는 상자 밖으로 나간다 — 실루엣이 바뀌는 둘이라 제일 비싸다.
+  // 귀와 망토는 상자 밖으로 나간다 — 실루엣이 바뀌는 셋이라 제일 비싸다.
   { id: 'rabbit', kind: 'avatar', name: '화이트 래빗', price: 40 },
+  // 토끼와 같은 종류의 변화(귀가 상자 밖으로)라 값도 나란히 둔다.
+  { id: 'cat', kind: 'avatar', name: '캣 버글러', price: 40 },
   { id: 'dracula', kind: 'avatar', name: '블러드 로드', price: 42 },
 
   // ── 프로필 배경 ───────────────────────────
