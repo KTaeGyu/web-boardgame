@@ -154,6 +154,47 @@ export function EmoteBubble({ emote }: { emote?: LiveEmote }) {
 }
 
 /**
+ * 덮개 위로 떠오르는 층.
+ *
+ * 전원이 보는 창(카드 고르기처럼 **사람 줄이 없는 것**)이 떠 있는 동안에는 자리도
+ * 그 위의 말풍선도 가려진다. 그때만 이 층이 대신 받는다 — 창 위에 말풍선으로 뜨고,
+ * 누구의 말인지 알아야 하므로 이름을 함께 적는다(자리에서는 자리가 곧 이름표였다).
+ *
+ * 사람 줄이 있는 창(스캔·결과)은 그 줄 위에 그대로 띄우므로 이 층을 쓰지 않는다.
+ */
+export function EmoteLayer({
+  live,
+  nameOf,
+}: {
+  live: LiveEmotes
+  nameOf: (playerId: string) => string | undefined
+}) {
+  const rows = Object.entries(live)
+  if (rows.length === 0) return null
+
+  return (
+    <div className="emote-layer">
+      {rows.map(([playerId, emote]) => {
+        const found = emoteOf(emote.id)
+        if (!found) return null
+        return (
+          <span
+            /* 번호를 키에 넣어 다시 붙인다 — 연달아 온 것이 한 번으로 읽히지 않게. */
+            key={`${playerId}:${emote.key}`}
+            className={`emote-say ${emote.state === 'out' ? 'emote-say--out' : ''}`}
+          >
+            <span className="emote-say__who">{nameOf(playerId) ?? '누군가'}</span>
+            <span className="emote-say__what" role="img" aria-label={found.name}>
+              {found.emoji}
+            </span>
+          </span>
+        )
+      })}
+    </div>
+  )
+}
+
+/**
  * 고르는 단추.
  *
  * 접혀 있다가 누르면 목록이 펼쳐지고, 하나 고르면 보내고 접힌다. **한 번 더 묻지

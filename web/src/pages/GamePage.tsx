@@ -17,7 +17,14 @@ import {
 
 import { recordPlay, session } from '../lib/auth.ts'
 import { Chat } from '../components/Chat.tsx'
-import { EmoteBubble, EmotePicker, useEmotes, type LiveEmote } from '../components/Emotes.tsx'
+import {
+  EmoteBubble,
+  EmoteLayer,
+  EmotePicker,
+  useEmotes,
+  type LiveEmote,
+  type LiveEmotes,
+} from '../components/Emotes.tsx'
 import { ExtrasDrawer, NoteCard, type CardNote } from '../components/ExtrasDrawer.tsx'
 import { ScanVote } from '../components/ScanVote.tsx'
 import { Toast } from '../components/Toast.tsx'
@@ -1002,6 +1009,20 @@ export function GamePage({ spectating = false }: { spectating?: boolean } = {}) 
       */}
       {/* 연습판에는 상대가 없다. 보낼 곳이 없는 단추를 두지 않는다. */}
       {!tutorial && <EmotePicker onPick={emotes.send} />}
+
+      {/*
+        사람 줄이 없는 덮개(카드 고르기·버리기)가 떠 있는 동안.
+
+        자리도 그 위의 말풍선도 창에 가려 갈 곳이 없으므로 창 위의 층이 대신 받는다.
+        스캔·결과는 사람 줄이 있어 그 줄에 그대로 뜬다 — 두 군데에 겹쳐 뜨지 않게
+        여기서 가른다.
+      */}
+      {!tutorial && (game.phase === 'setup' || game.discardingId === playerId) && (
+        <EmoteLayer
+          live={emotes.live}
+          nameOf={(id) => game.players.find((player) => player.id === id)?.displayName}
+        />
+      )}
       {!tutorial && <Chat code={code} />}
 
       {fresh && <NoteCard note={fresh} onClose={() => setFresh(null)} />}
@@ -1017,6 +1038,7 @@ export function GamePage({ spectating = false }: { spectating?: boolean } = {}) 
       <ScanVote
         game={game}
         playerId={playerId}
+        emotes={emotes.live}
         onVote={(kind, value) => void call('game:scanVote', { kind, value })}
       />
 
@@ -1029,6 +1051,7 @@ export function GamePage({ spectating = false }: { spectating?: boolean } = {}) 
           iAmHost={iAmHost}
           tutorial={tutorial}
           spectating={spectating}
+          emotes={emotes.live}
           onLeave={() => setConfirmLeave(true)}
         />
       )}
@@ -1224,6 +1247,8 @@ interface ShowdownProps {
   tutorial: boolean
   /** 자리 없이 보고만 있다. 판을 넘기는 것은 앉은 사람들이 정할 일이다. */
   spectating: boolean
+  /** 지금 떠 있는 한 마디들. 결과가 화면을 덮는 동안에는 이 줄이 그 사람의 자리다. */
+  emotes: LiveEmotes
   onLeave: () => void
 }
 
@@ -1235,6 +1260,7 @@ function Showdown({
   iAmHost,
   tutorial,
   spectating,
+  emotes,
   onLeave,
 }: ShowdownProps) {
   const navigate = useNavigate()
@@ -1344,6 +1370,13 @@ function Showdown({
                 onMouseEnter={() => done && setHovered(reveal.playerId)}
                 onMouseLeave={() => setHovered(null)}
               >
+                {/*
+                  줄 오른쪽 끝에 뜬다. 가운데는 카드가 차지하고, 이름 칸에는
+                  overflow 가 걸려 있어 말풍선이 잘린다.
+                */}
+                <span className="reveal__emote">
+                  <EmoteBubble emote={emotes[reveal.playerId]} />
+                </span>
                 <span className="reveal__token">{reveal.token}</span>
                 <span className="reveal__name">
                   {seat?.displayName}

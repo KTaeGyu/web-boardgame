@@ -1,6 +1,7 @@
 import { CATEGORY_LABEL, RANKS, ROUNDS, rankLabel, type GameView, type ScanQuestion } from '@the-gang/shared'
 
 import { CommunityBoard } from './Board.tsx'
+import { EmoteBubble, type LiveEmotes } from './Emotes.tsx'
 
 import { useEscapeBlock } from '../lib/useEscape.ts'
 import { useScrollLock } from '../lib/useScrollLock.ts'
@@ -9,6 +10,8 @@ import { Token, TokenBlank } from './Token.tsx'
 interface Props {
   game: GameView
   playerId: string
+  /** 지금 떠 있는 한 마디들. 이 창이 자리를 덮고 있어, 여기서는 이 줄이 그 사람의 자리다. */
+  emotes: LiveEmotes
   onVote: (kind: 'rank' | 'category', value: number) => void
 }
 
@@ -37,7 +40,7 @@ function label(kind: 'rank' | 'category', value: number): string {
  * 표가 서로 보이는 것이 핵심이다. 말을 주고받을 수 없으니, 남이 무엇을 골랐는지
  * 보면서 옮겨가야 만장일치에 닿는다. 물음이 둘이면 둘 다 맞혀야 넘어간다.
  */
-export function ScanVote({ game, playerId, onVote }: Props) {
+export function ScanVote({ game, playerId, emotes, onVote }: Props) {
   const scan = game.scan
   // 훅은 조건부로 부를 수 없다. 이른 return 앞에서 「지금 덮고 있는가」로 가른다.
   useScrollLock(scan !== null && game.phase === 'scanning')
@@ -95,6 +98,12 @@ export function ScanVote({ game, playerId, onVote }: Props) {
                 key={player.id}
                 className={`scan-track ${player.id === scan.targetId ? 'scan-track--target' : ''}`}
               >
+                {/*
+                  이름 칸이 아니라 줄에 붙인다 — 그쪽은 긴 이름을 자르려고 overflow 가
+                  걸려 있어 말풍선이 통째로 잘린다. 이름과 토큰이 양끝으로 벌어져
+                  가운데가 비어 있으므로 그 자리에 뜬다.
+                */}
+                <EmoteBubble emote={emotes[player.id]} />
                 <span className="scan-track__name">
                   {player.displayName}
                   {player.id === scan.targetId && <span className="scan-track__badge">스캔 대상</span>}

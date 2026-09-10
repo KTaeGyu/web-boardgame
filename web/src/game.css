@@ -672,6 +672,126 @@
 }
 
 /*
+ * 덮개 위로 떠오르는 한 마디.
+ *
+ * 전원이 보는 창이 뜨면 자리도 그 위의 말풍선도 가려진다. 사람 줄이 없는 창(카드
+ * 고르기)에서는 이 층이 대신 받는다 — 감정표현 단추 바로 위에서 오르므로 「눌러서 나온
+ * 것」으로 읽히고, 창 안의 단추(넘기기·외웠습니다)와 겹치지 않는다.
+ *
+ * 층은 모달(--z-modal)보다 위, 대화(--z-chat)보다 아래다. 말풍선이 대화창을 덮으면
+ * 정작 쓰던 줄이 가려진다.
+ */
+.emote-layer {
+  position: fixed;
+  right: 16px;
+  bottom: 88px;
+  z-index: var(--z-emote);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  /* 창을 덮고 서 있으므로 누르는 것을 가로채지 않는다. */
+  pointer-events: none;
+}
+
+.emote-say {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: min(70vw, 260px);
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--tip-bg, var(--card));
+  box-shadow: 0 8px 24px rgba(var(--shadow-rgb), 0.5);
+  transform-origin: bottom right;
+  animation: emote-say-in 0.28s cubic-bezier(0.2, 1.4, 0.4, 1) backwards;
+}
+
+/* 꼬리. 아래 오른쪽에서 단추 쪽을 가리켜 말풍선으로 읽힌다. */
+.emote-say::after {
+  content: '';
+  position: absolute;
+  right: 18px;
+  bottom: -5px;
+  width: 9px;
+  height: 9px;
+  background: inherit;
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  transform: rotate(45deg);
+}
+
+/* 자리에서는 자리가 곧 이름표였다. 여기서는 누구인지 적어야 안다. */
+.emote-say__who {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--ink-dim);
+}
+
+.emote-say__what {
+  flex: none;
+  font-size: 20px;
+  line-height: 1.1;
+}
+
+.emote-say--out {
+  animation-name: emote-say-out;
+  animation-duration: 0.17s;
+  animation-timing-function: ease-in;
+  animation-fill-mode: forwards;
+}
+
+@keyframes emote-say-in {
+  from {
+    transform: translateY(6px) scale(0.6);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes emote-say-out {
+  from {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+  to {
+    transform: translateY(6px) scale(0.6);
+    opacity: 0;
+  }
+}
+
+/*
+ * 사람 줄이 있는 창에서는 그 줄이 그 사람의 자리다.
+ *
+ * 스캔은 이름과 토큰이 양끝으로 벌어져 가운데가 비어 있어 그 자리에 그대로 뜬다.
+ * 결과는 가운데를 카드가 차지하므로 줄 오른쪽 끝에 붙인다 — 빈 자리(reveal__emote)를
+ * 하나 두고 그것을 기준으로 뜨게 해서, 자리에서 쓰는 오르내림을 그대로 쓴다.
+ */
+.scan-track {
+  position: relative;
+}
+
+.reveal {
+  position: relative;
+}
+
+.reveal__emote {
+  position: absolute;
+  top: 50%;
+  right: 26px;
+  width: 0;
+  height: 0;
+}
+
+/*
  * 판의 자리에서는 **자리 위로** 떠오른다.
  *
  * 대기실 줄은 가로라 이름 옆에 빈 칸을 두었지만, 자리는 세로라 옆에 둘 자리가 없다.
@@ -2559,6 +2679,11 @@ button.token:hover:not(:disabled) {
 
   .chat-peek {
     bottom: calc(122px + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* 단추가 확정 바 위로 올라간 만큼 말풍선도 함께 오른다. */
+  .emote-layer {
+    bottom: calc(180px + env(safe-area-inset-bottom, 0px));
   }
 
   .chat {
