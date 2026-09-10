@@ -608,8 +608,9 @@ describe('방 설정', () => {
   })
 
   it('없는 카드는 뺄 수 없고, 같은 카드를 두 번 담아도 하나로 선다', () => {
-    assert.equal(ctx.store.updateSettings('p1', { excludedChallenges: [999] }).ok, false)
-    assert.equal(ctx.store.updateSettings('p1', { excludedSpecialists: [99] }).ok, false)
+    // 표에 없는 번호. 화면에서는 올 수 없지만 계약은 방에 있으므로 여기서 막는다.
+    assert.equal(ctx.store.updateSettings('p1', { excludedChallenges: [999 as never] }).ok, false)
+    assert.equal(ctx.store.updateSettings('p1', { excludedSpecialists: [99 as never] }).ok, false)
     const twice = ctx.store.updateSettings('p1', { excludedSpecialists: [10, 10, 9] })
     assert.equal(twice.ok, true)
     if (twice.ok) assert.deepEqual(twice.value.settings.excludedSpecialists, [9, 10])

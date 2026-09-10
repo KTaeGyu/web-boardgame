@@ -868,10 +868,14 @@ a.btn {
     bottom: 0;
   }
 
+  /*
+   * 새 말 한 줄도 단추 «위»에 선다. 줄 안에서 왼쪽으로 밀면 그 자리가 감정표현
+   * 단추 자리라, 말이 올 때마다 그것이 가려져 누를 수 없었다.
+   */
   .room-footer .chat-peek {
     position: absolute;
-    right: 64px;
-    bottom: 6px;
+    right: 0;
+    bottom: 56px;
   }
 }
 
@@ -3030,14 +3034,15 @@ body.scroll-locked {
 }
 
 /*
- * 펼친 목록. 흐름 밖으로 띄운다 — 자리를 밀어내면 고를 때마다 아래의 설정들이
- * 통째로 오르내려서, 무엇을 고르는 중이었는지 눈이 놓친다.
+ * 펼친 목록. **화면에 띄운다**(fixed) — 자리와 폭은 컴포넌트가 단추를 재서 넣는다.
+ *
+ * 흐름 밖으로 내보내는 것은 두 가지 때문이다. 자리를 밀어내면 고를 때마다 아래의
+ * 설정들이 통째로 오르내려 무엇을 고르는 중이었는지 눈이 놓치고, 카드 «안»에 두면
+ * 넓은 화면의 설정 카드(`.room-body > .panel { overflow-y: auto }`)에 갇혀 잘리면서
+ * 없던 스크롤바가 생긴다. 말풍선(.card-tip)이 이미 같은 이유로 화면 좌표를 쓴다.
  */
 .picklist__menu {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: calc(100% + 6px);
+  position: fixed;
   z-index: var(--z-menu);
   margin: 0;
   padding: 4px;

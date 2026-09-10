@@ -41,6 +41,33 @@ export function PickList({ label, hint, options, picked, disabled, onPick }: Pro
   const { tip, handlers, hide } = useCardTip()
   const current = options.find((option) => option.id === picked) ?? options[0]
 
+  /**
+   * 펼친 목록이 설 자리. 화면 좌표다.
+   *
+   * **흐름이 아니라 화면에 띄운다**(position: fixed). 넓은 화면의 대기실은 설정 카드가
+   * 제 안에서 스크롤하는데(`.room-body > .panel { overflow-y: auto }`), 목록을 카드
+   * 안에 두면 두 가지가 한꺼번에 난다 — 카드 밖으로 나가지 못해 잘리고, 카드의 스크롤
+   * 길이를 늘려 고를 때마다 없던 스크롤바가 생긴다.
+   *
+   * 말풍선(card-tip)이 이미 같은 이유로 화면 좌표를 쓴다. 같은 어법을 따른다.
+   */
+  const [spot, setSpot] = useState<{ left: number; width: number; top?: number; bottom?: number } | null>(
+    null,
+  )
+
+  const place = useCallback(() => {
+    const rect = box.current?.getBoundingClientRect()
+    if (!rect) return
+    const below = window.innerHeight - rect.bottom
+    // 아래가 좁고 위가 더 넓으면 위로 편다. 목록이 길 때 화면 밖으로 흘러내리지 않게.
+    const flip = below < 220 && rect.top > below
+    setSpot({
+      left: rect.left,
+      width: rect.width,
+      ...(flip ? { bottom: window.innerHeight - rect.top + 6 } : { top: rect.bottom + 6 }),
+    })
+  }, [])
+
   /*
    * Esc 는 **줄에 세워서** 받는다(`useEscape`). 전에는 여기서 문서에 직접 매달아,
    * 화면이 매단 것과 함께 울려 목록이 닫히면서 「방을 나가시겠습니까?」가 떴다.
@@ -66,6 +93,25 @@ export function PickList({ label, hint, options, picked, disabled, onPick }: Pro
       document.removeEventListener('mousedown', away)
     }
   }, [open])
+
+  /*
+   * 펼쳐 둔 동안 자리를 따라다닌다.
+   *
+   * 스크롤은 **capture 로** 듣는다 — 밀리는 것이 창이 아니라 설정 카드일 수 있고,
+   * 그 스크롤은 window 까지 올라오지 않는다. 자리를 안 고치면 목록만 제자리에 남아
+   * 엉뚱한 곳에 뜬 채로 있는다.
+   */
+  useEffect(() => {
+    if (!open) return
+    place()
+    const again = () => place()
+    window.addEventListener('resize', again)
+    window.addEventListener('scroll', again, true)
+    return () => {
+      window.removeEventListener('resize', again)
+      window.removeEventListener('scroll', again, true)
+    }
+  }, [open, place])
 
   // 방장이 아니게 되는 순간(방장을 넘겨줬을 때) 펼쳐둔 채로 남지 않게 한다.
   useEffect(() => {
@@ -109,8 +155,8 @@ export function PickList({ label, hint, options, picked, disabled, onPick }: Pro
           </span>
         </button>
 
-        {open && (
-          <ul className="picklist__menu" role="listbox" aria-label={label}>
+        {open && spot && (
+          <ul className="picklist__menu" role="listbox" aria-label={label} style={spot}>
             {options.map((option) => {
               const on = option.id === picked
               return (
