@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="팀버 클럽">
+  <!--
+    얼굴이 상자가 아니라 **방망이**다. 위로 가느다란 손잡이가 솟고 아래가 통으로
+    부푼다 — 30px 에서 이것을 이것으로 만드는 것은 이목구비가 아니라 그 실루엣이다.
+    그래서 다른 아홉 장의 `rx 9` 정사각을 여기서는 쓰지 않는다.
+
+    손잡이와 팔은 몸통 **뒤에** 둔다. 앞에 두면 이음매가 보여 붙여 놓은 것으로 읽힌다.
+  -->
+  <rect x="27.6" y="4.5" width="8.8" height="20" rx="3.6" fill="#b87c3c" stroke="#3b3222" stroke-width="3"/>
+
+  <g stroke="#3b3222" stroke-width="3.2" stroke-linecap="round">
+    <path d="M20 38 7.5 45"/>
+    <path d="M44 38 56.5 45"/>
+  </g>
+  <circle cx="7.5" cy="45" r="3.1" fill="#cf9552" stroke="#3b3222" stroke-width="2.4"/>
+  <circle cx="56.5" cy="45" r="3.1" fill="#cf9552" stroke="#3b3222" stroke-width="2.4"/>
+
+  <path
+    d="M32 19.5C22 21 15.5 29 15.5 39.5a16.5 16.5 0 0 0 33 0C48.5 29 42 21 32 19.5Z"
+    fill="#cf9552"
+    stroke="#3b3222"
+    stroke-width="3"
+    stroke-linejoin="round"
+  />
+
+  <!-- 나뭇결. 통의 가장자리에만 둔다 — 얼굴 쪽으로 들어오면 주름으로 읽힌다. -->
+  <g stroke="#a5702f" stroke-width="2" stroke-linecap="round" fill="none">
+    <path d="M18.6 43.6q2.4 4 1.2 7.6"/>
+    <path d="M45.4 43.6q-2.4 4-1.2 7.6"/>
+  </g>
+
+  <!-- 눈. 흰자를 둬야 벌린 입과 함께 「놀란 얼굴」로 읽힌다. -->
+  <g stroke="#3b3222" stroke-width="2.2">
+    <ellipse cx="25.6" cy="33" rx="4.8" ry="5.4" fill="#f7f3ec"/>
+    <ellipse cx="38.4" cy="33" rx="4.8" ry="5.4" fill="#f7f3ec"/>
+  </g>
+  <circle cx="26.4" cy="34.1" r="2.4" fill="#24202b"/>
+  <circle cx="37.6" cy="34.1" r="2.4" fill="#24202b"/>
+
+  <!-- 벌린 입. 이 얼굴에서 제일 큰 조각이라 30px 에서도 남는다. -->
+  <ellipse cx="32" cy="45.4" rx="7.6" ry="5.6" fill="#5b3312" stroke="#3b3222" stroke-width="2.4"/>
+  <path d="M26.4 42.6h11.2" stroke="#f7f3ec" stroke-width="2.4" stroke-linecap="round"/>
+</svg>

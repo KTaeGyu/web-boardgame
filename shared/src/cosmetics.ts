@@ -80,7 +80,11 @@ export const COSMETICS: CosmeticItem[] = [
   { id: 'rabbit', kind: 'avatar', name: '화이트 래빗', price: 40 },
   // 토끼와 같은 종류의 변화(귀가 상자 밖으로)라 값도 나란히 둔다.
   { id: 'cat', kind: 'avatar', name: '캣 버글러', price: 40 },
+  // 머리 위의 하트가 상자 밖으로 솟는다. 귀와 같은 자리라 값도 같다.
+  { id: 'fairy', kind: 'avatar', name: '하트 페어리', price: 40 },
   { id: 'dracula', kind: 'avatar', name: '블러드 로드', price: 42 },
+  // 얼굴이 아예 상자가 아니다 — 손잡이가 위로, 팔이 좌우로 나가 제일 크게 갈린다.
+  { id: 'timber', kind: 'avatar', name: '팀버 클럽', price: 42 },
   // 어깨가 상자 밖으로 나간다 — 망토와 같은 자리라 값도 같다.
   // 파는 물건이 아니라 주는 물건이라 목록에는 안 선다.
   { id: 'insider', kind: 'avatar', name: '잉웅', price: 42, grantOnly: true },

@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="하트 페어리">
+  <!--
+    머리 위의 하트. 상자 밖으로 솟는 이것이 이 얼굴의 표시다 — 30px 로 줄이면
+    분홍 상자와 큰 눈은 남의 것과 섞이고, 실루엣에서 남는 것은 이 하나뿐이다.
+  -->
+  <path
+    d="M32 22.6C19.8 14.6 16.8 9.6 20.6 5.2 23.9 1.4 29.8 2.5 32 7 34.2 2.5 40.1 1.4 43.4 5.2 47.2 9.6 44.2 14.6 32 22.6Z"
+    fill="#ea5c7f"
+    stroke="#3b3222"
+    stroke-width="3"
+    stroke-linejoin="round"
+  />
+  <!-- 하트 왼쪽 위의 빛. 하트를 사탕이 아니라 부풀어 오른 것으로 만든다. -->
+  <path d="M24.4 6.6q3-2.6 5.1.7-3.2.5-5.1 3.5z" fill="#f9a8bf"/>
+
+  <rect x="12" y="19" width="40" height="33" rx="14" fill="#fbd7e4" stroke="#3b3222" stroke-width="3"/>
+
+  <!-- 앞머리 한 겹. 얼굴을 한 톤 눌러 하트와 이마 사이를 갈라 준다. -->
+  <path d="M14.4 30.5q3.4-9.5 17.6-9.5t17.6 9.5q-6.4-5-17.6-5t-17.6 5z" fill="#f7b3cd"/>
+
+  <!-- 눈. 큰 검은 알에 아래쪽만 분홍이고, 왼쪽 위에 반짝임 하나(고양이와 같은 어법). -->
+  <g>
+    <ellipse cx="24" cy="34" rx="5" ry="6.2" fill="#3a2a33"/>
+    <ellipse cx="24" cy="36.2" rx="3.2" ry="3" fill="#f06a96"/>
+    <circle cx="21.9" cy="31.3" r="1.7" fill="#ffffff"/>
+  </g>
+  <g>
+    <ellipse cx="40" cy="34" rx="5" ry="6.2" fill="#3a2a33"/>
+    <ellipse cx="40" cy="36.2" rx="3.2" ry="3" fill="#f06a96"/>
+    <circle cx="37.9" cy="31.3" r="1.7" fill="#ffffff"/>
+  </g>
+
+  <ellipse cx="17.6" cy="42.2" rx="4.2" ry="2.8" fill="#f58aad"/>
+  <ellipse cx="46.4" cy="42.2" rx="4.2" ry="2.8" fill="#f58aad"/>
+
+  <path
+    d="M28.2 43.4q3.8 3.8 7.6 0"
+    stroke="#3a2a33"
+    stroke-width="2.4"
+    stroke-linecap="round"
+    fill="none"
+  />
+</svg>
