@@ -169,6 +169,12 @@ export function Chat({ code }: { code: string }) {
     useCallback(
       (message: ChatMessage) => {
         setMessages((current) => [...current, message])
+        /*
+         * 방에 일어난 일(입장 같은)은 소리도 알림도 내지 않는다. 사람이 오갈 때마다
+         * 소리가 나면, 정작 누가 말을 걸었을 때의 소리와 구별되지 않는다.
+         * 흐름에는 남으므로 창을 열면 무슨 일이 있었는지 그대로 보인다.
+         */
+        if (message.system) return
         // 내가 한 말에 내가 놀랄 이유는 없다. 창이 열려 있어도 판을 보는 중일 수 있어
         // 접힘 여부는 따지지 않는다.
         if (message.playerId !== me) sfx('chat')
@@ -290,17 +296,25 @@ export function Chat({ code }: { code: string }) {
                 return (
                   <Fragment key={message.id}>
                     {broken && <p className="chat__break">이 사이의 대화는 남아 있지 않습니다</p>}
-                    <div className={`chat__line ${mine ? 'chat__line--mine' : ''}`}>
-                      {/* 내 말에 내 이름을 붙일 이유는 없다. 오른쪽에 선 것이 곧 표시다. */}
-                      {!mine && (
-                      <span className="chat__who">
-                        {message.name}
-                        {/* 판 밖에서 보는 사람의 말은 선언과 무게가 다르다. 그것이 보여야 한다. */}
-                        {message.spectator && <span className="chat__watcher">관전</span>}
-                      </span>
+                    {/*
+                      누구의 말도 아닌 줄은 가운데에 선다. 말풍선으로 세우면 그 사람이
+                      한 말로 읽히고, 왼쪽·오른쪽 어느 쪽에 세워도 편이 생긴다.
+                    */}
+                    {message.system ? (
+                      <p className="chat__note">{message.text}</p>
+                    ) : (
+                      <div className={`chat__line ${mine ? 'chat__line--mine' : ''}`}>
+                        {/* 내 말에 내 이름을 붙일 이유는 없다. 오른쪽에 선 것이 곧 표시다. */}
+                        {!mine && (
+                          <span className="chat__who">
+                            {message.name}
+                            {/* 판 밖에서 보는 사람의 말은 선언과 무게가 다르다. 그것이 보여야 한다. */}
+                            {message.spectator && <span className="chat__watcher">관전</span>}
+                          </span>
+                        )}
+                        <span className="chat__bubble">{message.text}</span>
+                      </div>
                     )}
-                      <span className="chat__bubble">{message.text}</span>
-                    </div>
                   </Fragment>
                 )
               })

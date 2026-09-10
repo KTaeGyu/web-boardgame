@@ -331,6 +331,18 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
       if (store.isTutorial(wanted) && !store.humanIds(wanted).includes(playerId)) {
         return ack({ ok: false, code: 'ROOM_NOT_FOUND', message: '없는 방입니다. 방 번호를 다시 확인해 주세요.' })
       }
+      /*
+       * 처음 들어온 것인가.
+       *
+       * 이 길로 오는 것이 셋이다 — 처음 들어오는 사람, 새로고침·재접속으로 돌아온 사람,
+       * 보고 있다가 자리에 앉는 사람. 뒤의 둘은 이미 방에 있던 사람이라 입장이 아니다.
+       */
+      const before = store.view(wanted)
+      const wasHere = Boolean(
+        before?.players.some((player) => player.id === playerId) ||
+          before?.spectators.some((watcher) => watcher.id === playerId),
+      )
+
       const result = store.joinRoom(playerId, nickname, payload.code.trim())
       if (!result.ok) return ack(result)
 
@@ -344,6 +356,21 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
       announce(store.view(code) ?? result.value)
       // 새로고침·재접속도 이 길로 온다. 앞의 흐름이 없으면 대화가 매번 끊긴다.
       socket.emit('chat:history', { messages: store.chatOf(code), since: store.openedAt(code) })
+
+      /*
+       * 들어왔다는 줄을 대화에 남긴다. **지난 흐름을 건넨 뒤에 얹는다** — 먼저 얹으면
+       * 들어온 사람에게는 이력에 한 번, 새 줄로 한 번, 같은 말이 두 줄로 선다.
+       *
+       * 이름은 자리에 붙는 것과 같아야 한다. 동명이인이 있으면 「홍길동」이 아니라
+       * 「홍길동 (2)」가 들어온 것이고, 그래야 목록의 누구인지 이어진다.
+       */
+      if (!wasHere) {
+        const seated = (store.view(code) ?? result.value).players.find(
+          (player) => player.id === playerId,
+        )
+        const line = store.addSystemChat(code, `${seated?.displayName ?? nickname} 님이 입장하셨습니다`)
+        if (line) io.to(code).emit('chat:message', line)
+      }
 
       // 판이 도는 중에 돌아온 것이라면 자리와 손패를 되돌려준다.
       const game = games.get(code)

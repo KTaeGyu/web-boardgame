@@ -338,6 +338,54 @@ describe('장착한 차림이 자리에 붙는다', () => {
 })
 
 /**
+ * 들어왔다는 줄.
+ *
+ * 대화의 흐름 안에 남는다 — 자리 목록은 「지금 누가 있나」만 말하고, 잠깐 자리를
+ * 비운 사이 누가 왔다 갔는지는 어디에도 남지 않았다.
+ */
+describe('입장 알림', () => {
+  it('새로 들어온 사람은 대화에 남는다', async () => {
+    const host = await client()
+    const room = unwrap(await call<RoomView>(host, 'room:create', identity(`enter-host-${seq()}`, '가')))
+
+    const heard = until<ChatMessage>(host, 'chat:message', (message) => message.system === true)
+    unwrap(
+      await call<RoomView>(await client(), 'room:join', {
+        ...identity(`enter-guest-${seq()}`, '나'),
+        code: room.code,
+      }),
+    )
+
+    const line = await heard
+    assert.equal(line.text, '나 님이 입장하셨습니다')
+    // 누구의 말도 아니다. 이름이 붙으면 그 사람이 한 말로 읽힌다.
+    assert.equal(line.playerId, '')
+    assert.equal(line.name, '')
+  })
+
+  /* 새로고침·재접속도 입장과 같은 길로 온다. 그때마다 남으면 흐름이 알림으로 덮인다. */
+  it('재접속은 남지 않는다', async () => {
+    const host = await client()
+    const room = unwrap(await call<RoomView>(host, 'room:create', identity(`again-host-${seq()}`, '가')))
+
+    const lines: ChatMessage[] = []
+    host.on('chat:message', (message: ChatMessage) => lines.push(message))
+
+    const guestId = `again-guest-${seq()}`
+    const guest = await client()
+    unwrap(await call<RoomView>(guest, 'room:join', { ...identity(guestId, '나'), code: room.code }))
+    unwrap(await call<RoomView>(guest, 'room:join', { ...identity(guestId, '나'), code: room.code }))
+
+    // 뒤에 보낸 말이 도착했으면 그 앞의 것은 이미 다 왔다.
+    const settled = until<ChatMessage>(host, 'chat:message', (message) => message.text === '왔어')
+    unwrap(await call<null>(guest, 'chat:send', { text: '왔어' }))
+    await settled
+
+    assert.equal(lines.filter((line) => line.system).length, 1)
+  })
+})
+
+/**
  * 감정표현.
  *
  * **자리 위에 뜨는 것은 상태가 아니라 사건이다.** 서버는 「누가 무엇을」만 한 번 쏘고

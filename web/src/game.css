@@ -1058,6 +1058,19 @@
   background: var(--line);
 }
 
+/*
+ * 방에 일어난 일. 누구의 말도 아니므로 가운데에 서고, 말보다 옅다.
+ * 끊긴 자리를 알리는 줄(.chat__break)과 같은 어법이되 선은 긋지 않는다 —
+ * 저쪽은 「여기서 흐름이 끊겼다」는 표시이고, 이쪽은 흐름 안에서 일어난 일이다.
+ */
+.chat__note {
+  margin: 4px 0;
+  padding: 0 8px;
+  font-size: 11px;
+  color: var(--ink-dim);
+  text-align: center;
+}
+
 /* 서버가 거절한 이유. 도배로 막힌 자리라 붉게 둔다. */
 .chat__notice {
   margin: 0;

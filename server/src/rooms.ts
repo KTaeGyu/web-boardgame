@@ -413,6 +413,32 @@ export class RoomStore {
     return message
   }
 
+  /**
+   * 사람이 한 말이 아닌 줄. 방에 일어난 일(입장 같은)이 대화의 흐름에 함께 남는다.
+   *
+   * 말과 같은 번호를 쓴다 — 갈라 세면 두 줄이 언제 오갔는지 순서를 잃는다.
+   * 이름을 붙이지 않는 것은 누구의 말도 아니기 때문이고, 그래서 화면도 가운데에 세운다.
+   */
+  addSystemChat(code: string, text: string): ChatMessage | null {
+    const room = this.rooms.get(code)
+    if (!room) return null
+
+    const trimmed = text.trim().slice(0, CHAT_MAX)
+    if (!trimmed) return null
+
+    const message: ChatMessage = {
+      id: (room.chatSeq += 1),
+      playerId: '',
+      name: '',
+      text: trimmed,
+      at: this.now(),
+      system: true,
+    }
+    room.chat.push(message)
+    if (room.chat.length > CHAT_KEEP) room.chat.splice(0, room.chat.length - CHAT_KEEP)
+    return message
+  }
+
   /** 방에 남아 있는 지난 말. 들어온 사람에게 한 번 건넨다. */
   chatOf(code: string | null): ChatMessage[] {
     const room = code ? this.rooms.get(code) : undefined
