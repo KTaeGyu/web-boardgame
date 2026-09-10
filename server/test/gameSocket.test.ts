@@ -125,6 +125,32 @@ async function passRound(people: Awaited<ReturnType<typeof seatThree>>['people']
   for (const person of people) unwrap(await call<null>(person.socket, 'game:ready', { ready: true }))
 }
 
+/** 금고 하나·경보 하나로 줄여 판 하나를 끝까지 굴린다. 끝난 뒤의 갈림길을 재는 자리다. */
+async function playToGameOver() {
+  const seated = await seatThree()
+  unwrap(
+    await call<RoomView>(seated.host.socket, 'room:settings', {
+      mode: 'custom',
+      pickedChallenges: [1],
+      specialistRounds: [null],
+      specialistRandomRounds: [false],
+      randomChallenges: 0,
+      vaultsToWin: 1,
+      alarmsToLose: 1,
+    }),
+  )
+  unwrap(await call<GameView>(seated.host.socket, 'game:start'))
+  // 「빠른 접근」이 1라운드를 건너뛰므로 몇 바퀴인지는 세지 않는다. 단계로 끊는다.
+  for (let round = 0; round < 4; round++) {
+    await new Promise((resolve) => setTimeout(resolve, 120))
+    if (seated.people[0].states.at(-1)?.phase !== 'picking') break
+    await passRound(seated.people)
+  }
+  const over = await waitState(seated.people[0], (v) => v.phase === 'gameOver', 6000)
+  assert.equal(over.phase, 'gameOver')
+  return seated
+}
+
 describe('판 시작', () => {
   it('방장이 시작하면 방이 게임 중으로 바뀌고 모두 상태를 받는다', async () => {
     const { people, host, code } = await seatThree()
@@ -393,31 +419,6 @@ describe('판이 도는 중의 이탈', () => {
 
 describe('재경기를 거절하면', () => {
   /** 금고 하나로 끝나는 판을 세운다. 거절 뒤의 뒷정리를 보려는 것이지 규칙을 보려는 것이 아니다. */
-  async function playToGameOver() {
-    const seated = await seatThree()
-    unwrap(
-      await call<RoomView>(seated.host.socket, 'room:settings', {
-        mode: 'custom',
-        pickedChallenges: [1],
-        specialistRounds: [null],
-        specialistRandomRounds: [false],
-        randomChallenges: 0,
-        vaultsToWin: 1,
-        alarmsToLose: 1,
-      }),
-    )
-    unwrap(await call<GameView>(seated.host.socket, 'game:start'))
-    // 「빠른 접근」이 1라운드를 건너뛰므로 몇 바퀴인지는 세지 않는다. 단계로 끊는다.
-    for (let round = 0; round < 4; round++) {
-      await new Promise((resolve) => setTimeout(resolve, 120))
-      if (seated.people[0].states.at(-1)?.phase !== 'picking') break
-      await passRound(seated.people)
-    }
-    const over = await waitState(seated.people[0], (v) => v.phase === 'gameOver', 6000)
-    assert.equal(over.phase, 'gameOver')
-    return seated
-  }
-
   /*
    * 방까지 접혀야 한다.
    *
@@ -550,6 +551,79 @@ describe('관전', () => {
 
     const message = await heard
     assert.equal(message.spectator, undefined)
+  })
+
+  /*
+   * 판이 끝난 뒤의 갈림길.
+   *
+   * 축은 하나다 — **보던 사람도 앉은 사람들과 같은 자리로 간다.** 다음 판이 서면 보던
+   * 채로 이어 보고, 방이 대기실로 돌아가면 구경 자리에 그대로 남고, 방이 없어지면
+   * 함께 나온다. 세 번째만 강제인 것은 남아 있을 방이 없어서다.
+   */
+  it('전원 동의하면 구경꾼도 다음 판을 이어 본다', async () => {
+    const { host, guests, code } = await playToGameOver()
+    const watcher = await watcherFor(code, 'watchA')
+
+    const restarted = until<GameView>(
+      watcher.socket,
+      'game:state',
+      (view) => view.phase !== 'gameOver' && view.heist === 1,
+      4000,
+    )
+    for (const person of [host, ...guests]) {
+      unwrap(await call<null>(person.socket, 'game:rematch', { agree: true }))
+    }
+    await restarted
+
+    const room = app.store.view(code)
+    assert.equal(room?.phase, 'playing', '방은 그대로 판이 도는 중이다')
+    assert.deepEqual(room?.spectators.map((one) => one.id), [watcher.playerId], '구경 자리도 그대로다')
+    assert.equal(watcher.hands.length, 0, '이어 봐도 손패는 가지 않는다')
+  })
+
+  it('한 명이라도 거절하면 구경꾼도 함께 나온다', async () => {
+    const { host, guests, code } = await playToGameOver()
+    const watcher = await watcherFor(code, 'watchB')
+
+    const closed = until<{ reason: string }>(watcher.socket, 'room:closed', () => true, 4000)
+    unwrap(await call<null>(host.socket, 'game:rematch', { agree: true }))
+    unwrap(await call<null>(guests[0].socket, 'game:rematch', { agree: false }))
+
+    assert.equal((await closed).reason, 'rematchDeclined')
+    assert.equal(app.store.view(code), null, '방이 없으니 남을 자리도 없다')
+  })
+
+  it('누가 나가 판이 접히면 구경꾼은 구경 자리에 남는다', async () => {
+    const { guests, code } = await playToGameOver()
+    const watcher = await watcherFor(code, 'watchC')
+
+    const aborted = until<{ message: string }>(watcher.socket, 'game:aborted', () => true, 4000)
+    unwrap(await call<null>(guests[0].socket, 'room:leave'))
+    await aborted
+
+    const room = app.store.view(code)
+    assert.equal(room?.phase, 'lobby', '방은 대기실로 돌아간다')
+    assert.deepEqual(
+      room?.spectators.map((one) => one.id),
+      [watcher.playerId],
+      '구경 자리는 그대로다 — 화면이 대기실로 따라 들어갈 자리가 있어야 한다',
+    )
+    assert.equal(
+      room?.players.some((player) => player.id === watcher.playerId),
+      false,
+      '판이 접혔다는 이유로 선수가 되면 안 된다',
+    )
+  })
+
+  it('앉은 사람이 모두 나가면 구경꾼도 강제로 나온다', async () => {
+    const { people, code } = await seatThree()
+    const watcher = await watcherFor(code, 'watchD')
+
+    const closed = until<{ reason: string }>(watcher.socket, 'room:closed', () => true, 4000)
+    for (const person of people) unwrap(await call<null>(person.socket, 'room:leave'))
+
+    assert.equal((await closed).reason, 'empty')
+    assert.equal(app.store.view(code), null, '앉은 사람이 없는 방은 남지 않는다')
   })
 })
 
