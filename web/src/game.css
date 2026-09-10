@@ -2522,7 +2522,9 @@ button.token:hover:not(:disabled) {
   }
 
   .game--watching .chat-fab,
-  .game--watching .chat {
+  .game--watching .chat,
+  /* 감정표현도 함께 내린다 — 하나만 위에 남으면 짝이 갈려 딴 데 있는 단추가 된다. */
+  .game--watching .emote-picker {
     bottom: max(24px, env(safe-area-inset-bottom));
   }
 

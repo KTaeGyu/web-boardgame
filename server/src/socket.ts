@@ -444,6 +444,18 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
       store.touch(code)
       ack({ ok: true, value: null })
       io.to(code).emit('emote', { playerId, id: emote.id })
+
+      /*
+       * 대화에도 한 줄로 남긴다.
+       *
+       * 자리 위에 뜨는 것은 잠깐이라, 판을 보고 있지 않았거나 뒤늦게 들어온 사람에게는
+       * 없던 일이 된다. 감정표현도 남에게 보내는 한마디이므로 말과 같은 자리에 쌓인다 —
+       * 접혀 있으면 미리보기 한 줄로 붙고, 새로고침해도 흐름에 남는다.
+       *
+       * 도배는 이미 위의 쿨다운이 막았으므로 대화 쪽 속도 제한은 다시 세지 않는다.
+       */
+      const line = store.addChat(playerId, emote.emoji)
+      if (line) io.to(code).emit('chat:message', line)
     })
 
     socket.on('chat:send', ({ text }, ack) => {

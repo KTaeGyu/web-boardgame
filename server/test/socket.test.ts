@@ -10,6 +10,8 @@ import type { AddressInfo } from 'node:net'
 import { io as connect, type Socket } from 'socket.io-client'
 import {
   DEFAULT_EQUIPPED,
+  emoteOf,
+  type ChatMessage,
   type Cosmetics,
   type Result,
   type RoomSummary,
@@ -338,8 +340,9 @@ describe('장착한 차림이 자리에 붙는다', () => {
 /**
  * 감정표현.
  *
- * **상태가 아니라 사건이다.** 서버는 「누가 무엇을」만 한 번 쏘고 아무것도 남기지
- * 않는다 — 뒤늦게 들어온 사람에게 지난 감정이 뜨면 그건 말이 아니라 표지판이 된다.
+ * **자리 위에 뜨는 것은 상태가 아니라 사건이다.** 서버는 「누가 무엇을」만 한 번 쏘고
+ * 자리에는 아무것도 남기지 않는다 — 뒤늦게 들어온 사람에게 지난 감정이 뜨면 그건
+ * 말이 아니라 표지판이 된다. 대화에 남는 한 줄은 그것과 별개로 말과 같이 쌓인다.
  */
 describe('감정표현', () => {
   it('같은 방 사람들에게 간다', async () => {
@@ -377,6 +380,27 @@ describe('감정표현', () => {
     const out = await call<null>(socket, 'emote:send', { id: 'good' })
     assert.equal(out.ok, false)
     if (!out.ok) assert.equal(out.code, 'NOT_IN_ROOM')
+  })
+
+  /* 자리 위의 것은 잠깐이라, 판을 보고 있지 않던 사람에게는 없던 일이 된다. */
+  it('대화에도 한 줄로 남는다', async () => {
+    const host = await client()
+    const guest = await client()
+    const room = unwrap(
+      await call<RoomView>(host, 'room:create', identity(`emote-chat-${seq()}`, '가')),
+    )
+    unwrap(
+      await call<RoomView>(guest, 'room:join', {
+        ...identity(`emote-chat-guest-${seq()}`, '나'),
+        code: room.code,
+      }),
+    )
+
+    const said = next<ChatMessage>(guest, 'chat:message')
+    unwrap(await call<null>(host, 'emote:send', { id: 'good' }))
+    const line = await said
+    assert.equal(line.playerId, room.players[0].id)
+    assert.equal(line.text, emoteOf('good')?.emoji)
   })
 
   it('연달아 누르면 잠깐 막는다 — 도배만 막는 정도다', async () => {
