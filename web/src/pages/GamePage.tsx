@@ -254,9 +254,9 @@ export function GamePage({ spectating = false }: { spectating?: boolean } = {}) 
       }
       setHostId(result.value.hostId)
       setTutorial(result.value.tutorial)
-      // 방은 있는데 판이 없으면 여기 있을 이유가 없다. 보러 온 사람은 대기실에도 갈 자리가 없다.
+      // 방은 있는데 판이 없으면 여기 있을 이유가 없다. 보러 온 사람은 관전 문으로 대기실에 든다.
       if (result.value.phase === 'lobby') {
-        navigate(spectating ? '/rooms' : `/rooms/${code}`, { replace: true })
+        navigate(spectating ? `/rooms/${code}?watch=1` : `/rooms/${code}`, { replace: true })
       }
     }
 
@@ -351,18 +351,19 @@ export function GamePage({ spectating = false }: { spectating?: boolean } = {}) 
   useServerEvent('tutorial:tip', useCallback((payload: TipPayload) => setTip(payload), []))
 
   /*
-   * 구경을 마치고 목록으로 나간다.
+   * 판이 끝나면 보던 사람도 대기실로 따라 들어간다 — **보던 채로.**
    *
-   * 화면만 옮기면 방 쪽에는 구경꾼이 그대로 남아, 대기실에 있는 사람들에게는 아직 보고
-   * 있는 것처럼 「관전 1/5」이 뜬다. 자리는 끊겨도 지켜주지만 구경 자리는 지킬 것이 없다.
+   * 방에서 빼지 않는다. 구경 자리는 대기실에도 있고(관전 1/5), 앉은 사람들이 다음 판을
+   * 세우는 것을 보려면 그 자리에 남아 있어야 한다. 목록까지 밀어내면 방 번호를 다시
+   * 찾아 들어와야 한다.
+   *
+   * 방 주소만으로 보내지 않는 것이 핵심이다 — 대기실은 그 주소를 「앉으러 왔다」로 읽어
+   * 자리에 앉혀 버린다(RoomPage 는 `?watch=1` 이 없으면 room:join 을 부른다).
+   * 보던 사람이 판이 끝났다는 이유로 선수가 되면 안 된다.
    */
-  const leaveAsWatcher = useCallback(
-    (notice: string) => {
-      void call<null>('room:leave')
-      navigate('/rooms', { replace: true, state: { notice } })
-    },
-    [navigate],
-  )
+  const backToLobbyWatching = useCallback(() => {
+    navigate(`/rooms/${code}?watch=1`, { replace: true })
+  }, [code, navigate])
 
   /*
    * 판이 접혔다는 말을 잠깐 보여주고 옮긴다. 그 사이에 화면을 벗어나면 시계도 함께 접는다 —
@@ -384,21 +385,15 @@ export function GamePage({ spectating = false }: { spectating?: boolean } = {}) 
         setGame(null)
         if (abortTimer.current) clearTimeout(abortTimer.current)
         abortTimer.current = setTimeout(() => {
-          /*
-           * 구경꾼에게는 돌아갈 자리가 없다.
-           *
-           * 방 주소로 보내면 대기실이 그 주소를 「앉으러 왔다」로 읽어 자리에 앉혀 버린다
-           * (RoomPage 는 ?watch=1 이 없으면 room:join 을 부른다). 보던 사람이 판이
-           * 접혔다는 이유로 선수가 되면 안 된다.
-           */
+          // 보던 사람은 관전인 채로 대기실에 남는다. 판이 접혔다고 선수가 되면 안 된다.
           if (spectating) {
-            leaveAsWatcher('판이 끝났습니다.')
+            backToLobbyWatching()
             return
           }
           navigate(`/rooms/${code}`, { replace: true })
         }, 2200)
       },
-      [code, navigate, spectating, leaveAsWatcher],
+      [code, navigate, spectating, backToLobbyWatching],
     ),
   )
 
@@ -412,13 +407,13 @@ export function GamePage({ spectating = false }: { spectating?: boolean } = {}) 
         // 판이 접혔거나 아직 시작 전이면 이 화면에 있을 이유가 없다.
         if (room.phase === 'lobby') {
           if (spectating) {
-            leaveAsWatcher('판이 끝났습니다.')
+            backToLobbyWatching()
             return
           }
           navigate(`/rooms/${code}`, { replace: true })
         }
       },
-      [code, navigate, spectating, leaveAsWatcher],
+      [code, navigate, spectating, backToLobbyWatching],
     ),
   )
 
