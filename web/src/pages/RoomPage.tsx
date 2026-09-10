@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
   CHALLENGES,
   GAME_MODES,
@@ -32,6 +32,7 @@ import { EmoteBubble, EmotePicker, useEmotes } from '../components/Emotes.tsx'
 import { CardPicker } from '../components/CardPicker.tsx'
 import { PickList } from '../components/PickList.tsx'
 import { Chat } from '../components/Chat.tsx'
+import { Toast, TOAST_MS } from '../components/Toast.tsx'
 import { SpecialistGrid } from '../components/SpecialistGrid.tsx'
 import { ChoiceModal, ConfirmModal } from '../components/Modal.tsx'
 import { useBackIntercept } from '../lib/back.ts'
@@ -69,6 +70,21 @@ export function RoomPage() {
   const watching = params.get('watch') === '1'
   const playerId = getPlayerId()
   const nickname = getNickname()
+
+  /*
+   * 판이 접혀 밀려온 경우, 그 까닭이 잠깐 뜨는 알림으로 스친다.
+   *
+   * **첫 렌더에서 한 번만 집는다.** 판이 접히면 같은 주소로 두 번 옮겨 올 수 있는데
+   * (game:aborted 와 뒤따르는 room:updated), 뒤엣것은 들고 오는 말이 없어 덮으면
+   * 정작 까닭이 사라진다.
+   */
+  const arrived = (useLocation().state as { notice?: string } | null)?.notice ?? ''
+  const [toast, setToast] = useState(arrived)
+  useEffect(() => {
+    if (!toast) return
+    const timer = setTimeout(() => setToast(''), TOAST_MS)
+    return () => clearTimeout(timer)
+  }, [toast])
 
   const [room, setRoom] = useState<RoomView | null>(null)
   /**
@@ -307,6 +323,12 @@ export function RoomPage() {
 
   return (
     <main className="page room-page">
+      {toast && (
+        <div className="toasts" role="status" aria-live="polite">
+          <Toast text={toast} tone="info" onAway={() => setToast('')} />
+        </div>
+      )}
+
       <div className="room-header">
         {/* 나가는 길이 화면 아래에만 있으면 설정을 다 지나쳐 내려가야 한다. 제목 옆에도 둔다. */}
         <button

@@ -10,6 +10,14 @@
 
 import { useSwipeAway } from '../lib/useSwipeAway.ts'
 
+/**
+ * 알림 하나가 떠 있는 시간.
+ *
+ * 부르는 쪽이 저마다 숫자를 고르면 화면을 옮길 때마다 뜨는 길이가 달라진다 —
+ * 같은 알림이 판에서는 4초, 대기실에서는 2초면 그것부터 눈에 띈다.
+ */
+export const TOAST_MS = 3800
+
 export function Toast({
   text,
   tone,

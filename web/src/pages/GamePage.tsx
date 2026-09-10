@@ -27,7 +27,7 @@ import {
 } from '../components/Emotes.tsx'
 import { ExtrasDrawer, NoteCard, type CardNote } from '../components/ExtrasDrawer.tsx'
 import { ScanVote } from '../components/ScanVote.tsx'
-import { Toast } from '../components/Toast.tsx'
+import { Toast, TOAST_MS } from '../components/Toast.tsx'
 import { SetupStep } from '../components/SetupStep.tsx'
 import { TableChallenges, TableSpecialist } from '../components/TableExtras.tsx'
 import { useSpecialistUse } from '../components/SpecialistUse.tsx'
@@ -74,7 +74,6 @@ function savedSeatView(): SeatView {
 }
 
 /** 알림이 떠 있는 시간. 한 줄을 읽고 눈을 판으로 되돌릴 만큼만. */
-const TOAST_MS = 3800
 
 /** 쇼다운은 한 사람씩 차례로 뒤집어야 순서가 맞았는지 눈에 들어온다. */
 const REVEAL_STEP_MS = 1900
@@ -366,34 +365,22 @@ export function GamePage({ spectating = false }: { spectating?: boolean } = {}) 
   }, [code, navigate])
 
   /*
-   * 판이 접혔다는 말을 잠깐 보여주고 옮긴다. 그 사이에 화면을 벗어나면 시계도 함께 접는다 —
-   * 남겨두면 이미 목록으로 나간 사람을 뒤늦게 방으로 끌고 온다.
+   * 판이 접혔다.
+   *
+   * 까닭은 **옮겨 간 화면에서 잠깐 뜨는 알림으로 스친다.** 예전에는 이 화면을 비우고
+   * 2.2초 동안 그 한 줄만 세워 두었는데, 읽을 것이 한 줄인데 화면을 멈춰 세우는 값이었다.
+   * 보던 사람은 관전인 채로 대기실에 든다 — 판이 접혔다고 선수가 되면 안 된다.
    */
-  const abortTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  useEffect(
-    () => () => {
-      if (abortTimer.current) clearTimeout(abortTimer.current)
-    },
-    [],
-  )
-
   useServerEvent(
     'game:aborted',
     useCallback(
       (payload: { message: string }) => {
-        setNotice(payload.message)
-        setGame(null)
-        if (abortTimer.current) clearTimeout(abortTimer.current)
-        abortTimer.current = setTimeout(() => {
-          // 보던 사람은 관전인 채로 대기실에 남는다. 판이 접혔다고 선수가 되면 안 된다.
-          if (spectating) {
-            backToLobbyWatching()
-            return
-          }
-          navigate(`/rooms/${code}`, { replace: true })
-        }, 2200)
+        navigate(spectating ? `/rooms/${code}?watch=1` : `/rooms/${code}`, {
+          replace: true,
+          state: { notice: payload.message },
+        })
       },
-      [code, navigate, spectating, backToLobbyWatching],
+      [code, navigate, spectating],
     ),
   )
 
