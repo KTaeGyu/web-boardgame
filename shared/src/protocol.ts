@@ -130,6 +130,23 @@ export interface RoomSettings {
    * 그만큼 더해진다.
    */
   randomChallengesStay: boolean
+  /**
+   * 무작위로는 **뽑지 않을** 도전자.
+   *
+   * 「고른 것」의 반대편이다 — 저쪽이 「반드시 걸린다」면 이쪽은 「나오지 않는다」이고,
+   * 아무 표시도 없는 카드만 뽑기 후보로 남는다. 무작위 장수가 0이면 뜻이 없다.
+   *
+   * 고정으로 고른 카드는 여기 담지 않는다. 이미 걸려 있는 것은 어차피 다시 뽑지 않아
+   * 두 표시가 겹치면 어느 쪽이 이겼는지 화면에서 읽을 수 없게 된다.
+   */
+  excludedChallenges: ChallengeId[]
+  /**
+   * 무작위로는 **뽑지 않을** 해결사. 배치표의 「제외」 열이다.
+   *
+   * 판에 직접 세워 둔 카드는 여기 담아도 그대로 나온다 — 제외는 뽑기에만 걸리는 말이고,
+   * 「이 판에 이것」이라고 손으로 짚은 것은 뽑은 것이 아니다.
+   */
+  excludedSpecialists: SpecialistId[]
   /** 몇 개를 열면 이기는가. 「직접 고르기」에서만 3이 아닐 수 있다. */
   vaultsToWin: number
   /** 몇 번 울리면 지는가. 「직접 고르기」에서만 3이 아닐 수 있다. */
@@ -167,6 +184,8 @@ export const DEFAULT_SETTINGS: RoomSettings = {
   randomChallenges: 0,
   randomChallengesOnWin: false,
   randomChallengesStay: false,
+  excludedChallenges: [],
+  excludedSpecialists: [],
   vaultsToWin: VAULTS_TO_WIN,
   alarmsToLose: ALARMS_TO_LOSE,
   maxPlayers: 6,

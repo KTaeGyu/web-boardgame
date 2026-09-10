@@ -19,6 +19,14 @@ interface Props {
   options: readonly PickOption[]
   picked: readonly (number | string)[]
   disabled?: boolean
+  /**
+   * 고른 것이 무슨 뜻인가.
+   *
+   * `pick` 은 「이것을 건다」(금색으로 채워진다), `exclude` 는 「이것은 빼겠다」다 —
+   * 같은 목록이 두 번 서므로 **색과 표시가 갈려야** 어느 쪽을 보고 있는지 알 수 있다.
+   * 뺀 카드는 지워진 것처럼 취소선을 긋는다.
+   */
+  tone?: 'pick' | 'exclude'
   onToggle: (id: number | string) => void
 }
 
@@ -32,7 +40,7 @@ interface Props {
  * 아예 보내지 않아서, 방장이 아닌 사람은 설명을 하나도 볼 수 없었다 — 짚어도 금지 표시만
  * 떴다(2026-09-03). `aria-disabled` 로 같은 뜻을 전하고 누름만 막는다.
  */
-export function CardPicker({ label, hint, options, picked, disabled, onToggle }: Props) {
+export function CardPicker({ label, hint, options, picked, disabled, tone = 'pick', onToggle }: Props) {
   const { tip, handlers } = useCardTip()
 
   return (
@@ -54,7 +62,7 @@ export function CardPicker({ label, hint, options, picked, disabled, onToggle }:
             <button
               key={option.id}
               type="button"
-              className={`pick-chip ${on ? 'pick-chip--on' : ''}`}
+              className={`pick-chip ${on ? (tone === 'exclude' ? 'pick-chip--out' : 'pick-chip--on') : ''}`}
               aria-disabled={locked || undefined}
               aria-pressed={on}
               {...handlers(option.text)}

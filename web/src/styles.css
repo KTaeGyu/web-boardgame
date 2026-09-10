@@ -1505,6 +1505,79 @@ a.btn {
   margin-bottom: 20px;
 }
 
+/*
+ * 접었다 펴는 설정 묶음.
+ *
+ * 「직접 고르기」의 칸이 열이 넘어 한 판을 넘긴다. 묶음마다 테두리를 둘러 어디서
+ * 어디까지가 한 이야기인지 보이게 하고, 접힌 채로도 지금 값(요약)이 머리에 남는다.
+ */
+.setting-group {
+  margin-bottom: 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(var(--ink-rgb), 0.02);
+}
+
+.setting-group__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 14px;
+  cursor: pointer;
+  user-select: none;
+  list-style: none;
+}
+
+/* 사파리의 기본 삼각형. 우리 것으로 갈아 끼운다. */
+.setting-group__head::-webkit-details-marker {
+  display: none;
+}
+
+/* 펴짐을 나타내는 꺾쇠. 열리면 아래를 가리킨다. */
+.setting-group__head::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  flex: none;
+  border-right: 1.6px solid var(--ink-dim);
+  border-bottom: 1.6px solid var(--ink-dim);
+  transform: rotate(-45deg) translate(-1px, 1px);
+  transition: transform 0.15s;
+}
+
+.setting-group[open] > .setting-group__head::before {
+  transform: rotate(45deg) translate(-1px, -1px);
+}
+
+.setting-group__title {
+  font-size: 13px;
+  color: var(--ink);
+  letter-spacing: 0.04em;
+}
+
+/* 접힌 채로 읽는 지금 값. 오른쪽 끝에 붙어 제목과 겹쳐 보이지 않는다. */
+.setting-group__summary {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--ink-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.setting-group[open] > .setting-group__head {
+  border-bottom: 1px solid var(--line);
+}
+
+.setting-group__body {
+  padding: 14px 14px 2px;
+}
+
+/* 묶음 안의 마지막 칸은 아래 여백을 테두리에 맡긴다. */
+.setting-group__body > .setting:last-child {
+  margin-bottom: 12px;
+}
+
 .setting__label {
   display: block;
   /*
@@ -1609,6 +1682,47 @@ a.btn {
 .pick-chip--on .pick-chip__mark {
   background: currentColor;
   opacity: 1;
+}
+
+/*
+ * 뽑기에서 뺀 카드.
+ *
+ * 같은 목록이 두 번 서는 자리라(고를 때 한 번, 뺄 때 한 번) **색이 갈려야** 지금
+ * 어느 쪽을 보고 있는지 알 수 있다. 고른 것은 금색으로 «채워지고», 뺀 것은 지워진
+ * 것처럼 흐려지고 줄이 그어진다 — 「더한다」와 「던다」가 눈으로도 반대여야 한다.
+ */
+.pick-chip--out {
+  border-color: var(--line);
+  background: rgba(var(--ink-rgb, 235, 230, 220), 0.06);
+  color: var(--ink-dim);
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+
+.pick-chip--out .pick-chip__mark {
+  position: relative;
+  border-color: var(--ink-dim);
+  opacity: 1;
+}
+
+/* 표시 자리에 ✕ 하나. 채우면 「고른 것」과 같은 모양이 되어 둘이 안 갈린다. */
+.pick-chip--out .pick-chip__mark::before,
+.pick-chip--out .pick-chip__mark::after {
+  content: '';
+  position: absolute;
+  left: 1px;
+  right: 1px;
+  top: 5px;
+  height: 1px;
+  background: currentColor;
+}
+
+.pick-chip--out .pick-chip__mark::before {
+  transform: rotate(45deg);
+}
+
+.pick-chip--out .pick-chip__mark::after {
+  transform: rotate(-45deg);
 }
 
 .choice {
@@ -1784,6 +1898,55 @@ a.btn {
   width: max(100%, calc(150px + var(--rounds, 5) * 38px));
   grid-template-columns: minmax(0, 1fr) repeat(var(--rounds, 5), 38px);
   align-items: center;
+}
+
+/*
+ * 제외 열이 서면 칸이 하나 늘어난다.
+ *
+ * 판 칸(38px)보다 넓게 두는 것은 머리에 「제외」 두 글자가 들어가야 해서다.
+ * 폭 계산도 함께 늘린다 — 줄마다 같은 식으로 구해야 세로줄이 어긋나지 않는다.
+ */
+.slot-grid--skip .slot-row {
+  width: max(100%, calc(198px + var(--rounds, 5) * 38px));
+  grid-template-columns: minmax(0, 1fr) repeat(var(--rounds, 5), 38px) 48px;
+}
+
+/* 판 칸과 다른 종류의 칸이라 선을 굵게 그어 갈라 둔다. */
+.slot-cell--skip {
+  box-shadow: inset 2px 0 0 var(--line);
+}
+
+/* 뺀 카드는 이름부터 지워진 것처럼 둔다. 표에서 눈이 먼저 건너뛰어야 한다. */
+.slot-row--out .slot-row__name {
+  color: var(--ink-dim);
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+
+.slot-cell--out .slot-cell__mark {
+  position: relative;
+  border-color: var(--ink-dim);
+}
+
+/* 표시는 ✕ 다. 채우면 자리를 잡은 칸과 같은 모양이 되어 둘이 안 갈린다. */
+.slot-cell--out .slot-cell__mark::before,
+.slot-cell--out .slot-cell__mark::after {
+  content: '';
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  top: 6px;
+  height: 1.5px;
+  border-radius: 1px;
+  background: var(--ink-dim);
+}
+
+.slot-cell--out .slot-cell__mark::before {
+  transform: rotate(45deg);
+}
+
+.slot-cell--out .slot-cell__mark::after {
+  transform: rotate(-45deg);
 }
 
 /* 줄무늬. 열 칸을 세로로 훑을 때 줄을 놓치지 않게 한다. */

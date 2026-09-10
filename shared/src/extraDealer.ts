@@ -77,6 +77,8 @@ export class ExtraDealer {
     stay: boolean
     specialistRandom: readonly boolean[]
     specialistOnLoss: boolean
+    /** 무작위로는 뽑지 않을 도전자. 해결사 쪽은 뭉치를 만들 때 이미 빠져 있다. */
+    skipChallenges: readonly ChallengeId[]
   }
   /**
    * 「직접 고르기」에서 방장이 짠 배치. 자리 하나가 판 하나다.
@@ -97,6 +99,8 @@ export class ExtraDealer {
       stay?: boolean
       specialistRandom?: readonly boolean[]
       specialistOnLoss?: boolean
+      excludedChallenges?: readonly ChallengeId[]
+      excludedSpecialists?: readonly SpecialistId[]
     } = {},
   ) {
     this.mode = mode
@@ -111,7 +115,17 @@ export class ExtraDealer {
         ? READY_CHALLENGES.filter((id) => id !== QUICK_ACCESS)
         : READY_CHALLENGES
     this.challenges = new Stack(pool)
-    this.specialists = new Stack(READY_SPECIALISTS)
+    /*
+     * 뽑기에서 뺀 해결사는 뭉치에 아예 넣지 않는다. 뽑고 나서 거르면 그 자리가 비어
+     * 「이번 판은 없음」이 되는데, 그건 방장이 말한 것과 다르다.
+     *
+     * **「직접 고르기」에서만 뺀다.** 제외는 그 모드의 설정이라, 원작 모드는 표대로 다 돈다.
+     */
+    this.specialists = new Stack(
+      mode === 'custom'
+        ? READY_SPECIALISTS.filter((id) => !(options.excludedSpecialists ?? []).includes(id))
+        : READY_SPECIALISTS,
+    )
 
     this.custom = {
       random: options.random ?? 0,
@@ -119,6 +133,7 @@ export class ExtraDealer {
       stay: options.stay ?? false,
       specialistRandom: options.specialistRandom ?? [],
       specialistOnLoss: options.specialistOnLoss ?? true,
+      skipChallenges: options.excludedChallenges ?? [],
     }
 
     if (mode === 'professional') this.permanent = this.challenges.drawRandom(rng)
@@ -182,7 +197,11 @@ export class ExtraDealer {
     if (this.custom.onWin && lastSuccess !== true) return []
 
     const rest = READY_CHALLENGES.filter(
-      (id) => !standing.includes(id) && !conflictsWith(id).some((other) => standing.includes(other)),
+      (id) =>
+        !standing.includes(id) &&
+        // 뽑지 않기로 한 것. 「고른 것」의 반대편이라 후보에서 먼저 빠진다.
+        !this.custom.skipChallenges.includes(id) &&
+        !conflictsWith(id).some((other) => standing.includes(other)),
     )
     const rolled: ChallengeId[] = []
     for (let i = 0; i < this.custom.random && rest.length > 0; i += 1) {
@@ -206,6 +225,11 @@ export class ExtraDealer {
   private pickSpecialist(lastSuccess: boolean | null): SpecialistId | null {
     if (this.custom.specialistOnLoss && lastSuccess !== false) return null
     const at = this.heist - 1
+    /*
+     * 제외는 **뽑는 자리에만** 걸린다. 손으로 세워 둔 카드는 표시가 있어도 그대로
+     * 나온다 — 「이 판에 이것」이라고 짚은 것은 뽑은 것이 아니다.
+     * 뽑을 것이 하나도 안 남았으면 그 판은 해결사 없이 지나간다(drawRandom 이 null).
+     */
     if (this.custom.specialistRandom[at]) return this.specialists.drawRandom(this.rng)
     return this.specialistRounds[at] ?? null
   }

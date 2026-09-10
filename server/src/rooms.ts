@@ -162,7 +162,14 @@ export class RoomStore {
       code,
       hostId: playerId,
       players: [{ id: playerId, nickname, connected: true, disconnectedAt: null, joinedAt: now }],
-      settings: { ...DEFAULT_SETTINGS, pickedChallenges: [], specialistRounds: emptyRounds() },
+      settings: {
+        ...DEFAULT_SETTINGS,
+        pickedChallenges: [],
+        specialistRounds: emptyRounds(),
+        // 표의 배열을 그대로 물려주지 않는다 — 방마다 제 것을 들고 있어야 한다.
+        excludedChallenges: [],
+        excludedSpecialists: [],
+      },
       phase: 'lobby',
       createdAt: now,
       lastActivityAt: now,
@@ -601,6 +608,22 @@ export class RoomStore {
     if (!inRange(next.randomChallenges, 0, MAX_RANDOM_CHALLENGES)) {
       return err('INVALID_SETTINGS', `무작위 도전자는 0~${MAX_RANDOM_CHALLENGES}장입니다.`)
     }
+    /*
+     * 뽑기에서 뺄 카드.
+     *
+     * **고른 것과 같은 카드에 둘 다 표시할 수는 없다.** 고정은 「반드시 걸린다」이고
+     * 제외는 「나오지 않는다」라, 한 카드가 둘을 함께 말하면 화면에서 어느 쪽이
+     * 이겼는지 읽을 수 없다. 화면이 이미 잠그지만 계약은 방에 있지 화면에 있지 않다.
+     */
+    if (next.excludedChallenges.some((id) => !READY_CHALLENGES.includes(id as ChallengeId))) {
+      return err('INVALID_SETTINGS', '뺄 수 없는 도전자 카드입니다.')
+    }
+    if (next.excludedChallenges.some((id) => together.includes(id as ChallengeId))) {
+      return err('INVALID_SETTINGS', '고른 카드는 뽑기에서 뺄 것도 없습니다.')
+    }
+    if (next.excludedSpecialists.some((id) => !READY_SPECIALISTS.includes(id as SpecialistId))) {
+      return err('INVALID_SETTINGS', '뺄 수 없는 해결사 카드입니다.')
+    }
     if (!inRange(next.vaultsToWin, MIN_MARKS, MAX_MARKS) || !inRange(next.alarmsToLose, MIN_MARKS, MAX_MARKS)) {
       return err('INVALID_SETTINGS', `금고와 경보는 ${MIN_MARKS}~${MAX_MARKS} 사이입니다.`)
     }
@@ -638,6 +661,8 @@ export class RoomStore {
       ...next,
       maxPlayers,
       pickedChallenges: [...new Set(next.pickedChallenges)].sort((a, b) => a - b),
+      excludedChallenges: [...new Set(next.excludedChallenges)].sort((a, b) => a - b),
+      excludedSpecialists: [...new Set(next.excludedSpecialists)].sort((a, b) => a - b),
       // 정렬하지 않는다 — 여기서는 자리가 곧 뜻이다.
       specialistRounds: rounds,
       specialistRandomRounds: randomRounds,

@@ -16,6 +16,7 @@ import {
   MIN_MARKS,
   MIN_PLAYERS,
   READY_CHALLENGES,
+  READY_SPECIALISTS,
   canPick,
   maxHeists,
   nextHost,
@@ -32,6 +33,7 @@ import { EmoteBubble, EmotePicker, useEmotes } from '../components/Emotes.tsx'
 import { CardPicker } from '../components/CardPicker.tsx'
 import { PickList } from '../components/PickList.tsx'
 import { Chat } from '../components/Chat.tsx'
+import { SettingGroup } from '../components/SettingGroup.tsx'
 import { Toast, TOAST_MS } from '../components/Toast.tsx'
 import { SpecialistGrid } from '../components/SpecialistGrid.tsx'
 import { ChoiceModal, ConfirmModal } from '../components/Modal.tsx'
@@ -146,6 +148,23 @@ export function RoomPage() {
     const next = picked.includes(id) ? picked.filter((x) => x !== id) : [...picked, id]
     void change({ pickedChallenges: next })
   }
+
+  /** 뽑기에서 뺄 도전자. 고정으로 고른 카드는 애초에 후보가 아니라 여기 담지 않는다. */
+  function toggleExcludedChallenge(id: ChallengeId, excluded: ChallengeId[]) {
+    const next = excluded.includes(id) ? excluded.filter((x) => x !== id) : [...excluded, id]
+    void change({ excludedChallenges: next })
+  }
+
+  /*
+   * 어느 묶음이 펴져 있나.
+   *
+   * 아무것도 적히지 않은 묶음은 **방장에게만 펴져 있다** — 설정을 만지는 사람은
+   * 방장뿐이고, 나머지에게는 읽을거리라 접힌 편이 짧다. 한 번 여닫으면 그 사람의
+   * 선택이 이긴다.
+   */
+  const [groupOpen, setGroupOpen] = useState<Record<string, boolean>>({})
+  const flip = (key: string, fallback: boolean) =>
+    setGroupOpen((current) => ({ ...current, [key]: !(current[key] ?? fallback) }))
 
   /*
    * 숫자 칸은 지우는 도중에 빈 값이 되고, 그때 0 을 보내면 서버가 거절해 붉은 줄이 뜬다.
@@ -295,6 +314,15 @@ export function RoomPage() {
   const circling = room.settings.variant === 'circle' || room.settings.variant === 'circleWild'
   const enoughPlayers = room.players.length >= MIN_PLAYERS
   const everyoneHere = room.players.every((player) => player.connected)
+  /** 무작위로 뽑을 수 있는 도전자가 몇 장 남았나. 고른 것과 뺀 것을 덜어낸 나머지다. */
+  const challengePool = READY_CHALLENGES.filter(
+    (id) =>
+      !room.settings.pickedChallenges.includes(id) && !room.settings.excludedChallenges.includes(id),
+  ).length
+  /** 해결사가 서 있는 판 수. 접힌 묶음 머리에 적는다 — 표를 펴지 않아도 읽히게. */
+  const specialistHeists = room.settings.specialistRounds.filter(
+    (id, at) => id !== null || room.settings.specialistRandomRounds[at],
+  ).length
   // 직접 고르기인데 아무것도 고르지 않았다. 설정은 그대로 두고 시작만 막는다.
   const needsCards =
     room.settings.mode === 'custom' &&
@@ -548,24 +576,48 @@ export function RoomPage() {
                 감지기가 보는 「처음 선언」이 2라운드가 되어, 규칙대로 돌아도
                 「두 번 집은 뒤에 감지가 왔다」로 읽힌다.
               */}
-              <CardPicker
-                label={`도전자 카드 (${room.settings.pickedChallenges.length}장)`}
-                hint={
-                  READY_CHALLENGES.some((id) => !canPick(id, room.settings.pickedChallenges))
-                    ? '고른 것이 모든 판에 함께 걸립니다. 「빠른 접근」과 감지기는 함께 걸 수 없어 서로 잠깁니다.'
-                    : '고른 것이 모든 판에 함께 걸립니다.'
+              <SettingGroup
+                title="도전자 카드"
+                summary={
+                  room.settings.pickedChallenges.length === 0
+                    ? '고른 것 없음'
+                    : `${room.settings.pickedChallenges.length}장 고름`
                 }
-                options={READY_CHALLENGES.map((id) => ({
-                  id,
-                  name: CHALLENGES[id].name,
-                  text: CHALLENGES[id].text,
-                  locked: !canPick(id, room.settings.pickedChallenges),
-                }))}
-                picked={room.settings.pickedChallenges}
-                disabled={!iAmHost}
-                onToggle={(id) => toggleChallenge(id as ChallengeId, room.settings.pickedChallenges)}
-              />
+                open={groupOpen.challenges ?? iAmHost}
+                onToggle={() => flip('challenges', iAmHost)}
+              >
+                <CardPicker
+                  label={`모든 판에 걸 카드 (${room.settings.pickedChallenges.length}장)`}
+                  hint={
+                    READY_CHALLENGES.some((id) => !canPick(id, room.settings.pickedChallenges))
+                      ? '고른 것이 모든 판에 함께 걸립니다. 「빠른 접근」과 감지기는 함께 걸 수 없어 서로 잠깁니다.'
+                      : '고른 것이 모든 판에 함께 걸립니다.'
+                  }
+                  options={READY_CHALLENGES.map((id) => ({
+                    id,
+                    name: CHALLENGES[id].name,
+                    text: CHALLENGES[id].text,
+                    locked: !canPick(id, room.settings.pickedChallenges),
+                  }))}
+                  picked={room.settings.pickedChallenges}
+                  disabled={!iAmHost}
+                  onToggle={(id) => toggleChallenge(id as ChallengeId, room.settings.pickedChallenges)}
+                />
+              </SettingGroup>
 
+              <SettingGroup
+                title="무작위 도전자"
+                summary={
+                  room.settings.randomChallenges === 0
+                    ? '뽑지 않음'
+                    : `판마다 ${room.settings.randomChallenges}장` +
+                      (room.settings.excludedChallenges.length > 0
+                        ? ` · ${room.settings.excludedChallenges.length}장 뺌`
+                        : '')
+                }
+                open={groupOpen.random ?? iAmHost}
+                onToggle={() => flip('random', iAmHost)}
+              >
               <div className="setting">
                 <span
                   className="setting__label"
@@ -573,7 +625,7 @@ export function RoomPage() {
                     '판마다 이만큼을 무작위로 새로 뽑아 얹습니다. 위에서 고른 카드와는 겹치지 않고, 지난 판에 나왔던 카드는 다시 나올 수 있습니다.',
                   )}
                 >
-                  무작위 도전자
+                  판마다 새로 뽑기
                   <i className="setting__more" aria-hidden="true">
                     ?
                   </i>
@@ -624,15 +676,71 @@ export function RoomPage() {
                 </label>
               </div>
 
-              <SpecialistGrid
-                rounds={room.settings.specialistRounds}
-                randomRounds={room.settings.specialistRandomRounds}
-                onLoss={room.settings.specialistOnLoss}
-                disabled={!iAmHost}
-                onChange={(specialistRounds) => void change({ specialistRounds })}
-                onRandomChange={(specialistRandomRounds) => void change({ specialistRandomRounds })}
-                onLossChange={(specialistOnLoss) => void change({ specialistOnLoss })}
-              />
+              {/*
+                뺄 카드는 **뽑을 때만** 뜻이 있다. 장수가 0이면 뽑지 않으므로 이 목록도
+                서지 않는다 — 늘 세워 두면 쓸 일 없는 설정이 자리를 먹고, 처음 보는
+                사람은 위의 목록과 무엇이 다른지부터 묻게 된다.
+              */}
+              {room.settings.randomChallenges > 0 && (
+                <CardPicker
+                  label={`뽑기에서 뺄 카드 (${room.settings.excludedChallenges.length}장)`}
+                  hint="표시한 카드는 무작위로 뽑히지 않습니다. 위에서 고른 카드는 이미 걸려 있어 뽑기 후보가 아니므로 잠깁니다."
+                  tone="exclude"
+                  options={READY_CHALLENGES.map((id) => ({
+                    id,
+                    name: CHALLENGES[id].name,
+                    text: CHALLENGES[id].text,
+                    locked: room.settings.pickedChallenges.includes(id),
+                  }))}
+                  picked={room.settings.excludedChallenges}
+                  disabled={!iAmHost}
+                  onToggle={(id) =>
+                    toggleExcludedChallenge(id as ChallengeId, room.settings.excludedChallenges)
+                  }
+                />
+              )}
+
+              {/* 다 빼 두면 뽑을 것이 없다. 설정은 그대로 두고 사실만 알린다. */}
+              {room.settings.randomChallenges > 0 && challengePool === 0 && (
+                <p className="notice notice--warn">
+                  뽑을 도전자가 남지 않았습니다. 이대로면 무작위로는 아무것도 걸리지 않습니다.
+                </p>
+              )}
+              </SettingGroup>
+
+              <SettingGroup
+                title="해결사 배치"
+                summary={
+                  specialistHeists === 0
+                    ? '배치 없음'
+                    : `${specialistHeists}판` +
+                      (room.settings.excludedSpecialists.length > 0
+                        ? ` · ${room.settings.excludedSpecialists.length}장 뺌`
+                        : '')
+                }
+                open={groupOpen.specialists ?? iAmHost}
+                onToggle={() => flip('specialists', iAmHost)}
+              >
+                <SpecialistGrid
+                  rounds={room.settings.specialistRounds}
+                  randomRounds={room.settings.specialistRandomRounds}
+                  onLoss={room.settings.specialistOnLoss}
+                  excluded={room.settings.excludedSpecialists}
+                  disabled={!iAmHost}
+                  onChange={(specialistRounds) => void change({ specialistRounds })}
+                  onRandomChange={(specialistRandomRounds) => void change({ specialistRandomRounds })}
+                  onLossChange={(specialistOnLoss) => void change({ specialistOnLoss })}
+                  onExcludedChange={(excludedSpecialists) => void change({ excludedSpecialists })}
+                />
+
+                {/* 다 빼 두면 뽑을 것이 없다. 그 판은 해결사 없이 지나간다. */}
+                {room.settings.specialistRandomRounds.some(Boolean) &&
+                  room.settings.excludedSpecialists.length === READY_SPECIALISTS.length && (
+                    <p className="notice notice--warn">
+                      뽑을 해결사가 남지 않았습니다. 무작위로 둔 판은 해결사 없이 지나갑니다.
+                    </p>
+                  )}
+              </SettingGroup>
             </>
           )}
 

@@ -96,6 +96,8 @@ describe('방 만들기', () => {
       randomChallenges: 0,
       randomChallengesOnWin: false,
       randomChallengesStay: false,
+      excludedChallenges: [],
+      excludedSpecialists: [],
       vaultsToWin: 3,
       alarmsToLose: 3,
       maxPlayers: 6,
@@ -586,6 +588,31 @@ describe('방 설정', () => {
     }
     assert.equal(ctx.store.updateSettings('p1', { pickedChallenges: [3, 7] }).ok, true, '감지기끼리는 된다')
     assert.equal(ctx.store.updateSettings('p1', { pickedChallenges: [1, 2] }).ok, true, '다른 카드와는 된다')
+  })
+
+  /*
+   * 뽑기에서 뺄 카드.
+   *
+   * 한 카드에 「반드시 걸린다」와 「나오지 않는다」를 함께 붙일 수는 없다 —
+   * 화면이 이미 잠그지만 계약은 방에 있지 화면에 있지 않다.
+   */
+  it('고른 카드는 뽑기에서 뺄 수 없다', () => {
+    assert.equal(ctx.store.updateSettings('p1', { pickedChallenges: [2, 4] }).ok, true)
+    const clash = ctx.store.updateSettings('p1', { excludedChallenges: [4] })
+    assert.equal(clash.ok, false)
+    if (!clash.ok) assert.equal(clash.code, 'INVALID_SETTINGS')
+
+    const apart = ctx.store.updateSettings('p1', { excludedChallenges: [5] })
+    assert.equal(apart.ok, true, '고르지 않은 카드는 뺄 수 있다')
+    if (apart.ok) assert.deepEqual(apart.value.settings.excludedChallenges, [5])
+  })
+
+  it('없는 카드는 뺄 수 없고, 같은 카드를 두 번 담아도 하나로 선다', () => {
+    assert.equal(ctx.store.updateSettings('p1', { excludedChallenges: [999] }).ok, false)
+    assert.equal(ctx.store.updateSettings('p1', { excludedSpecialists: [99] }).ok, false)
+    const twice = ctx.store.updateSettings('p1', { excludedSpecialists: [10, 10, 9] })
+    assert.equal(twice.ok, true)
+    if (twice.ok) assert.deepEqual(twice.value.settings.excludedSpecialists, [9, 10])
   })
 
   it('금고와 경보는 1~5 사이다', () => {

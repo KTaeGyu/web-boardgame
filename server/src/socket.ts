@@ -771,6 +771,8 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
                 randomChallengesStay: room.settings.randomChallengesStay,
                 specialistRandomRounds: room.settings.specialistRandomRounds,
                 specialistOnLoss: room.settings.specialistOnLoss,
+                excludedChallenges: room.settings.excludedChallenges,
+                excludedSpecialists: room.settings.excludedSpecialists,
                 vaultsToWin: room.settings.vaultsToWin,
                 alarmsToLose: room.settings.alarmsToLose,
               }

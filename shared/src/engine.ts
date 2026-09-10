@@ -97,6 +97,9 @@ export interface GameOptions {
   specialistRandomRounds?: readonly boolean[]
   /** 해결사를 직전 판을 졌을 때만 내보내는가. */
   specialistOnLoss?: boolean
+  /** 무작위로는 뽑지 않을 것들. 손으로 세워 둔 해결사는 이 말과 무관하게 나온다. */
+  excludedChallenges?: readonly ChallengeId[]
+  excludedSpecialists?: readonly SpecialistId[]
   /**
    * 몇 개를 열면 이기고 몇 번 울리면 지는가. 「직접 고르기」에서만 넘어온다.
    * 다른 모드는 원작 그대로이고, 마스터 시프의 경보 2는 모드가 정하므로 여기서 받지 않는다.
@@ -242,6 +245,8 @@ export class Game {
       stay: options.randomChallengesStay ?? false,
       specialistRandom: options.specialistRandomRounds ?? [],
       specialistOnLoss: options.specialistOnLoss ?? true,
+      excludedChallenges: options.excludedChallenges ?? [],
+      excludedSpecialists: options.excludedSpecialists ?? [],
     })
     this.seats = players.map((player) => ({
       id: player.id,

@@ -22,24 +22,36 @@ interface Props {
   randomRounds: readonly boolean[]
   /** 직전 판을 졌을 때만 내보내는가. */
   onLoss: boolean
+  /**
+   * 뽑기에서 뺄 카드. 표의 맨 오른쪽 열이다.
+   *
+   * **무작위 칸을 하나라도 찍었을 때만 열이 선다** — 뽑지 않는 판에서는 뜻이 없는
+   * 칸이라, 늘 세워 두면 「이건 뭘 하는 칸인가」를 매번 묻게 된다.
+   */
+  excluded: readonly SpecialistId[]
   disabled?: boolean
   onChange: (rounds: (SpecialistId | null)[]) => void
   onRandomChange: (randomRounds: boolean[]) => void
   onLossChange: (onLoss: boolean) => void
+  onExcludedChange: (excluded: SpecialistId[]) => void
 }
 
 export function SpecialistGrid({
   rounds,
   randomRounds,
   onLoss,
+  excluded,
   disabled,
   onChange,
   onRandomChange,
   onLossChange,
+  onExcludedChange,
 }: Props) {
   const { tip, handlers } = useCardTip()
   /** 몇 판이 채워졌나. 같은 카드가 여러 판에 설 수 있으므로 「장」이 아니라 「판」이다. */
   const filled = rounds.filter((id, at) => id !== null || randomRounds[at]).length
+  /** 뽑는 판이 하나라도 있나. 제외 열은 그때만 뜻이 있다. */
+  const drawing = randomRounds.some(Boolean)
 
   function toggle(id: SpecialistId, at: number) {
     const next = [...rounds]
@@ -51,6 +63,13 @@ export function SpecialistGrid({
     if (next[at] !== null && randomRounds[at]) {
       onRandomChange(randomRounds.map((on, index) => (index === at ? false : on)))
     }
+  }
+
+  /** 뽑기에서 뺄 카드. 판에 손으로 세워 둔 카드는 이 표시가 있어도 그대로 나온다. */
+  function toggleSkip(id: SpecialistId) {
+    onExcludedChange(
+      excluded.includes(id) ? excluded.filter((one) => one !== id) : [...excluded, id],
+    )
   }
 
   function toggleRandom(at: number) {
@@ -76,7 +95,10 @@ export function SpecialistGrid({
         </i>
       </span>
 
-      <div className="slot-grid" style={{ '--rounds': rounds.length } as CSSProperties}>
+      <div
+        className={`slot-grid ${drawing ? 'slot-grid--skip' : ''}`}
+        style={{ '--rounds': rounds.length } as CSSProperties}
+      >
         <div className="slot-row slot-row--head">
           <span />
           {rounds.map((_, index) => (
@@ -84,6 +106,13 @@ export function SpecialistGrid({
               {index + 1}판
             </span>
           ))}
+          {drawing && (
+            <span className="slot-row__round slot-cell--skip" {...handlers(
+              '무작위로 뽑을 때 이 카드는 나오지 않습니다. 판에 직접 세워 둔 카드는 그대로 나옵니다.',
+            )}>
+              제외
+            </span>
+          )}
         </div>
 
         {/*
@@ -105,12 +134,19 @@ export function SpecialistGrid({
               <span className="slot-cell__mark" aria-hidden="true" />
             </button>
           ))}
+          {/* 뽑기 줄에는 제외 칸이 없다 — 뽑기를 뽑기에서 뺄 수는 없다. */}
+          {drawing && <span className="slot-cell--skip" />}
         </div>
 
         {READY_SPECIALISTS.map((id) => {
           const at = rounds.indexOf(id)
           return (
-            <div key={id} className={`slot-row ${at >= 0 ? 'slot-row--on' : ''}`}>
+            <div
+              key={id}
+              className={`slot-row ${at >= 0 ? 'slot-row--on' : ''} ${
+                excluded.includes(id) ? 'slot-row--out' : ''
+              }`}
+            >
               {/* 이름을 짚으면 무슨 카드인지 뜬다. 스무 장을 설명과 함께 늘어놓지 않으려는 것이다. */}
               <span className="slot-row__name" {...handlers(SPECIALISTS[id].text)}>
                 {SPECIALISTS[id].name}
@@ -128,6 +164,20 @@ export function SpecialistGrid({
                   <span className="slot-cell__mark" aria-hidden="true" />
                 </button>
               ))}
+              {drawing && (
+                <button
+                  type="button"
+                  className={`slot-cell slot-cell--skip ${
+                    excluded.includes(id) ? 'slot-cell--out' : ''
+                  }`}
+                  disabled={disabled}
+                  aria-pressed={excluded.includes(id)}
+                  aria-label={`${SPECIALISTS[id].name} — 뽑기에서 제외`}
+                  onClick={() => toggleSkip(id)}
+                >
+                  <span className="slot-cell__mark" aria-hidden="true" />
+                </button>
+              )}
             </div>
           )
         })}

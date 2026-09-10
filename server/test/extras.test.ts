@@ -1132,6 +1132,69 @@ describe('직접 고르기 — 무작위 도전자', () => {
     assert.equal(dealer.next(true).specialist, null, '찍지 않은 판은 그대로 비어 있다')
   })
 
+  /*
+   * 뽑기에서 뺀 카드.
+   *
+   * 「고른 것」의 반대편이다 — 저쪽이 「반드시 걸린다」면 이쪽은 「나오지 않는다」이고,
+   * 아무 표시도 없는 카드만 후보로 남는다. 손으로 세워 둔 해결사는 이 말과 무관하다.
+   */
+  it('뺀 도전자는 몇 번을 돌려도 뽑히지 않는다', () => {
+    const excluded: ChallengeId[] = [1, 2, 3, 5]
+    for (let seed = 1; seed <= 30; seed += 1) {
+      const dealer = new ExtraDealer('custom', mulberry32(seed), [], [], {
+        random: 3,
+        excludedChallenges: excluded,
+      })
+      for (let heist = 0; heist < 4; heist += 1) {
+        for (const id of dealer.next(true).challenges) {
+          assert.ok(!excluded.includes(id), `씨앗 ${seed} — 뺀 카드가 나왔다: ${id}`)
+        }
+      }
+    }
+  })
+
+  it('남은 것이 뽑을 장수보다 적으면 남은 만큼만 나온다', () => {
+    // 다 빼면 아무것도 안 걸린다. 설정을 거절하는 대신 그 판이 비는 쪽이다.
+    const dealer = new ExtraDealer('custom', mulberry32(11), [], [], {
+      random: 3,
+      excludedChallenges: [...READY_CHALLENGES],
+    })
+    assert.deepEqual(dealer.next(true).challenges, [])
+  })
+
+  it('뺀 해결사는 뽑히지 않지만, 판에 세워 둔 것은 그대로 나온다', () => {
+    for (let seed = 1; seed <= 20; seed += 1) {
+      const dealer = new ExtraDealer(
+        'custom',
+        mulberry32(seed),
+        [],
+        // 둘째 판에는 손으로 세워 둔다 — 그 카드는 빼 두어도 나와야 한다.
+        [null, READY_SPECIALISTS[0], null, null, null],
+        {
+          specialistRandom: [true, false, false, false, false],
+          specialistOnLoss: false,
+          excludedSpecialists: [READY_SPECIALISTS[0], READY_SPECIALISTS[1]],
+        },
+      )
+      const drawn = dealer.next(null).specialist
+      assert.ok(drawn !== null, `씨앗 ${seed} — 뽑을 것이 남았는데 비었다`)
+      assert.ok(
+        drawn !== READY_SPECIALISTS[0] && drawn !== READY_SPECIALISTS[1],
+        `씨앗 ${seed} — 뺀 해결사가 뽑혔다: ${drawn}`,
+      )
+      assert.equal(dealer.next(true).specialist, READY_SPECIALISTS[0], '세워 둔 것은 그대로 나온다')
+    }
+  })
+
+  it('해결사를 다 빼면 무작위로 둔 판은 비어서 지나간다', () => {
+    const dealer = new ExtraDealer('custom', mulberry32(3), [], [null, null, null, null, null], {
+      specialistRandom: [true, false, false, false, false],
+      specialistOnLoss: false,
+      excludedSpecialists: [...READY_SPECIALISTS],
+    })
+    assert.equal(dealer.next(null).specialist, null)
+  })
+
   it('고른 카드와 겹치지 않고, 무작위끼리도 겹치지 않는다', () => {
     // 겹치면 두 장이 한 장으로 합쳐지는 셈이라 얹은 만큼 안 얹힌다. 씨앗을 바꿔가며 본다.
     for (let seed = 1; seed <= 30; seed += 1) {
