@@ -153,6 +153,7 @@ curl localhost:3001/healthz     # {"ok":true,"rooms":0}
 | [`docs/context.md`](docs/context.md) | **지금 어디까지 왔고 무엇이 남았는지.** 이어서 작업할 때 여기부터 |
 | [`docs/도전자-해결사-카드.md`](docs/도전자-해결사-카드.md) | 카드 20장의 효과 정본 |
 | [`docs/배포.md`](docs/배포.md) | Render + Vercel 올리는 순서와 함정 |
+| [`docs/plan-llm-플레이어.md`](docs/plan-llm-플레이어.md) | **아직 만들지 않은 것.** LLM 봇을 붙인다면 어떻게 — 벡터를 안 쓰는 까닭, 「정해진 것」과 부딪히는 다섯 |
 | 이 문서 아래쪽 | **왜 이렇게 만들었는가** — 설계 결정과 근거 |
 
 ---
