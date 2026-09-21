@@ -258,7 +258,8 @@ export function GamePage({ spectating = false }: { spectating?: boolean } = {}) 
       }
     }
 
-    void enter()
+    // 끊겨 있으면 지금 보내지 않는다. 붙는 순간 아래 connect 가 부르므로 두 번이 된다.
+    if (socket.connected) void enter()
     // 인자 없는 off 는 'connect' 를 듣던 모두를 떼어낸다 — 연결 표시등까지 귀가 먹어
     // 서버가 돌아와도 화면이 영영 「끊김」인 채로 남는다. 내 것만 떼어낸다.
     const onConnect = () => void enter()
@@ -642,16 +643,19 @@ export function GamePage({ spectating = false }: { spectating?: boolean } = {}) 
    * 끝을 본 판만 적는다 — 승·패·중도포기 셋뿐이라 그때만 세면 새로고침으로 두 번 세는
    * 일이 없다. 연습과 관전은 세지 않는다. 남이 나가 접힌 판도 내 승패가 아니라 세지 않는다.
    */
+  /*
+   * 열쇠 하나에만 매단다. `game` 에 매달면 끝난 뒤 재경기 표·재접속으로 상태가 올 때마다
+   * 같은 끝을 다시 보냈다(서버가 한 번만 세지만 요청은 사람 수만큼 나갔다).
+   * 같은 방에서 재경기가 돌면 판 번호가 겹친다. 게임이 시작된 시각으로 가른다.
+   */
+  const outcome = game?.phase === 'gameOver' ? game.outcome : null
+  const recordKey =
+    !spectating && !tutorial && outcome ? `${code}:${game?.startedAt}:${outcome}` : ''
   useEffect(() => {
-    if (spectating || tutorial || !game) return
-    if (game.phase !== 'gameOver' || !game.outcome) return
     // 로그인했을 때만 쌓인다. 게스트로 한 판은 세지 않는다 — 쌓을 곳이 없다.
-    // 같은 방에서 재경기가 돌면 판 번호가 겹친다. 게임이 시작된 시각으로 가른다.
-    void recordPlay(
-      game.outcome === 'win' ? 'win' : 'lose',
-      `${code}:${game.startedAt}:${game.outcome}`,
-    )
-  }, [spectating, tutorial, game, code])
+    if (recordKey && outcome) void recordPlay(outcome === 'win' ? 'win' : 'lose', recordKey)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recordKey])
 
   /*
    * 골드는 금고마다 쌓인다(2026-09-21). 게임의 끝을 기다리지 않는 것이 요점이다 —

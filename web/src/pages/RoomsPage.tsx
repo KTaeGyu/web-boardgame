@@ -42,15 +42,16 @@ export function RoomsPage() {
    * 재연결 때 다시 구독해야 서버가 우리를 기억한다.
    */
   useEffect(() => {
-    const watch = () => {
-      socket.emit('rooms:watch', { watching: true })
-      void askWhere()
-    }
-    watch()
+    /*
+     * 구독하면 서버가 곧바로 목록을 보내 준다(`rooms:changed`). 그 신호가 내 자리도 다시
+     * 묻게 하므로 목록을 따로 받거나 자리를 따로 물을 필요가 없다.
+     *
+     * 끊긴 채로 보내면 socket.io 가 쌓아 뒀다가 붙을 때 보내고, 아래 connect 에서 한 번
+     * 더 보내 두 번이 된다. 붙어 있을 때만 지금 보내고 나머지는 connect 에 맡긴다.
+     */
+    const watch = () => socket.emit('rooms:watch', { watching: true })
+    if (socket.connected) watch()
     socket.on('connect', watch)
-    void call<RoomSummary[]>('room:list').then((result) => {
-      if (result.ok) setRooms(result.value)
-    })
     return () => {
       socket.off('connect', watch)
       socket.emit('rooms:watch', { watching: false })

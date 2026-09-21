@@ -126,7 +126,8 @@ export function useSession(): Session | null {
 export function useResumeSession(): void {
   const again = useCallback(() => void resume(), [])
   useEffect(() => {
-    again()
+    // 앱을 열 때는 아직 안 붙어 있다. 그때 부르면 붙는 순간 connect 와 함께 두 번 나간다.
+    if (socket.connected) again()
     socket.on('connect', again)
     return () => {
       socket.off('connect', again)

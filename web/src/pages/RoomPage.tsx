@@ -120,9 +120,17 @@ export function RoomPage() {
 
   /** 설정 바꾸기는 방장만 할 수 있다. 거절 사유는 그대로 보여준다. */
   async function change(patch: Partial<RoomView['settings']>) {
+    /*
+     * 답을 기다리지 않고 화면에 먼저 얹는다. 카드 고르기는 배열을 통째로 보내므로, 답이
+     * 오기 전에 두 장을 연달아 누르면 둘째가 첫째를 모르는 채로 계산돼 첫째가 사라졌다.
+     */
+    const before = room
+    setRoom((current) => (current ? { ...current, settings: { ...current.settings, ...patch } } : current))
     const result = await call<RoomView>('room:settings', patch)
-    if (!result.ok) setError(result.message)
-    else setError('')
+    if (!result.ok) {
+      setError(result.message)
+      if (before) setRoom(before)
+    } else setError('')
   }
 
   /** 자리에서 물러나 보기만 한다. 성공해야 주소를 바꾼다 — 거절당하면 자리는 그대로다. */
@@ -223,7 +231,8 @@ export function RoomPage() {
       }
     }
 
-    void enter()
+    // 끊겨 있으면 지금 보내지 않는다. 붙는 순간 아래 connect 가 부르므로 두 번이 된다.
+    if (socket.connected) void enter()
     socket.on('connect', enter) // 재연결 때마다 자리를 다시 잡는다
     return () => {
       alive = false
