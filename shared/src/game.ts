@@ -88,8 +88,11 @@ export const AUTO_CONFIRM_COUNTDOWN_MS = 5_000
  *
  * 전역으로 잠그면 여러 명이 활발히 뺏을 때 서로의 입력을 계속 먹는다.
  * 화면 애니메이션과 같은 길이여야 손이 도착하는 순간 실제로 풀린다.
+ *
+ * 0.5초에서 0.2초로 줄였다(2026-09-21). 한 번 옮기고 다음 손까지 묶이는 시간이 판을
+ * 굼뜨게 했다. 비행도 같은 값이라 함께 빨라진다.
  */
-export const TOKEN_LOCK_MS = 500
+export const TOKEN_LOCK_MS = 200
 
 export type GamePhase = 'setup' | 'picking' | 'scanning' | 'showdown' | 'gameOver'
 

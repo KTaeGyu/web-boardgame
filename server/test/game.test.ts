@@ -223,8 +223,8 @@ describe('토큰 잠금', () => {
     ctx.game.takeToken('p1', 2)
     assert.deepEqual(ctx.game.view().lockLeft, [{ token: 2, ms: TOKEN_LOCK_MS }])
 
-    ctx.advance(200)
-    assert.deepEqual(ctx.game.view().lockLeft, [{ token: 2, ms: TOKEN_LOCK_MS - 200 }])
+    ctx.advance(TOKEN_LOCK_MS / 2)
+    assert.deepEqual(ctx.game.view().lockLeft, [{ token: 2, ms: TOKEN_LOCK_MS / 2 }])
 
     ctx.advance(TOKEN_LOCK_MS)
     assert.deepEqual(ctx.game.view().lockLeft, [])
