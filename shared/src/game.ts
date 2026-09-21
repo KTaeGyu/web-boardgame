@@ -168,6 +168,13 @@ export interface Announcement {
 
 export interface GameView {
   roomCode: string
+  /**
+   * 이 게임이 시작된 시각. 재경기면 새 값이다.
+   *
+   * 같은 방에서 여러 게임이 돌아 「몇 번째 판」만으로는 어느 게임의 판인지 가릴 수 없다.
+   * 전적과 골드를 한 번만 세는 열쇠에 이것이 들어간다.
+   */
+  startedAt: number
   /** 어떤 포커인가. 화면이 손을 어떻게 읽을지가 여기서 갈린다. */
   variant: PokerVariant
   mode: GameMode

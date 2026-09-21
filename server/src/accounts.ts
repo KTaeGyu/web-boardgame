@@ -103,6 +103,8 @@ export class Accounts {
   private locked = false
   /** 아직 밖으로 못 보낸 전적. 이메일로 모아 두므로 같은 사람이 두 판 끝내도 한 번 나간다. */
   private pending = new Set<string>()
+  /** 골드가 늘어 꾸미기 칸을 다시 써야 하는 사람들. 전적과 같은 물길로 나간다. */
+  private pendingGold = new Set<string>()
   private drain: ReturnType<typeof setTimeout> | null = null
   /**
    * 이메일마다 하나씩. **꾸미기 쓰기를 한 줄로 세운다.**
@@ -153,7 +155,8 @@ export class Accounts {
             salt: one.passwordSalt,
             hash: one.passwordHash,
             record: { wins: one.wins, losses: one.losses },
-            cosmetics: one.cosmetics ?? { ...EMPTY_COSMETICS },
+            // 꾸미기 칸이 아예 없는 옛 계정도 이긴 만큼은 벌어 둔 것이다.
+            cosmetics: one.cosmetics ?? { ...EMPTY_COSMETICS, earned: one.wins },
             counted: new Set(),
           })
         }
@@ -286,6 +289,25 @@ export class Accounts {
   }
 
   /**
+   * 금고 하나를 열었다. 골드 1 이 쌓인다.
+   *
+   * **게임의 끝을 기다리지 않는다** — 끝까지 못 하고 자리를 뜨는 사람에게도 그동안 연
+   * 금고는 남는다. 전적은 여전히 끝을 본 게임만 센다.
+   */
+  earn(token: string, once: string): Result<Cosmetics> {
+    const account = this.find(token)
+    if (!account) return err('NOT_SIGNED_IN', '다시 로그인해 주세요.')
+    const key = `vault:${once}`
+    if (!account.counted.has(key)) {
+      account.counted.add(key)
+      account.cosmetics = { ...account.cosmetics, earned: account.cosmetics.earned + 1 }
+      this.pendingGold.add(account.email)
+      this.later(account.email)
+    }
+    return ok({ ...account.cosmetics })
+  }
+
+  /**
    * 한 계정의 꾸미기 쓰기를 줄 세운다.
    *
    * **판정을 이 안에서 다시 한다는 것이 요점이다.** 줄 밖에서 읽은 값은 내 차례가
@@ -333,7 +355,7 @@ export class Accounts {
       // 줄을 선 사이에 앞사람이 사고 갔을 수 있다. 그래서 판정이 줄 안에 있다.
       if (owns(account.cosmetics, id)) return err('INVALID_SETTINGS', '이미 보유한 아이템입니다.')
 
-      const left = balanceOf(account.record.wins, account.cosmetics.spent)
+      const left = balanceOf(account.cosmetics)
       if (left < item.price) {
         return err('INVALID_SETTINGS', `골드가 ${item.price - left} 부족합니다.`)
       }
@@ -341,6 +363,7 @@ export class Accounts {
       const next: Cosmetics = {
         owned: [...account.cosmetics.owned, id],
         equipped: { ...account.cosmetics.equipped },
+        earned: account.cosmetics.earned,
         spent: account.cosmetics.spent + item.price,
       }
       if (this.store) {
@@ -351,8 +374,7 @@ export class Accounts {
           return err('INVALID_SETTINGS', '구매에 실패했습니다. 잠시 뒤에 다시 시도해 주세요.')
         }
       }
-      account.cosmetics = next
-      return ok({ ...next, owned: [...next.owned], equipped: { ...next.equipped } })
+      return ok(this.settle(account, next))
     })
   }
 
@@ -383,8 +405,7 @@ export class Accounts {
           return err('INVALID_SETTINGS', '지금은 바꿀 수 없습니다. 잠시 뒤에 다시 시도해 주세요.')
         }
       }
-      account.cosmetics = next
-      return ok({ ...next, owned: [...next.owned], equipped: { ...next.equipped } })
+      return ok(this.settle(account, next))
     })
   }
 
@@ -419,8 +440,37 @@ export class Accounts {
       } catch (trouble) {
         logLine('error', `전적을 남기지 못했다: ${email}`, trouble)
       }
+      if (this.pendingGold.delete(email)) {
+        // 구매·장착과 같은 줄에 선다. 따로 쓰면 서로의 값을 덮는다.
+        const store = this.store
+        await this.queue(email, async () => {
+          try {
+            await store.saveCosmetics(email, account.cosmetics)
+          } catch (trouble) {
+            logLine('error', `골드를 남기지 못했다: ${email}`, trouble)
+          }
+          return ok(null)
+        })
+      }
       await wait(DRAIN_MS)
     }
+  }
+
+  /**
+   * 밖에 쓰고 돌아온 꾸미기를 계정에 앉힌다.
+   *
+   * **쓰는 사이에 금고가 열렸을 수 있다.** `next` 는 줄에 들어설 때의 골드를 들고 있어,
+   * 그대로 앉히면 그사이 번 것이 사라진다. 번 골드는 계정 쪽 값을 따르고, 밖에 나간
+   * 값이 그만큼 낡았으므로 한 번 더 흘려보낸다.
+   */
+  private settle(account: Account, next: Cosmetics): Cosmetics {
+    const earned = Math.max(next.earned, account.cosmetics.earned)
+    if (earned !== next.earned) {
+      this.pendingGold.add(account.email)
+      this.later(account.email)
+    }
+    account.cosmetics = { ...next, earned }
+    return { ...account.cosmetics, owned: [...next.owned], equipped: { ...next.equipped } }
   }
 
   /** 표를 들고 있는 계정. 저장소에 넘길 것을 고를 때 쓴다. */

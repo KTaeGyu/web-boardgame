@@ -1,9 +1,9 @@
 /**
  * 상점 — 코스메틱을 사고 장착하는 자리.
  *
- * **골드는 승리에서 나온다.** 다만 이긴 판(`record.wins`)은 누적이라 줄지 않고,
- * 쓴 만큼(`cosmetics.spent`)을 따로 센다. 그 둘의 차가 지금 쓸 수 있는 잔액이다 —
- * 전적에서 직접 깎으면 많이 이기고 많이 쓴 사람의 전적이 0승이 된다.
+ * **골드는 연 금고에서 나온다**(2026-09-21, 하나에 1). 번 것(`cosmetics.earned`)은
+ * 누적이라 줄지 않고, 쓴 만큼(`cosmetics.spent`)을 따로 센다. 그 둘의 차가 지금 쓸 수
+ * 있는 잔액이다. 전적(승·패)과는 따로 돈다 — 게임을 끝까지 못 해도 연 금고는 남는다.
  *
  * **게스트에게는 열리지 않는다.** 꾸민 것을 남길 자리가 계정뿐이라, 게스트가 골라도
  * 창을 닫는 순간 사라진다. 고를 수 있는 척하고 사라지는 것보다 못 한다고 말하는 편이 낫다.
@@ -74,7 +74,7 @@ export function LooksPage() {
   }
 
   const worn = me.cosmetics.equipped ?? DEFAULT_EQUIPPED
-  const left = balanceOf(me.record.wins, me.cosmetics.spent)
+  const left = balanceOf(me.cosmetics)
 
   /** 이미 가진 것을 장착한다. 값이 오가지 않으므로 묻지 않는다. */
   async function equipOnly(id: string, slot: keyof Equipped) {
@@ -130,14 +130,14 @@ export function LooksPage() {
             <div className="looks-me__side">
               <p className="looks-me__name">{me.nickname}</p>
               {/*
-                누적 승리와 보유 골드를 **나란히** 둔다. 같은 숫자에서 나오지만 다른 값이라,
-                떨어뜨려 두면 「전적이 줄었다」로 읽힌다.
+                번 것과 가진 것을 **나란히** 둔다. 같은 숫자에서 나오지만 다른 값이라,
+                떨어뜨려 두면 「골드가 줄었다」로만 읽힌다.
               */}
               <p className="looks-me__coin">
                 보유 골드 <strong>{left}</strong>
               </p>
               <p className="looks-me__hint">
-                누적 획득 {me.record.wins} · 사용 {me.cosmetics.spent}
+                누적 획득 {me.cosmetics.earned} · 사용 {me.cosmetics.spent}
               </p>
             </div>
           </section>
@@ -148,7 +148,7 @@ export function LooksPage() {
           */}
           {notice && <p className="notice">{notice}</p>}
 
-          <p className="looks-foot">1승당 1골드를 획득합니다.</p>
+          <p className="looks-foot">금고를 하나 열 때마다 1골드를 획득합니다.</p>
         </div>
 
         <div className="looks-main">

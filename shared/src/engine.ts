@@ -158,6 +158,7 @@ export class Game {
   /** 방에서 정한 뽑기 설정. 재경기에서 뽑는 자리를 다시 세울 때도 이것을 쓴다. */
   private readonly dealing: ConstructorParameters<typeof ExtraDealer>[4]
   private dealer: ExtraDealer
+  private startedAt: number
 
   private seats: Seat[] = []
   private deck: Card[] = []
@@ -251,6 +252,7 @@ export class Game {
       excludedSpecialists: options.excludedSpecialists ?? [],
     }
     this.dealer = this.newDealer()
+    this.startedAt = this.now()
     this.seats = players.map((player) => ({
       id: player.id,
       nickname: player.nickname,
@@ -758,6 +760,7 @@ export class Game {
     this.alarms = 0
     this.lastSuccess = null
     this.rematchAgreed.clear()
+    this.startedAt = this.now()
     this.dealer = this.newDealer()
     this.startHeist()
   }
@@ -1101,6 +1104,7 @@ export class Game {
 
     return {
       roomCode: this.roomCode,
+      startedAt: this.startedAt,
       variant: this.variant,
       mode: this.mode,
       vaultsToWin: this.vaultsToWin,

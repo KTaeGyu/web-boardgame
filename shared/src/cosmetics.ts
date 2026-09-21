@@ -148,20 +148,25 @@ export const DEFAULT_EQUIPPED: Equipped = {
 /**
  * 계정이 들고 다니는 코스메틱.
  *
- * **`spent` 는 전적과 따로 센다.** 승리 수(`wins`)는 누적이라 줄지 않는다 —
- * 거기서 깎으면 많이 이기고 많이 쓴 사람의 전적이 0승이 된다. 살 수 있는 것은
- * `wins - spent` 이고, 그 값만 「골드」로 부른다.
+ * **골드는 전적과 따로 센다**(2026-09-21). 번 것(`earned`)은 **연 금고 하나에 1** 이고,
+ * 살 수 있는 것은 `earned - spent` 다. 예전에는 이긴 게임 하나에 1 이었는데(`wins - spent`),
+ * 끝까지 못 하고 자리를 뜨는 사람에게는 아무것도 남지 않았다. 전적(승·패)은 그대로
+ * 게임 단위로 센다. 옛 계정은 읽을 때 `earned` 를 그때의 `wins` 로 채운다 — 가진 골드가
+ * 그대로 넘어온다.
  */
 export interface Cosmetics {
   /** 구매한 것들. 0골드짜리는 여기 없어도 늘 보유한 것으로 친다. */
   owned: string[]
   equipped: Equipped
+  /** 지금까지 번 골드. 연 금고 하나에 1. 쓴다고 줄지 않는다. */
+  earned: number
   spent: number
 }
 
 export const EMPTY_COSMETICS: Cosmetics = {
   owned: [],
   equipped: DEFAULT_EQUIPPED,
+  earned: 0,
   spent: 0,
 }
 
@@ -175,9 +180,9 @@ export function cosmeticsOfKind(kind: CosmeticKind): CosmeticItem[] {
   return COSMETICS.filter((item) => item.kind === kind)
 }
 
-/** 지금 쓸 수 있는 골드. 승리로 번 것에서 쓴 만큼을 뺀다. */
-export function balanceOf(wins: number, spent: number): number {
-  return Math.max(0, wins - spent)
+/** 지금 쓸 수 있는 골드. 번 것에서 쓴 만큼을 뺀다. */
+export function balanceOf(cosmetics: Pick<Cosmetics, 'earned' | 'spent'>): number {
+  return Math.max(0, cosmetics.earned - cosmetics.spent)
 }
 
 /**

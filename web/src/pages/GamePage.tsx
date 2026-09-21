@@ -15,7 +15,7 @@ import {
   type Round,
 } from '@the-gang/shared'
 
-import { recordPlay, session } from '../lib/auth.ts'
+import { recordPlay, recordVault, session } from '../lib/auth.ts'
 import { Chat } from '../components/Chat.tsx'
 import {
   EmoteBubble,
@@ -646,11 +646,23 @@ export function GamePage({ spectating = false }: { spectating?: boolean } = {}) 
     if (spectating || tutorial || !game) return
     if (game.phase !== 'gameOver' || !game.outcome) return
     // 로그인했을 때만 쌓인다. 게스트로 한 판은 세지 않는다 — 쌓을 곳이 없다.
+    // 같은 방에서 재경기가 돌면 판 번호가 겹친다. 게임이 시작된 시각으로 가른다.
     void recordPlay(
       game.outcome === 'win' ? 'win' : 'lose',
-      `${code}:${game.heist}:${game.outcome}`,
+      `${code}:${game.startedAt}:${game.outcome}`,
     )
   }, [spectating, tutorial, game, code])
+
+  /*
+   * 골드는 금고마다 쌓인다(2026-09-21). 게임의 끝을 기다리지 않는 것이 요점이다 —
+   * 끝까지 못 하고 자리를 뜨는 사람에게도 그동안 연 금고는 남는다.
+   * 쇼다운 상태는 넘어가기 전까지 여러 번 오지만 열쇠가 같아 한 번만 세어진다.
+   */
+  const vaultKey =
+    !spectating && !tutorial && game?.showdown?.success ? `${code}:${game.startedAt}:${game.heist}` : ''
+  useEffect(() => {
+    if (vaultKey) void recordVault(vaultKey)
+  }, [vaultKey])
 
   /*
    * 판이 끝나기 전에 나간다.

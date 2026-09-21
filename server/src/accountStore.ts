@@ -26,9 +26,13 @@ import { logLine } from './log.ts'
  * 통째로 버리지 않는다. 「무엇을 걸칠 수 있는가」는 여기서 보지 않는다 —
  * 그 판정은 표를 든 `sanitizeEquipped` 의 몫이다.
  */
-function readCosmetics(value: unknown): Cosmetics | null {
+/**
+ * @param wins 옛 줄에는 `earned` 가 없다. 그때는 이긴 게임 수가 곧 번 골드였으므로
+ *   그 값으로 채운다 — 가진 골드가 그대로 넘어온다(2026-09-21).
+ */
+export function readCosmetics(value: unknown, wins: number): Cosmetics | null {
   if (!value || typeof value !== 'object') return null
-  const raw = value as { owned?: unknown; equipped?: unknown; spent?: unknown }
+  const raw = value as { owned?: unknown; equipped?: unknown; earned?: unknown; spent?: unknown }
   const owned = Array.isArray(raw.owned) ? raw.owned.filter((one) => typeof one === 'string') : []
   const worn = (raw.equipped ?? {}) as Record<string, unknown>
   const at = (key: keyof typeof DEFAULT_EQUIPPED) =>
@@ -36,6 +40,7 @@ function readCosmetics(value: unknown): Cosmetics | null {
   return {
     owned,
     equipped: { avatar: at('avatar'), bg: at('bg'), effect: at('effect'), banner: at('banner') },
+    earned: typeof raw.earned === 'number' && raw.earned >= 0 ? raw.earned : wins,
     spent: typeof raw.spent === 'number' && raw.spent >= 0 ? raw.spent : 0,
   }
 }
@@ -284,7 +289,7 @@ class ContentfulAccounts implements AccountStore {
       passwordSalt,
       wins: typeof wins === 'number' ? wins : 0,
       losses: typeof losses === 'number' ? losses : 0,
-      cosmetics: readCosmetics(pick('cosmetics')),
+      cosmetics: readCosmetics(pick('cosmetics'), typeof wins === 'number' ? wins : 0),
     }
   }
 

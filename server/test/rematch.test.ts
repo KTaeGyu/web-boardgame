@@ -108,6 +108,17 @@ describe('재경기', () => {
   })
 
   /*
+   * 전적과 골드를 한 번만 세는 열쇠에 이 값이 들어간다. 같으면 재경기의 첫 금고가
+   * 앞 게임의 첫 금고와 같은 것으로 읽혀 세어지지 않는다.
+   */
+  it('다시 시작하면 게임이 시작된 시각도 새로 찍힌다', () => {
+    const { game, ids } = finishedGame()
+    const before = game.view().startedAt
+    for (const id of ids) game.proposeRematch(id, true)
+    assert.notEqual(game.view().startedAt, before)
+  })
+
+  /*
    * 다시 시작할 때 뽑기 설정을 빠뜨려, 무작위 세 장으로 시작한 방이 재경기에서는
    * 고른 한 장만 걸렸다(2026-09-21). 방에서 정한 것은 재경기에도 그대로여야 한다.
    */

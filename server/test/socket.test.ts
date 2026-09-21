@@ -281,13 +281,13 @@ describe('방 설정', () => {
  * 그 사람의 차림이 자리에 붙었는가」와 「표가 없으면 안 붙는가」 둘이다.
  */
 describe('장착한 차림이 자리에 붙는다', () => {
-  /** 가입하고 몇 판 이겨 골드를 쌓아 둔 사람 하나. 표를 돌려준다. */
+  /** 가입하고 금고를 몇 개 열어 골드를 쌓아 둔 사람 하나. 표를 돌려준다. */
   async function signedIn(socket: Socket, email: string, wins: number) {
     const made = unwrap(
       await call<Session>(socket, 'auth:signup', { email, password: 'pass1234', nickname: '태규' }),
     )
     for (let at = 0; at < wins; at += 1) {
-      unwrap(await call(socket, 'auth:record', { token: made.token, outcome: 'win', once: `h${at}` }))
+      unwrap(await call(socket, 'auth:vault', { token: made.token, once: `h${at}` }))
     }
     return made.token
   }

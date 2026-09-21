@@ -18,7 +18,7 @@ import {
 } from '@the-gang/shared'
 
 import { Accounts } from '../src/accounts.ts'
-import type { AccountStore, StoredAccount } from '../src/accountStore.ts'
+import { readCosmetics, type AccountStore, type StoredAccount } from '../src/accountStore.ts'
 
 /*
  * 가입만 비동기다. 밖에 먼저 쓰고 성공을 확인한 뒤 메모리에 넣기 때문인데,
@@ -305,17 +305,18 @@ const MASK = price('mask')
 /**
  * 코스메틱 — 골드가 걸린 자리라 판정이 서버에 있어야 한다.
  *
- * 누적 승리는 줄지 않고, 사용한 만큼(`spent`)을 따로 센다. 그 둘의 차가 보유 골드다.
+ * 번 골드(`earned`, 연 금고 하나에 1)는 줄지 않고, 사용한 만큼(`spent`)을 따로 센다.
+ * 그 둘의 차가 보유 골드다. 전적(승·패)과는 따로 돈다.
  */
 describe('코스메틱', () => {
-  /** 승리를 원하는 수만큼 쌓아 둔 계정 하나. 보유 골드는 곧 승리 수다. */
-  async function signedIn(wins: number) {
+  /** 금고를 원하는 수만큼 열어 둔 계정 하나. 보유 골드는 곧 연 금고 수다. */
+  async function signedIn(vaults: number) {
     const accounts = new Accounts(null)
     const made = await accounts.signup('tk@example.com', 'pass1234', '태규')
     assert.equal(made.ok, true)
     if (!made.ok) throw new Error('unreachable')
     const token = made.value.token
-    for (let at = 0; at < wins; at += 1) accounts.record(token, 'win', `heist-${at}`)
+    for (let at = 0; at < vaults; at += 1) accounts.earn(token, `heist-${at}`)
     return { accounts, token }
   }
 
@@ -337,9 +338,9 @@ describe('코스메틱', () => {
     if (!bought.ok) assert.match(bought.message, /골드가 1 부족합니다/)
   })
 
-  it('구매하면 사용한 만큼만 늘고 누적 승리는 그대로다', async () => {
-    const wins = COWL + 5
-    const { accounts, token } = await signedIn(wins)
+  it('구매하면 사용한 만큼만 늘고 번 골드는 그대로다', async () => {
+    const vaults = COWL + 5
+    const { accounts, token } = await signedIn(vaults)
     const bought = await accounts.buy(token, 'bat')
     assert.equal(bought.ok, true)
     if (!bought.ok) return
@@ -350,8 +351,49 @@ describe('코스메틱', () => {
     const me = accounts.resume(token)
     assert.equal(me.ok, true)
     if (!me.ok) return
-    assert.equal(me.value.record.wins, wins, '전적은 깎이지 않는다')
-    assert.equal(balanceOf(me.value.record.wins, me.value.cosmetics.spent), 5)
+    assert.equal(me.value.cosmetics.earned, vaults, '번 골드는 깎이지 않는다')
+    assert.equal(balanceOf(me.value.cosmetics), 5)
+  })
+
+  /*
+   * 골드는 게임이 아니라 금고로 센다(2026-09-21). 끝까지 못 하고 자리를 뜨는 사람에게도
+   * 그동안 연 금고는 남아야 한다 — 전적은 여전히 끝을 본 게임만 센다.
+   */
+  it('금고를 열면 게임이 끝나지 않아도 골드가 쌓이고, 전적은 그대로다', async () => {
+    const { accounts, token } = await signedIn(0)
+    const earned = accounts.earn(token, 'ROOM:1:1')
+    assert.equal(earned.ok, true)
+    if (earned.ok) assert.equal(balanceOf(earned.value), 1)
+
+    const me = accounts.resume(token)
+    if (me.ok) assert.deepEqual(me.value.record, { wins: 0, losses: 0 })
+  })
+
+  /*
+   * 옛 줄에는 `earned` 가 없다. 그때는 이긴 게임 수가 곧 번 골드였으므로 그 값으로
+   * 읽어야 가진 골드가 그대로 넘어온다 — 0 으로 읽으면 이미 쓴 사람의 잔액이 사라진다.
+   */
+  it('옛 계정은 이긴 게임 수만큼 번 것으로 읽는다', () => {
+    const old = readCosmetics({ owned: ['bat'], equipped: {}, spent: 30 }, 34)
+    assert.equal(old?.earned, 34)
+    if (old) assert.equal(balanceOf(old), 4)
+
+    const moved = readCosmetics({ owned: [], equipped: {}, earned: 50, spent: 30 }, 34)
+    assert.equal(moved?.earned, 50, '한 번 옮긴 뒤로는 제 값을 따른다')
+  })
+
+  it('같은 금고는 한 번만 센다 — 새로고침으로 두 번 보내도', async () => {
+    const { accounts, token } = await signedIn(0)
+    accounts.earn(token, 'ROOM:1:1')
+    const again = accounts.earn(token, 'ROOM:1:1')
+    if (again.ok) assert.equal(again.value.earned, 1)
+  })
+
+  it('게임을 이기는 것만으로는 골드가 늘지 않는다', async () => {
+    const { accounts, token } = await signedIn(0)
+    accounts.record(token, 'win', 'ROOM:1:win')
+    const me = accounts.resume(token)
+    if (me.ok) assert.equal(balanceOf(me.value.cosmetics), 0)
   })
 
   it('같은 것을 두 번 구매할 수 없다', async () => {
@@ -477,14 +519,14 @@ describe('꾸미기 동시 요청', () => {
     }
   }
 
-  /** 원하는 만큼 이겨 둔 계정 하나. 저장소는 느린 것으로 준다. */
-  async function rich(wins: number) {
+  /** 금고를 원하는 만큼 열어 둔 계정 하나. 저장소는 느린 것으로 준다. */
+  async function rich(vaults: number) {
     const accounts = new Accounts(slow(), { retryWaitMs: 1, holdMs: 1 })
     const made = await accounts.signup('tk@example.com', 'pass1234', '태규')
     assert.equal(made.ok, true)
     if (!made.ok) throw new Error('unreachable')
     const token = made.value.token
-    for (let at = 0; at < wins; at += 1) accounts.record(token, 'win', `heist-${at}`)
+    for (let at = 0; at < vaults; at += 1) accounts.earn(token, `heist-${at}`)
     return { accounts, token }
   }
 

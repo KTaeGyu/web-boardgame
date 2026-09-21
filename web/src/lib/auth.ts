@@ -98,6 +98,14 @@ export async function recordPlay(outcome: PlayOutcome, once: string): Promise<vo
   if (result.ok && current) put({ ...current, record: result.value })
 }
 
+/** 금고 하나를 열었다. 골드가 쌓인다. 게스트면 아무 일도 하지 않는다. */
+export async function recordVault(once: string): Promise<void> {
+  const token = current?.token
+  if (!token) return
+  const result = await call<Cosmetics>('auth:vault', { token, once })
+  if (result.ok && current) put({ ...current, cosmetics: result.value })
+}
+
 /** 화면이 로그인 상태를 따라가게 한다. */
 export function useSession(): Session | null {
   const [value, setValue] = useState(current)

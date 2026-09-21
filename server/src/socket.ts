@@ -664,6 +664,10 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
       ack(accounts.record(String(token ?? ''), outcome, String(once ?? '')))
     })
 
+    socket.on('auth:vault', ({ token, once }, ack) => {
+      ack(accounts.earn(String(token ?? ''), String(once ?? '')))
+    })
+
     socket.on('cosmetics:buy', ({ token, id }, ack) => {
       answer('cosmetics:buy', accounts.buy(String(token ?? ''), String(id ?? '')), ack)
     })

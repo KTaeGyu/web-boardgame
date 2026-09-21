@@ -308,7 +308,7 @@ export interface Session {
   /** 테이블에서 불릴 이름. **유일하지 않다** — 같은 이름이 둘 앉으면 [1] [2] 가 붙는다. */
   nickname: string
   record: PlayRecord
-  /** 구매한 것과 장착한 것. 골드 잔액은 `balanceOf(record.wins, cosmetics.spent)` 다. */
+  /** 구매한 것과 장착한 것, 번 골드와 쓴 골드. 잔액은 `balanceOf(cosmetics)` 다. */
   cosmetics: Cosmetics
 }
 
@@ -385,6 +385,15 @@ export interface ClientToServerEvents {
   'auth:record': (
     payload: { token: string; outcome: PlayOutcome; once: string },
     ack: (result: Result<PlayRecord>) => void,
+  ) => void
+  /**
+   * 금고 하나를 열었다. 골드 1 이 쌓인다 — 게임을 끝까지 못 해도 남는다.
+   *
+   * 전적과 같은 이유로 화면이 보낸다. `once` 로 같은 금고를 두 번 세지 않는다.
+   */
+  'auth:vault': (
+    payload: { token: string; once: string },
+    ack: (result: Result<Cosmetics>) => void,
   ) => void
   /**
    * 코스메틱 하나를 구매한다. 가격은 골드(= 누적 획득 − 사용)로 낸다.
