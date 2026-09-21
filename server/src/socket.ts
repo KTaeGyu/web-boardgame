@@ -645,7 +645,7 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
     })
 
     socket.on('auth:login', ({ email, password }, ack) => {
-      ack(accounts.login(String(email ?? ''), String(password ?? '')))
+      answer('auth:login', accounts.login(String(email ?? ''), String(password ?? '')), ack)
     })
 
     socket.on('auth:resume', ({ token }, ack) => {

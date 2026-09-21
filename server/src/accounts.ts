@@ -12,7 +12,7 @@
  * 한 줄이 붙는 순간 평문이면 그대로 새어 나간다. 사람들은 다른 곳에서 쓰던 것을 친다.
  */
 
-import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto'
+import { randomBytes, scrypt, timingSafeEqual } from 'node:crypto'
 import {
   EMPTY_COSMETICS,
   LEGACY_GOLD_RATE,
@@ -74,9 +74,15 @@ const EMPTY: PlayRecord = { wins: 0, losses: 0 }
  *
  * Buffer 로 들고 있으면 밖으로 내보낼 때마다 옮겨 적어야 한다 — 저장소가 붙으면
  * 글자로 나가고 글자로 돌아온다. 견줄 때만 Buffer 로 되돌린다.
+ *
+ * **동기로 돌리면 안 된다.** scrypt 는 일부러 무거운 계산이라, 그동안 이벤트 루프가
+ * 멈춰 모든 방의 토큰·쇼다운이 함께 선다(이 PC 에서 한 번에 22ms, CPU 0.1 개인 Render
+ * 무료 요금제에서는 그 몇 배). 비동기판은 libuv 스레드에서 돈다.
  */
-function hash(password: string, salt: string): string {
-  return scryptSync(password, salt, 32).toString('hex')
+function hash(password: string, salt: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    scrypt(password, salt, 32, (trouble, key) => (trouble ? reject(trouble) : resolve(key.toString('hex'))))
+  })
 }
 
 /** 부팅 로딩을 몇 번까지 다시 해보나. 한 번 삐끗한 것과 정말 안 되는 것을 가른다. */
@@ -200,11 +206,14 @@ export class Accounts {
     if (this.byEmail.has(email)) return err('INVALID_SETTINGS', '이미 쓰이는 이메일입니다.')
 
     const salt = randomBytes(16).toString('hex')
+    const digest = await hash(password, salt)
+    // 해시를 기다리는 사이에 같은 이메일이 먼저 들어왔을 수 있다. 위의 확인은 그 전의 것이다.
+    if (this.byEmail.has(email)) return err('INVALID_SETTINGS', '이미 쓰이는 이메일입니다.')
     const account: Account = {
       email,
       nickname,
       salt,
-      hash: hash(password, salt),
+      hash: digest,
       record: { ...EMPTY },
       cosmetics: { ...EMPTY_COSMETICS },
       counted: new Set(),
@@ -239,7 +248,7 @@ export class Accounts {
     return ok(this.open(this.put(account)))
   }
 
-  login(rawEmail: string, password: string): Result<Session> {
+  async login(rawEmail: string, password: string): Promise<Result<Session>> {
     if (this.locked) return err('NOT_SIGNED_IN', '계정 기능을 지금 쓸 수 없습니다. 게스트로 해 주세요.')
 
     /*
@@ -253,7 +262,7 @@ export class Accounts {
     const account = this.byEmail.get(email)
     if (!account) return wrong
 
-    const given = Buffer.from(hash(password, account.salt), 'hex')
+    const given = Buffer.from(await hash(password, account.salt), 'hex')
     const kept = Buffer.from(account.hash, 'hex')
     if (given.length !== kept.length || !timingSafeEqual(given, kept)) return wrong
     return ok(this.open(account))

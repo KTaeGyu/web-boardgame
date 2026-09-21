@@ -22,8 +22,8 @@ import { Accounts } from '../src/accounts.ts'
 import { readCosmetics, type AccountStore, type StoredAccount } from '../src/accountStore.ts'
 
 /*
- * 가입만 비동기다. 밖에 먼저 쓰고 성공을 확인한 뒤 메모리에 넣기 때문인데,
- * 여기서는 저장소를 주지 않으므로 밖에 쓰는 걸음이 통째로 없다 — 그래도 모양은 같다.
+ * 가입과 로그인은 비동기다. 둘 다 비밀번호 해시(scrypt)를 스레드에서 기다리고, 가입은
+ * 거기에 밖에 먼저 쓰는 걸음이 더 있다 — 여기서는 저장소를 주지 않으므로 그 걸음은 없다.
  */
 async function makeOne(email = 'tk@example.com', password = 'pass1234', nickname = '태규') {
   const accounts = new Accounts()
@@ -50,7 +50,7 @@ describe('계정 만들기', () => {
   it('여백과 대소문자가 달라도 같은 이메일이다', async () => {
     const { accounts } = await makeOne()
     assert.equal((await accounts.signup(' TK@Example.com ', 'pass1234', '태규')).ok, false)
-    assert.equal(accounts.login(' TK@Example.com ', 'pass1234').ok, true)
+    assert.equal((await accounts.login(' TK@Example.com ', 'pass1234')).ok, true)
   })
 
   /* 닉네임은 유일하지 않다. 테이블에서 같은 이름이 둘이면 [1] [2] 가 붙을 뿐이다. */
@@ -66,6 +66,17 @@ describe('계정 만들기', () => {
     assert.equal((await accounts.signup('', 'pass1234', '태규')).ok, false)
   })
 
+  /* 해시를 기다리는 사이가 생겼다. 그 틈에 같은 이메일이 둘 들어오면 안 된다. */
+  it('같은 이메일로 동시에 가입하면 하나만 된다', async () => {
+    const accounts = new Accounts()
+    const results = await Promise.all([
+      accounts.signup('tk@example.com', 'pass1234', '하나'),
+      accounts.signup('tk@example.com', 'pass5678', '둘'),
+    ])
+    // 해시는 스레드에서 돌아 어느 쪽이 먼저 끝날지 정해져 있지 않다. 하나만 되면 된다.
+    assert.equal(results.filter((result) => result.ok).length, 1)
+  })
+
   it('짧은 비밀번호와 빈 닉네임은 받지 않는다', async () => {
     const accounts = new Accounts()
     assert.equal((await accounts.signup('tk@example.com', 'ab', '태규')).ok, false)
@@ -74,17 +85,30 @@ describe('계정 만들기', () => {
 })
 
 describe('로그인', () => {
+  /*
+   * 해시를 동기로 돌리면 그동안 서버 전체가 선다 — 다른 방의 토큰도, 쇼다운도.
+   * 로그인 다섯이 겹치는 동안 1ms 시계가 한 번도 못 돌면 루프가 막힌 것이다.
+   */
+  it('비밀번호를 견주는 동안 서버의 다른 일을 막지 않는다', async () => {
+    const { accounts } = await makeOne()
+    let ticks = 0
+    const clock = setInterval(() => (ticks += 1), 1)
+    await Promise.all(Array.from({ length: 5 }, () => accounts.login('tk@example.com', 'pass1234')))
+    clearInterval(clock)
+    assert.equal(ticks > 0, true, '해시가 이벤트 루프 위에서 돌았다')
+  })
+
   it('맞으면 들어가고 틀리면 막힌다', async () => {
     const { accounts } = await makeOne()
-    assert.equal(accounts.login('tk@example.com', 'pass1234').ok, true)
-    assert.equal(accounts.login('tk@example.com', 'nope1234').ok, false)
+    assert.equal((await accounts.login('tk@example.com', 'pass1234')).ok, true)
+    assert.equal((await accounts.login('tk@example.com', 'nope1234')).ok, false)
   })
 
   /* 갈라 말하면 어느 주소가 쓰이고 있는지 물어보는 것만으로 알 수 있다. */
   it('없는 이메일과 틀린 비밀번호를 같은 말로 돌려보낸다', async () => {
     const { accounts } = await makeOne()
-    const noSuch = accounts.login('nobody@example.com', 'pass1234')
-    const wrongPass = accounts.login('tk@example.com', 'nope1234')
+    const noSuch = await accounts.login('nobody@example.com', 'pass1234')
+    const wrongPass = await accounts.login('tk@example.com', 'nope1234')
     assert.equal(noSuch.ok, false)
     assert.equal(wrongPass.ok, false)
     if (!noSuch.ok && !wrongPass.ok) {
@@ -103,7 +127,7 @@ describe('로그인', () => {
   /* 창 여럿으로 같은 계정에 붙어 볼 수 있어야 한다. 자리를 묶는 것은 이메일이지 표가 아니다. */
   it('두 번 로그인하면 표가 둘이고 둘 다 산다', async () => {
     const { accounts, session } = await makeOne()
-    const again = accounts.login('tk@example.com', 'pass1234')
+    const again = await accounts.login('tk@example.com', 'pass1234')
     assert.equal(again.ok, true)
     if (!again.ok) return
     assert.notEqual(again.value.token, session.token)
@@ -144,7 +168,7 @@ describe('전적', () => {
   /* 같은 계정에 창 둘로 붙어 있어도 한 판은 한 판이다. */
   it('다른 표로 같은 끝을 보내도 한 번만 센다', async () => {
     const { accounts, session } = await makeOne()
-    const second = accounts.login('tk@example.com', 'pass1234')
+    const second = await accounts.login('tk@example.com', 'pass1234')
     assert.equal(second.ok, true)
     if (!second.ok) return
 
@@ -203,7 +227,7 @@ describe('밖에 둔 계정', () => {
     const next = new Accounts(store, quick)
     await next.load()
     assert.equal(next.size, 1)
-    assert.equal(next.login('tk@example.com', 'pass1234').ok, true)
+    assert.equal((await next.login('tk@example.com', 'pass1234')).ok, true)
     assert.equal(rows.length, 1)
   })
 
@@ -220,7 +244,7 @@ describe('밖에 둔 계정', () => {
 
     const next = new Accounts(store, quick)
     await next.load()
-    const back = next.login('tk@example.com', 'pass1234')
+    const back = await next.login('tk@example.com', 'pass1234')
     assert.equal(back.ok, true)
     if (back.ok) assert.deepEqual(back.value.record, { wins: 1, losses: 1 })
   })
@@ -240,7 +264,7 @@ describe('밖에 둔 계정', () => {
 
     assert.equal(accounts.closed, true)
     assert.equal((await accounts.signup('tk@example.com', 'pass1234', '태규')).ok, false)
-    assert.equal(accounts.login('tk@example.com', 'pass1234').ok, false)
+    assert.equal((await accounts.login('tk@example.com', 'pass1234')).ok, false)
   })
 
   it('세 번까지 다시 해보고, 그 안에 되면 열린다', async () => {
@@ -270,7 +294,7 @@ describe('밖에 둔 계정', () => {
 
     assert.equal((await accounts.signup('tk@example.com', 'pass1234', '태규')).ok, false)
     assert.equal(accounts.size, 0)
-    assert.equal(accounts.login('tk@example.com', 'pass1234').ok, false)
+    assert.equal((await accounts.login('tk@example.com', 'pass1234')).ok, false)
   })
 
   /* 부팅 로딩이 반쯤 어긋났을 때 같은 이메일로 줄이 둘 생기는 것을 막는다. */
