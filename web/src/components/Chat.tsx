@@ -90,6 +90,17 @@ function mergeById(a: ChatMessage[], b: ChatMessage[]): ChatMessage[] {
   return [...byId.values()].sort((left, right) => left.id - right.id).slice(-LOCAL_KEEP)
 }
 
+/**
+ * 보낸 시각을 `HH:mm` 으로. 보는 사람의 시계 기준이다.
+ *
+ * `toLocaleTimeString` 을 쓰지 않는 것은 기기마다 「오후 3:07」·「15:07」로 갈려서다.
+ */
+function clock(at: number): string {
+  const when = new Date(at)
+  const two = (value: number) => String(value).padStart(2, '0')
+  return `${two(when.getHours())}:${two(when.getMinutes())}`
+}
+
 export function Chat({ code }: { code: string }) {
   const me = getPlayerId()
   const [open, setOpen] = useState(false)
@@ -342,7 +353,16 @@ export function Chat({ code }: { code: string }) {
                             {message.spectator && <span className="chat__watcher">관전</span>}
                           </span>
                         )}
-                        <span className="chat__bubble">{message.text}</span>
+                        {/*
+                          시각은 말풍선 옆 아래에 작게 선다. 말보다 앞서 읽히면 안 되고,
+                          내 말이면 왼쪽·남의 말이면 오른쪽 — 늘 말풍선의 안쪽 옆이다.
+                        */}
+                        <span className="chat__row">
+                          <span className="chat__bubble">{message.text}</span>
+                          <time className="chat__time" dateTime={new Date(message.at).toISOString()}>
+                            {clock(message.at)}
+                          </time>
+                        </span>
                       </div>
                     )}
                   </Fragment>

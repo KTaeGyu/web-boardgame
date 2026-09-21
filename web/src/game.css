@@ -1050,8 +1050,28 @@
   font-weight: 700;
 }
 
+/* 말풍선과 보낸 시각이 한 줄에 선다. 시각은 말풍선의 발치에 맞춘다. */
+.chat__row {
+  display: flex;
+  align-items: flex-end;
+  gap: 5px;
+  max-width: 92%;
+}
+
+.chat__line--mine .chat__row {
+  flex-direction: row-reverse;
+}
+
+.chat__time {
+  flex: 0 0 auto;
+  padding-bottom: 2px;
+  font-size: 10px;
+  color: var(--ink-dim);
+  font-variant-numeric: tabular-nums;
+}
+
 .chat__bubble {
-  max-width: 84%;
+  min-width: 0;
   padding: 7px 11px;
   border: 1px solid var(--line);
   /* 한쪽 모서리만 각지게 두어 말이 누구 쪽에서 나왔는지 모양으로도 남는다. */
