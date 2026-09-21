@@ -38,7 +38,7 @@ import { Toast, TOAST_MS } from '../components/Toast.tsx'
 import { SpecialistGrid } from '../components/SpecialistGrid.tsx'
 import { ChoiceModal, ConfirmModal } from '../components/Modal.tsx'
 import { useBackIntercept } from '../lib/back.ts'
-import { getNickname, getPlayerId } from '../lib/identity.ts'
+import { getNickname, usePlayerId } from '../lib/identity.ts'
 import { call, socket, useServerEvent } from '../lib/socket.ts'
 import { tipPosition, useCardTip } from '../lib/tooltip.ts'
 import { useEscapeFallback } from '../lib/useEscape.ts'
@@ -69,7 +69,7 @@ export function RoomPage() {
    */
   const [params, setParams] = useSearchParams()
   const watching = params.get('watch') === '1'
-  const playerId = getPlayerId()
+  const playerId = usePlayerId()
   const nickname = getNickname()
 
   /*

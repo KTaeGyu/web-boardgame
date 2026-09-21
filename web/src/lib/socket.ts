@@ -10,10 +10,14 @@ import type { Result, ServerToClientEvents } from '@the-gang/shared'
 import { useEffect, useState } from 'react'
 
 import { devLog } from './devlog.ts'
+import { adoptPlayerId } from './identity.ts'
 
 const URL = import.meta.env.VITE_SOCKET_URL ?? 'http://localhost:3001'
 
 export const socket: Socket = io(URL, { transports: ['websocket'], autoConnect: true })
+
+// 로그인한 사람이 새 창에서 돌아왔다. 서버가 계정으로 찾은 자리의 id 로 갈아탄다.
+socket.on('identity:adopt', ({ playerId }: { playerId: string }) => adoptPlayerId(playerId))
 
 /*
  * 연결이 오가는 것을 개발에서만 적어 둔다(logs/web.log).

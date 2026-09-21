@@ -12,7 +12,7 @@ import { CHAT_MAX, type ChatMessage } from '@the-gang/shared'
 
 import { useBackIntercept } from '../lib/back.ts'
 import { useEscape } from '../lib/useEscape.ts'
-import { getPlayerId } from '../lib/identity.ts'
+import { usePlayerId } from '../lib/identity.ts'
 import { sfx } from '../lib/sfx.ts'
 import { call, useServerEvent } from '../lib/socket.ts'
 
@@ -102,7 +102,7 @@ function clock(at: number): string {
 }
 
 export function Chat({ code }: { code: string }) {
-  const me = getPlayerId()
+  const me = usePlayerId()
   const [open, setOpen] = useState(false)
   // 펼쳐 둔 채 휴대폰의 뒤로가기를 누르면 판을 떠나는 것이 아니라 대화를 접는다.
   useBackIntercept(open, () => setOpen(false))

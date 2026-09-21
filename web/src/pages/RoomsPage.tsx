@@ -82,7 +82,8 @@ export function RoomsPage() {
 
   /** 내 자리가 어느 방에 남아 있는지 서버에 묻는다. 답이 없으면 없는 것으로 둔다. */
   async function askWhere() {
-    const result = await call<string | null>('room:where', { playerId: getPlayerId() })
+    // 표도 함께 보낸다. 이 창으로는 자리가 없어도 계정으로 앉아 있으면 서버가 찾아 준다.
+    const result = await call<string | null>('room:where', { playerId: getPlayerId(), token: session()?.token })
     setMySeat(result.ok ? result.value : null)
   }
 

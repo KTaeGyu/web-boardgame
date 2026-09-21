@@ -35,7 +35,7 @@ const open: Socket[] = []
  * 골드는 판에서 금고를 열어야만 쌓인다 — 화면이 「열었다」고 말해도 서버가 판을 보고
  * 센다. 차림을 사 보는 시험마다 판을 돌릴 수는 없으므로 부팅 때 읽히는 저장소에 둔다.
  */
-const RICH = 10
+const RICH = 16
 const richStore: AccountStore = {
   loadAll: async () =>
     Array.from({ length: RICH }, (_, index): StoredAccount => {
@@ -522,5 +522,83 @@ describe('감정표현', () => {
     const again = await call<null>(socket, 'emote:send', { id: 'laugh' })
     assert.equal(again.ok, false)
     if (!again.ok) assert.equal(again.code, 'TOO_FAST')
+  })
+})
+
+/**
+ * 새 창에서 돌아온 사람.
+ *
+ * 「나」는 탭마다 만든 id 라 탭이 닫히면 사라진다. 로그인한 사람은 계정으로 제 자리를
+ * 되찾아야 한다 — 폰에서 탭이 정리되거나 카톡에서 링크를 다시 열면 흔히 벌어진다.
+ */
+describe('로그인한 사람은 새 창에서도 제 자리로 돌아온다', () => {
+  /** 로그인한 셋이 앉아 판을 연다. 첫 사람의 표와 id 를 돌려준다. */
+  async function playingTable() {
+    const people = await Promise.all(
+      [0, 1, 2].map(async (index) => {
+        const socket = await client()
+        const made = unwrap(
+          await call<Session>(socket, 'auth:login', { email: `rich${richUsed++}@example.com`, password: 'pass1234' }),
+        )
+        return { socket, token: made.token, playerId: `back-${seq()}-${index}`.padEnd(12, 'x') }
+      }),
+    )
+    const [host, ...guests] = people
+    const room = unwrap(
+      await call<RoomView>(host.socket, 'room:create', { playerId: host.playerId, nickname: '방장', token: host.token }),
+    )
+    for (const guest of guests) {
+      unwrap(
+        await call<RoomView>(guest.socket, 'room:join', {
+          playerId: guest.playerId,
+          nickname: '손님',
+          code: room.code,
+          token: guest.token,
+        }),
+      )
+    }
+    unwrap(await call(host.socket, 'game:start'))
+    // 첫 사람의 탭이 닫혔다.
+    guests[0].socket.disconnect()
+    return { code: room.code, gone: guests[0] }
+  }
+
+  it('같은 계정이 다른 id 로 들어오면 그 자리의 id 를 건네고 손패를 돌려준다', async () => {
+    const { code, gone } = await playingTable()
+    const fresh = await client()
+    const adopted = next<{ playerId: string }>(fresh, 'identity:adopt')
+    const hand = next<{ hole: unknown[] }>(fresh, 'game:hand')
+
+    const result = await call<RoomView>(fresh, 'room:join', {
+      playerId: 'brand-new-tab-01',
+      nickname: '손님',
+      code,
+      token: gone.token,
+    })
+    assert.equal(result.ok, true, '판이 도는 방인데도 제 자리라 받아 준다')
+    assert.equal((await adopted).playerId, gone.playerId)
+    assert.equal((await hand).hole.length > 0, true)
+  })
+
+  it('방 목록에서 물으면 계정의 자리가 있는 방을 알려 준다', async () => {
+    const { code, gone } = await playingTable()
+    const fresh = await client()
+    const adopted = next<{ playerId: string }>(fresh, 'identity:adopt')
+    const where = unwrap(
+      await call<string | null>(fresh, 'room:where', { playerId: 'brand-new-tab-02', token: gone.token }),
+    )
+    assert.equal(where, code)
+    assert.equal((await adopted).playerId, gone.playerId)
+  })
+
+  it('표가 없으면(게스트) 새 id 는 판이 도는 방에 앉지 못한다', async () => {
+    const { code } = await playingTable()
+    const fresh = await client()
+    const result = await call<RoomView>(fresh, 'room:join', {
+      playerId: 'brand-new-tab-03',
+      nickname: '손님',
+      code,
+    })
+    assert.equal(result.ok, false)
   })
 })

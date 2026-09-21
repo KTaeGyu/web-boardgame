@@ -142,6 +142,15 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
   /** 감정표현을 마지막으로 낸 시각. 도배만 막는 자리라 대화처럼 창을 세지 않는다. */
   const emoteAt = new Map<string, number>()
   /**
+   * 자리의 주인 계정. 로그인하고 앉은 사람만 적힌다.
+   *
+   * 「나」는 탭마다 만든 무작위 id 라 탭이 닫히면 함께 사라진다 — 폰에서 앱을 오가다
+   * 탭이 정리되거나 카톡에서 링크를 다시 열면 다른 사람이 되어, 판이 도는 방에는 다시
+   * 앉지 못했다. 로그인한 사람은 계정으로 자기 자리를 되찾게 한다. **끊겨도 지우지
+   * 않는다** — 끊긴 뒤에 찾으려고 두는 것이다. 방에서 나갈 때 지운다.
+   */
+  const accountOfPlayer = new Map<string, string>()
+  /**
    * 계정. 이메일로 사람을 가리키고 전적을 이어 준다.
    *
    * 닉네임은 붙들어 두지 않는다 — 계정이 있어도 그 이름은 남도 쓴다. 그래서 방에
@@ -264,6 +273,34 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
     return account ? sanitizeEquipped(account.cosmetics) : undefined
   }
 
+  /** 로그인하고 앉았으면 자리에 계정을 적는다. */
+  function tagAccount(playerId: string, token: unknown): void {
+    if (typeof token !== 'string' || token === '') return
+    const account = accounts.accountOf(token)
+    if (account) accountOfPlayer.set(playerId, account.email)
+  }
+
+  /**
+   * 이 표의 계정이 앉아 있는 자리. 방을 주면 그 방에서만 찾는다. 관전 자리는 세지 않는다.
+   */
+  function seatOfAccount(token: unknown, code?: string): { playerId: string; code: string } | null {
+    if (typeof token !== 'string' || token === '') return null
+    const email = accounts.accountOf(token)?.email
+    if (!email) return null
+    for (const [playerId, owner] of accountOfPlayer) {
+      if (owner !== email) continue
+      const at = store.codeOf(playerId)
+      // 유예가 끝나 자리가 치워진 사람이다. 찾는 김에 지운다.
+      if (!at) {
+        accountOfPlayer.delete(playerId)
+        continue
+      }
+      if (code && at !== code) continue
+      if (store.view(at)?.players.some((player) => player.id === playerId)) return { playerId, code: at }
+    }
+    return null
+  }
+
   /** 자리에 차림을 얹고 방에 알린다. 방에 앉아 있지 않으면 아무 일도 하지 않는다. */
   function dressUp(playerId: string, token: unknown): void {
     const room = store.dressUp(playerId, equippedOf(token))
@@ -313,6 +350,7 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
 
       if (previous) leftRoom(previous, playerId)
       bind(socket, playerId, result.value.code)
+      tagAccount(playerId, payload.token)
       // 응답 전에 얹는다. 방을 막 만든 자리에는 알릴 남이 없으므로 알림도 필요 없다.
       const dressed = store.dressUp(playerId, equippedOf(payload.token))
       ack(dressed ? { ok: true, value: dressed } : result)
@@ -330,9 +368,20 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
         return ack({ ok: false, code: 'ROOM_NOT_FOUND', message: '방 번호를 입력해 주세요.' })
       }
 
-      const { playerId, nickname } = identity.value
-      const previous = store.codeOf(playerId)
+      const { nickname } = identity.value
+      let { playerId } = identity.value
       const wanted = payload.code.trim().toUpperCase()
+      /*
+       * 같은 계정이 이 방에 다른 id 로 앉아 있다 — 새 창에서 돌아온 사람이다. 그 자리의
+       * id 를 건네고 그 id 로 재접속시킨다. 답(ack)보다 먼저 보내야 화면이 답을 받을 때
+       * 이미 갈아타 있다. 계정 하나가 자리 둘을 차지하는 일도 이것으로 막힌다.
+       */
+      const mine = seatOfAccount(payload.token, wanted)
+      if (mine && mine.playerId !== playerId) {
+        socket.emit('identity:adopt', { playerId: mine.playerId })
+        playerId = mine.playerId
+      }
+      const previous = store.codeOf(playerId)
       // 혼자 해보는 방은 남이 들어올 자리가 아니다. 목록에 없지만 번호를 찍어 넣을 수는 있다.
       if (store.isTutorial(wanted) && !store.humanIds(wanted).includes(playerId)) {
         return ack({ ok: false, code: 'ROOM_NOT_FOUND', message: '없는 방입니다. 방 번호를 다시 확인해 주세요.' })
@@ -356,6 +405,7 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
       if (previous && previous !== code) leftRoom(previous, playerId)
       store.touch(code)
       bind(socket, playerId, code)
+      tagAccount(playerId, payload.token)
       ack(result)
       // 알리기 전에 얹는다. 뒤에 얹으면 얼굴 없는 줄이 한 번 지나간다.
       store.dressUp(playerId, equippedOf(payload.token))
@@ -546,6 +596,18 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
       }
 
       const { playerId, nickname } = identity.value
+      /*
+       * 이 계정은 이 방에 자리가 있다 — 새 창으로 목록에서 눌러 들어오면 관전 문으로 온다.
+       * 구경꾼으로 앉히지 않고 자리의 id 를 건넨 뒤 거절한다. 화면은 거절되면 자리에
+       * 앉는 길(room:join)을 한 번 더 두드리고, 거기서 제 자리로 돌아간다.
+       */
+      const wanted = payload.code.trim().toUpperCase()
+      const mine = seatOfAccount(payload.token, wanted)
+      // 대기실에서는 넘기지 않는다. 넘긴 id 로 관전을 다시 두드리면 제 자리가 관전으로 바뀐다.
+      if (mine && mine.playerId !== playerId && store.view(wanted)?.phase !== 'lobby') {
+        socket.emit('identity:adopt', { playerId: mine.playerId })
+        return ack({ ok: false, code: 'ROOM_IN_GAME', message: '이 방에 자리가 있습니다. 자리로 돌아갑니다.' })
+      }
       const previous = store.codeOf(playerId)
       const result = store.spectate(playerId, nickname, payload.code.trim())
       if (!result.ok) return ack(result)
@@ -573,6 +635,7 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
       // 끊길 때 치우는 자리지만, 나가기가 먼저 연결 고리를 끊어 그때는 누구인지 모른다.
       chatRate.delete(playerId)
       emoteAt.delete(playerId)
+      accountOfPlayer.delete(playerId)
 
       ack({ ok: true, value: null })
       if (code) leftRoom(code, playerId)
@@ -702,10 +765,16 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
       })
     })
 
-    socket.on('room:where', ({ playerId }, ack) => {
+    socket.on('room:where', ({ playerId, token }, ack) => {
       const id = String(playerId ?? '')
       if (!PLAYER_ID_PATTERN.test(id)) return ack({ ok: true, value: null })
-      ack({ ok: true, value: store.codeOf(id) })
+      const here = store.codeOf(id)
+      if (here) return ack({ ok: true, value: here })
+      // 이 창으로는 자리가 없지만 계정으로는 있다. 그 id 로 갈아타게 하고 방을 알려 준다.
+      const mine = seatOfAccount(token)
+      if (!mine) return ack({ ok: true, value: null })
+      socket.emit('identity:adopt', { playerId: mine.playerId })
+      ack({ ok: true, value: mine.code })
     })
 
     socket.on('rooms:watch', ({ watching }) => {

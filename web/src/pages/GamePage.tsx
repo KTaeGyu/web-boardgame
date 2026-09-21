@@ -37,7 +37,7 @@ import { CommunityBoard } from '../components/Board.tsx'
 import { CardSlot, PlayingCard } from '../components/PlayingCard.tsx'
 import { Token, TokenBlank, TokenHole } from '../components/Token.tsx'
 import { useBackIntercept } from '../lib/back.ts'
-import { getNickname, getPlayerId } from '../lib/identity.ts'
+import { getNickname, usePlayerId } from '../lib/identity.ts'
 import { sfx } from '../lib/sfx.ts'
 import { socket } from '../lib/socket.ts'
 // 사람들과 하는 판은 서버에서, 혼자 해보기는 화면 안에서 돈다. 이 화면은 그 차이를 모른다.
@@ -85,7 +85,7 @@ const FINAL_MS = 2400
 export function GamePage({ spectating = false }: { spectating?: boolean } = {}) {
   const { code = '' } = useParams()
   const navigate = useNavigate()
-  const playerId = getPlayerId()
+  const playerId = usePlayerId()
   const nickname = getNickname()
   const emotes = useEmotes()
 
@@ -231,6 +231,8 @@ export function GamePage({ spectating = false }: { spectating?: boolean } = {}) 
           playerId,
           nickname,
           code,
+          // 새 창이면 이 id 로는 자리가 없다. 표가 있으면 서버가 계정으로 자리를 찾아 준다.
+          token: session()?.token,
         })
         if (!alive) return
         if (seat.ok) {

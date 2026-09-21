@@ -356,7 +356,7 @@ export interface ClientToServerEvents {
    * 것인지는 서버만 안다 — 새로고침한 창은 소켓이 어느 사람인지도 잊었으므로
    * playerId 를 함께 보낸다.
    */
-  'room:where': (payload: { playerId: string }, ack: (result: Result<string | null>) => void) => void
+  'room:where': (payload: { playerId: string; token?: string }, ack: (result: Result<string | null>) => void) => void
 
   /*
    * 계정. 이메일로 사람을 가리키고 전적을 쌓는다.
@@ -533,6 +533,11 @@ export interface ServerToClientEvents {
   emote: (payload: { playerId: string; id: string }) => void
   /** 서버가 감당할 수 있는 인원을 넘겼다. 곧 연결이 끊긴다. */
   'server:full': (payload: { message: string }) => void
+  /**
+   * 「당신의 자리 id 는 이것이다」. 로그인한 사람이 새 창에서 돌아왔을 때, 같은 계정이
+   * 앉아 있던 자리의 id 를 건넨다. 화면은 이 id 로 갈아타고 평소처럼 재접속한다.
+   */
+  'identity:adopt': (payload: { playerId: string }) => void
   'rooms:changed': (rooms: RoomSummary[]) => void
   /**
    * 지금 몇 명이 붙어 있고 방은 몇 개인가. 목록을 보고 있는 사람에게만 간다.
