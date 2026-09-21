@@ -1103,6 +1103,49 @@
   text-align: center;
 }
 
+/*
+ * 읽어 올린 동안 아래에 온 새 말. 목록 밑에 한 줄로 붙고 누르면 바닥으로 간다.
+ * 목록 위에 띄우지 않고 흐름에 세운다 — 띄우면 읽던 마지막 줄을 덮는다.
+ */
+.chat__below {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 14px;
+  border: none;
+  border-top: 1px solid var(--gold-dim);
+  background: rgba(var(--gold-rgb), 0.12);
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.chat__below .chat__who {
+  flex: 0 0 auto;
+  max-width: 40%;
+  padding: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat__below-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+
+.chat__below-go {
+  flex: 0 0 auto;
+  color: var(--gold);
+  font-weight: 700;
+}
+
 /* 서버가 거절한 이유. 도배로 막힌 자리라 붉게 둔다. */
 .chat__notice {
   margin: 0;

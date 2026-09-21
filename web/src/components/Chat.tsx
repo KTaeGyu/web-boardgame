@@ -105,6 +105,11 @@ export function Chat({ code }: { code: string }) {
   /** 접힌 동안 왼쪽에 붙어 있는 마지막 한 줄. */
   const [peek, setPeek] = useState<ChatMessage | null>(null)
   const [unread, setUnread] = useState(0)
+  /**
+   * 옛 대화를 읽어 올린 동안 아래에 새로 온 말. 목록 밑에 한 줄로 붙고, 누르면 바닥으로 간다.
+   * 접힌 동안의 한 줄(`peek`)과 달리 스스로 사라지지 않는다 — 내려가서 읽어야 없어진다.
+   */
+  const [below, setBelow] = useState<ChatMessage | null>(null)
 
   const listRef = useRef<HTMLDivElement | null>(null)
   const sheetRef = useRef<HTMLElement | null>(null)
@@ -179,7 +184,11 @@ export function Chat({ code }: { code: string }) {
         // 접힘 여부는 따지지 않는다.
         if (message.playerId !== me) sfx('chat')
         // 내가 한 말은 알림이 아니다. 접혀 있을 때만 왼쪽에 잠깐 붙인다.
-        if (message.playerId === me || openRef.current) return
+        if (message.playerId === me) return
+        if (openRef.current) {
+          if (!pinned.current) setBelow(message)
+          return
+        }
         setPeek(message)
         setUnread((count) => count + 1)
       },
@@ -199,11 +208,30 @@ export function Chat({ code }: { code: string }) {
     return () => clearTimeout(timer)
   }, [peek])
 
-  // 펼쳐져 있으면 늘 마지막 말이 보여야 한다.
+  /*
+   * 새 말을 따라 내려가는 것은 **바닥에 있었을 때만**이다.
+   *
+   * 예전에는 말이 올 때마다 끌어내렸는데, 옛 대화를 읽어 올린 사람은 누가 한마디 할
+   * 때마다 읽던 자리를 잃었다(2026-09-21). 막 펼쳤을 때와 내가 말했을 때는 예외다 —
+   * 펼치면 마지막 말부터 보여야 하고, 내 말이 화면 밖에 떨어지면 나갔는지 알 수 없다.
+   */
+  const wasOpen = useRef(false)
   useEffect(() => {
-    if (!open || !listRef.current) return
-    listRef.current.scrollTop = listRef.current.scrollHeight
-  }, [open, messages])
+    const list = listRef.current
+    const opened = open && !wasOpen.current
+    wasOpen.current = open
+    if (!open || !list) return
+    const mine = messages[messages.length - 1]?.playerId === me
+    if (opened || mine || pinned.current) toBottom()
+  }, [open, messages, me])
+
+  function toBottom() {
+    const list = listRef.current
+    if (!list) return
+    list.scrollTop = list.scrollHeight
+    pinned.current = true
+    setBelow(null)
+  }
 
   /*
    * 창이 짧아져도 마지막 말이 그대로 보여야 한다.
@@ -280,6 +308,8 @@ export function Chat({ code }: { code: string }) {
             onScroll={(event) => {
               const list = event.currentTarget
               pinned.current = list.scrollHeight - list.scrollTop - list.clientHeight < NEAR_BOTTOM
+              // 손으로 내려와 읽었으면 알릴 것이 남지 않는다.
+              if (pinned.current) setBelow(null)
             }}
           >
             {messages.length === 0 ? (
@@ -320,6 +350,16 @@ export function Chat({ code }: { code: string }) {
               })
             )}
           </div>
+
+          {below && (
+            <button type="button" className="chat__below" onClick={toBottom} aria-label="새 말로 내려가기">
+              <span className="chat__who">{below.name}</span>
+              <span className="chat__below-text">{below.text}</span>
+              <span className="chat__below-go" aria-hidden="true">
+                ↓
+              </span>
+            </button>
+          )}
 
           {notice && <p className="chat__notice">{notice}</p>}
 
