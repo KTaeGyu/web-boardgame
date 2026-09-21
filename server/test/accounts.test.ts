@@ -10,6 +10,7 @@ import assert from 'node:assert/strict'
 import {
   DEFAULT_EQUIPPED,
   EMPTY_COSMETICS,
+  LEGACY_GOLD_RATE,
   balanceOf,
   cosmeticOf,
   owns,
@@ -373,13 +374,14 @@ describe('코스메틱', () => {
    * 옛 줄에는 `earned` 가 없다. 그때는 이긴 게임 수가 곧 번 골드였으므로 그 값으로
    * 읽어야 가진 골드가 그대로 넘어온다 — 0 으로 읽으면 이미 쓴 사람의 잔액이 사라진다.
    */
-  it('옛 계정은 이긴 게임 수만큼 번 것으로 읽는다', () => {
+  it('옛 계정은 번 것과 쓴 것을 같은 배율로 옮겨 읽는다', () => {
     const old = readCosmetics({ owned: ['bat'], equipped: {}, spent: 30 }, 34)
-    assert.equal(old?.earned, 34)
-    if (old) assert.equal(balanceOf(old), 4)
+    assert.equal(old?.earned, 34 * LEGACY_GOLD_RATE)
+    if (old) assert.equal(balanceOf(old), 4 * LEGACY_GOLD_RATE, '잔액이 그 배율 그대로 넘어온다')
 
     const moved = readCosmetics({ owned: [], equipped: {}, earned: 50, spent: 30 }, 34)
     assert.equal(moved?.earned, 50, '한 번 옮긴 뒤로는 제 값을 따른다')
+    assert.equal(moved?.spent, 30, '두 번 곱하면 쓴 돈이 불어난다')
   })
 
   it('같은 금고는 한 번만 센다 — 새로고침으로 두 번 보내도', async () => {

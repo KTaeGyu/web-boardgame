@@ -15,6 +15,7 @@
 import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto'
 import {
   EMPTY_COSMETICS,
+  LEGACY_GOLD_RATE,
   NICKNAME_MAX,
   balanceOf,
   cosmeticOf,
@@ -156,7 +157,7 @@ export class Accounts {
             hash: one.passwordHash,
             record: { wins: one.wins, losses: one.losses },
             // 꾸미기 칸이 아예 없는 옛 계정도 이긴 만큼은 벌어 둔 것이다.
-            cosmetics: one.cosmetics ?? { ...EMPTY_COSMETICS, earned: one.wins },
+            cosmetics: one.cosmetics ?? { ...EMPTY_COSMETICS, earned: one.wins * LEGACY_GOLD_RATE },
             counted: new Set(),
           })
         }

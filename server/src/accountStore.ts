@@ -14,7 +14,7 @@
  * 만들 만큼 의존성을 아낀다.
  */
 
-import { DEFAULT_EQUIPPED, type Cosmetics } from '@the-gang/shared'
+import { DEFAULT_EQUIPPED, LEGACY_GOLD_RATE, type Cosmetics } from '@the-gang/shared'
 
 import { logLine } from './log.ts'
 
@@ -28,7 +28,8 @@ import { logLine } from './log.ts'
  */
 /**
  * @param wins 옛 줄에는 `earned` 가 없다. 그때는 이긴 게임 수가 곧 번 골드였으므로
- *   그 값으로 채운다 — 가진 골드가 그대로 넘어온다(2026-09-21).
+ *   그 값을 새 골드로 옮겨 채운다(2026-09-21). **쓴 것도 같은 배율로 옮긴다** — 번 것만
+ *   곱하면 이미 쓴 사람의 잔액이 제 몫보다 커진다.
  */
 export function readCosmetics(value: unknown, wins: number): Cosmetics | null {
   if (!value || typeof value !== 'object') return null
@@ -37,11 +38,14 @@ export function readCosmetics(value: unknown, wins: number): Cosmetics | null {
   const worn = (raw.equipped ?? {}) as Record<string, unknown>
   const at = (key: keyof typeof DEFAULT_EQUIPPED) =>
     typeof worn[key] === 'string' ? (worn[key] as string) : DEFAULT_EQUIPPED[key]
+  // `earned` 칸이 있으면 이미 새 골드로 옮긴 줄이다.
+  const moved = typeof raw.earned === 'number' && raw.earned >= 0
+  const spent = typeof raw.spent === 'number' && raw.spent >= 0 ? raw.spent : 0
   return {
     owned,
     equipped: { avatar: at('avatar'), bg: at('bg'), effect: at('effect'), banner: at('banner') },
-    earned: typeof raw.earned === 'number' && raw.earned >= 0 ? raw.earned : wins,
-    spent: typeof raw.spent === 'number' && raw.spent >= 0 ? raw.spent : 0,
+    earned: moved ? (raw.earned as number) : wins * LEGACY_GOLD_RATE,
+    spent: moved ? spent : spent * LEGACY_GOLD_RATE,
   }
 }
 

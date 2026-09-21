@@ -12,11 +12,16 @@
  * 찾아 그린다(`web/public/avatars/…`). 파일 경로를 값으로 저장하면 나중에 그림을
  * 갈 때 이미 저장된 차림이 죽는다.
  *
- * **가격은 두 축으로 정한다**(1승 = 1골드).
+ * **가격은 두 축으로 정한다**(연 금고 하나 = 1골드).
  *
- * **슬롯끼리는 무게 순이다.** 얼굴이 곧 그 사람이라 아바타가 제일 비싸고(30~42), 줄
- * 전체를 덮는 배너가 그다음(20~25), 움직임인 이펙트(12~16), 색 하나인 프로필 배경이
- * 제일 싸다(4~6). 눈에 띄는 크기 순서와 가격 순서가 같아야 「비싼 것을 샀다」가 화면에서
+ * **2026-09-21 에 전부 두 배가 됐다.** 골드를 이긴 게임이 아니라 연 금고로 세면서
+ * 이긴 게임 하나가 1골드에서 3골드가 됐고, 옛 골드는 그 비율(×3, `LEGACY_GOLD_RATE`)로
+ * 옮겼다. 가격을 셋이 아니라 둘만 곱한 것은 **일부러 ⅓쯤 싸게 한 것이다** — 슬롯 넷을
+ * 제일 싸게 채우는 데 66승이 들던 값이 친구 대여섯이 하는 판에는 멀었다.
+ *
+ * **슬롯끼리는 무게 순이다.** 얼굴이 곧 그 사람이라 아바타가 제일 비싸고(60~84), 줄
+ * 전체를 덮는 배너가 그다음(40~50), 움직임인 이펙트(24~32), 색 하나인 프로필 배경이
+ * 제일 싸다(8~12). 눈에 띄는 크기 순서와 가격 순서가 같아야 「비싼 것을 샀다」가 화면에서
  * 보인다.
  *
  * **한 슬롯 안에서는 좁게 벌린다.** 같은 자리에 걸치는 것끼리 값이 두 배 세 배로 갈리면
@@ -70,24 +75,24 @@ export const COSMETICS: CosmeticItem[] = [
   // ── 아바타 ────────────────────────────────
   { id: 'square', kind: 'avatar', name: '루키', price: 0 },
   // 눈가리개 하나. 상자도 이목구비도 그대로라 제일 적게 바뀐다.
-  { id: 'mask', kind: 'avatar', name: '섀도우 마스크', price: 30 },
-  { id: 'bat', kind: 'avatar', name: '나이트 카울', price: 32 },
+  { id: 'mask', kind: 'avatar', name: '섀도우 마스크', price: 60 },
+  { id: 'bat', kind: 'avatar', name: '나이트 카울', price: 64 },
   // 여기부터는 얼굴이 통째로 바뀐다.
-  { id: 'cheddar', kind: 'avatar', name: '체다', price: 34 },
-  { id: 'driver', kind: 'avatar', name: '겟어웨이 드라이버', price: 36 },
-  { id: 'spider', kind: 'avatar', name: '레드 웹', price: 38 },
+  { id: 'cheddar', kind: 'avatar', name: '체다', price: 68 },
+  { id: 'driver', kind: 'avatar', name: '겟어웨이 드라이버', price: 72 },
+  { id: 'spider', kind: 'avatar', name: '레드 웹', price: 76 },
   // 귀와 망토는 상자 밖으로 나간다 — 실루엣이 바뀌는 셋이라 제일 비싸다.
-  { id: 'rabbit', kind: 'avatar', name: '화이트 래빗', price: 40 },
+  { id: 'rabbit', kind: 'avatar', name: '화이트 래빗', price: 80 },
   // 토끼와 같은 종류의 변화(귀가 상자 밖으로)라 값도 나란히 둔다.
-  { id: 'cat', kind: 'avatar', name: '캣 버글러', price: 40 },
+  { id: 'cat', kind: 'avatar', name: '캣 버글러', price: 80 },
   // 머리 위의 하트가 상자 밖으로 솟는다. 귀와 같은 자리라 값도 같다.
-  { id: 'fairy', kind: 'avatar', name: '하트 페어리', price: 40 },
-  { id: 'dracula', kind: 'avatar', name: '블러드 로드', price: 42 },
+  { id: 'fairy', kind: 'avatar', name: '하트 페어리', price: 80 },
+  { id: 'dracula', kind: 'avatar', name: '블러드 로드', price: 84 },
   // 얼굴이 아예 상자가 아니다 — 손잡이가 위로, 팔이 좌우로 나가 제일 크게 갈린다.
-  { id: 'timber', kind: 'avatar', name: '팀버 클럽', price: 42 },
+  { id: 'timber', kind: 'avatar', name: '팀버 클럽', price: 84 },
   // 어깨가 상자 밖으로 나간다 — 망토와 같은 자리라 값도 같다.
   // 파는 물건이 아니라 주는 물건이라 목록에는 안 선다.
-  { id: 'insider', kind: 'avatar', name: '잉웅', price: 42, grantOnly: true },
+  { id: 'insider', kind: 'avatar', name: '잉웅', price: 84, grantOnly: true },
 
   // ── 프로필 배경 ───────────────────────────
   // 그림이 아니라 색이다. 아바타 뒤에 깔리는 작은 자리라 그림은 읽히지 않고,
@@ -98,35 +103,35 @@ export const COSMETICS: CosmeticItem[] = [
   // 값이 거의 붙어 있다. 이 슬롯은 색 하나라 화려함에 차이를 둘 자리가 없다 —
   // 밝아서 눈에 먼저 드는 둘만 위로 올린다.
   { id: 'slate', kind: 'bg', name: '스틸 그레이', price: 0 },
-  { id: 'crimson', kind: 'bg', name: '크림슨', price: 4 },
-  { id: 'forest', kind: 'bg', name: '에메랄드', price: 4 },
-  { id: 'night', kind: 'bg', name: '미드나잇', price: 4 },
-  { id: 'mustard', kind: 'bg', name: '머스터드', price: 4 },
-  { id: 'gold', kind: 'bg', name: '앰버', price: 6 },
-  { id: 'carrot', kind: 'bg', name: '캐럿', price: 6 },
+  { id: 'crimson', kind: 'bg', name: '크림슨', price: 8 },
+  { id: 'forest', kind: 'bg', name: '에메랄드', price: 8 },
+  { id: 'night', kind: 'bg', name: '미드나잇', price: 8 },
+  { id: 'mustard', kind: 'bg', name: '머스터드', price: 8 },
+  { id: 'gold', kind: 'bg', name: '앰버', price: 12 },
+  { id: 'carrot', kind: 'bg', name: '캐럿', price: 12 },
 
   // ── 이펙트 ────────────────────────────────
   { id: 'none-effect', kind: 'effect', name: '미장착', price: 0 },
   // 한 겹짜리 둘.
-  { id: 'flame', kind: 'effect', name: '플레임', price: 12 },
-  { id: 'dash', kind: 'effect', name: '스피드 라인', price: 12 },
+  { id: 'flame', kind: 'effect', name: '플레임', price: 24 },
+  { id: 'dash', kind: 'effect', name: '스피드 라인', price: 24 },
   // 조각이 둘이고 생겼다 사라지는 둘.
-  { id: 'petal', kind: 'effect', name: '블로섬', price: 14 },
-  { id: 'melt', kind: 'effect', name: '멜팅', price: 14 },
+  { id: 'petal', kind: 'effect', name: '블로섬', price: 28 },
+  { id: 'melt', kind: 'effect', name: '멜팅', price: 28 },
   // 아바타 «전체»가 움직인다. 이 슬롯에서 제일 눈에 든다.
-  { id: 'hop', kind: 'effect', name: '홉', price: 16 },
+  { id: 'hop', kind: 'effect', name: '홉', price: 32 },
 
   // ── 배너 ──────────────────────────────────
   //
   // 줄을 얼마나 덮는가로 세운다. 「더 볼트」가 아래쪽인 것이 어색해 보이지만 금고 하나에
   // 금괴 몇이 전부다 — 이야기의 무게가 아니라 눈에 드는 무게로 매긴다.
   { id: 'none-banner', kind: 'banner', name: '미장착', price: 0 },
-  { id: 'moonlit-hill', kind: 'banner', name: '문라이트 힐', price: 20 },
-  { id: 'vault', kind: 'banner', name: '더 볼트', price: 21 },
-  { id: 'cheese-factory', kind: 'banner', name: '치즈 팩토리', price: 22 },
-  { id: 'blossom', kind: 'banner', name: '체리 블로섬', price: 23 },
-  { id: 'castle', kind: 'banner', name: '고딕 캐슬', price: 24 },
-  { id: 'night-city', kind: 'banner', name: '네온 시티', price: 25 },
+  { id: 'moonlit-hill', kind: 'banner', name: '문라이트 힐', price: 40 },
+  { id: 'vault', kind: 'banner', name: '더 볼트', price: 42 },
+  { id: 'cheese-factory', kind: 'banner', name: '치즈 팩토리', price: 44 },
+  { id: 'blossom', kind: 'banner', name: '체리 블로섬', price: 46 },
+  { id: 'castle', kind: 'banner', name: '고딕 캐슬', price: 48 },
+  { id: 'night-city', kind: 'banner', name: '네온 시티', price: 50 },
 ]
 
 /** 지금 장착 중인 슬롯 넷. */
@@ -151,8 +156,8 @@ export const DEFAULT_EQUIPPED: Equipped = {
  * **골드는 전적과 따로 센다**(2026-09-21). 번 것(`earned`)은 **연 금고 하나에 1** 이고,
  * 살 수 있는 것은 `earned - spent` 다. 예전에는 이긴 게임 하나에 1 이었는데(`wins - spent`),
  * 끝까지 못 하고 자리를 뜨는 사람에게는 아무것도 남지 않았다. 전적(승·패)은 그대로
- * 게임 단위로 센다. 옛 계정은 읽을 때 `earned` 를 그때의 `wins` 로 채운다 — 가진 골드가
- * 그대로 넘어온다.
+ * 게임 단위로 센다. 옛 계정은 읽을 때 그때의 `wins` 와 `spent` 를 새 골드로 옮긴다 — 가진 것이
+ * 그대로 넘어온다(`LEGACY_GOLD_RATE`).
  */
 export interface Cosmetics {
   /** 구매한 것들. 0골드짜리는 여기 없어도 늘 보유한 것으로 친다. */
@@ -179,6 +184,16 @@ export function cosmeticOf(id: string): CosmeticItem | null {
 export function cosmeticsOfKind(kind: CosmeticKind): CosmeticItem[] {
   return COSMETICS.filter((item) => item.kind === kind)
 }
+
+/**
+ * 옛 골드 1 이 새 골드 몇인가.
+ *
+ * 예전에는 이긴 게임 하나가 1골드였고 지금은 금고 셋, 곧 3골드다. 옛 계정을 읽을 때
+ * 번 것(그때의 `wins`)과 쓴 것(`spent`)을 **둘 다** 이만큼 곱한다 — 한쪽만 곱하면
+ * 이미 쓴 사람의 잔액이 어긋난다. `earned` 칸이 없는 것이 「아직 안 옮겼다」는 표시라
+ * **한 번 옮겨 밖에 쓰인 뒤에는 이 값을 고쳐도 돌아오지 않는다.**
+ */
+export const LEGACY_GOLD_RATE = 3
 
 /** 지금 쓸 수 있는 골드. 번 것에서 쓴 만큼을 뺀다. */
 export function balanceOf(cosmetics: Pick<Cosmetics, 'earned' | 'spent'>): number {

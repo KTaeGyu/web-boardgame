@@ -10,6 +10,7 @@ import type { AddressInfo } from 'node:net'
 import { io as connect, type Socket } from 'socket.io-client'
 import {
   DEFAULT_EQUIPPED,
+  cosmeticOf,
   emoteOf,
   type ChatMessage,
   type Cosmetics,
@@ -294,7 +295,7 @@ describe('장착한 차림이 자리에 붙는다', () => {
 
   it('산 것을 걸치고 방에 들어가면 그 줄에 차림이 실린다', async () => {
     const socket = await client()
-    const token = await signedIn(socket, `dress1-${seq()}@example.com`, 60)
+    const token = await signedIn(socket, `dress1-${seq()}@example.com`, cosmeticOf('bat')?.price ?? 0)
 
     unwrap(await call(socket, 'cosmetics:buy', { token, id: 'bat' }))
     unwrap(await call(socket, 'cosmetics:equip', { token, equipped: { avatar: 'bat' } }))
@@ -323,7 +324,7 @@ describe('장착한 차림이 자리에 붙는다', () => {
 
   it('대기실에 앉은 채로 바꾸면 그 자리에서 갈린다', async () => {
     const host = await client()
-    const token = await signedIn(host, `dress3-${seq()}@example.com`, 60)
+    const token = await signedIn(host, `dress3-${seq()}@example.com`, cosmeticOf('bat')?.price ?? 0)
     unwrap(await call(host, 'cosmetics:buy', { token, id: 'mask' }))
 
     unwrap(await call<RoomView>(host, 'room:create', { playerId: 'dresser-02', nickname: '태규', token }))
