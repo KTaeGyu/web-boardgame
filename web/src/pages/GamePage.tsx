@@ -42,6 +42,7 @@ import { sfx } from '../lib/sfx.ts'
 import { socket } from '../lib/socket.ts'
 // 사람들과 하는 판은 서버에서, 혼자 해보기는 화면 안에서 돈다. 이 화면은 그 차이를 모른다.
 import { call, useServerEvent } from '../lib/transport.ts'
+import { localRunning } from '../lib/localGame.ts'
 import { useEscapeBlock, useEscapeFallback } from '../lib/useEscape.ts'
 import { useTokenFlight } from '../lib/useTokenFlight.ts'
 import { useScrollLock } from '../lib/useScrollLock.ts'
@@ -81,6 +82,8 @@ const VERDICT_MS = 1200
 /** 마지막 사람까지 보고 나서 판 전체의 결과를 띄우기까지의 뜸. */
 const FINAL_GAP_MS = 350
 const FINAL_MS = 2400
+/** 방금 집은 토큰을 이 안에 다시 누르면 내려놓기가 아니라 두 번 누른 것으로 본다. */
+const DOUBLE_TAP_MS = 400
 
 export function GamePage({ spectating = false }: { spectating?: boolean } = {}) {
   const { code = '' } = useParams()
@@ -260,8 +263,12 @@ export function GamePage({ spectating = false }: { spectating?: boolean } = {}) 
       }
     }
 
-    // 끊겨 있으면 지금 보내지 않는다. 붙는 순간 아래 connect 가 부르므로 두 번이 된다.
-    if (socket.connected) void enter()
+    /*
+     * 끊겨 있으면 지금 보내지 않는다. 붙는 순간 아래 connect 가 부르므로 두 번이 된다.
+     * **혼자 해보기는 예외다** — 판이 이 화면 안에서 돌아 서버에 붙을 일이 없고, 서버가
+     * 잠들어 있으면 connect 가 영영 오지 않아 「테이블을 차리는 중」에서 멈췄다.
+     */
+    if (socket.connected || localRunning()) void enter()
     // 인자 없는 off 는 'connect' 를 듣던 모두를 떼어낸다 — 연결 표시등까지 귀가 먹어
     // 서버가 돌아와도 화면이 영영 「끊김」인 채로 남는다. 내 것만 떼어낸다.
     const onConnect = () => void enter()
@@ -716,14 +723,35 @@ export function GamePage({ spectating = false }: { spectating?: boolean } = {}) 
     void leave(navigate, tutorial)
   }
 
+  /*
+   * 두 번 누른 것을 두 번의 동작으로 읽지 않는다.
+   *
+   * 쥔 토큰을 다시 누르는 것은 「내려놓기」다. 그래서 빠르게 두 번 누르면 들고 가자마자
+   * 내려놓았다 — 두 번째 요청이 서버에 닿을 때 잠금(0.2초)이 이미 풀려 있으면 그렇게 된다.
+   * 답을 기다리는 동안은 다음 누름을 받지 않고, 방금 집은 토큰을 곧바로 다시 누른 것도
+   * 두 번 누른 것으로 보고 버린다.
+   */
+  const taking = useRef(false)
+  const tookAt = useRef<{ token: number; at: number } | null>(null)
+
   async function take(token: number) {
+    if (taking.current) return
+    const holding = game?.players.find((player) => player.id === playerId)?.currentToken === token
+    const just = tookAt.current
+    if (holding && just?.token === token && Date.now() - just.at < DOUBLE_TAP_MS) return
+
+    taking.current = true
     /*
      * 소리는 누른 순간에 낸다. 서버 확정을 기다렸다 내면 한 번 오가는 만큼(0.1초 남짓)
      * 눌렀는데 아무 일도 없는 틈이 생겼다. 토큰이 움직이는 것은 여전히 확정 뒤다.
      */
     sfx('take')
     const result = await call<null>('game:take', { token })
-    if (result.ok) return
+    taking.current = false
+    if (result.ok) {
+      tookAt.current = holding ? null : { token, at: Date.now() }
+      return
+    }
     // 거절은 조용히 씹지 않는다. 눌렀는데 아무 일도 안 일어나는 게 제일 나쁘다.
     sfx('deny')
     setRejected(token)
