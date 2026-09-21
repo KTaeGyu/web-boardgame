@@ -84,6 +84,11 @@ let noiseBuffer: AudioBuffer | null = null
 function ready(): number | null {
   const gain = sfxGain()
   if (gain <= 0) return null
+  /*
+   * 다른 탭·앱으로 가 있으면 내지 않는다. 브라우저가 숨은 창의 타이머를 늦춰(길게는
+   * 1분에 한 번) 쇼다운의 공개 소리가 판이 넘어간 뒤에 뒤늦게 줄줄이 울렸다.
+   */
+  if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return null
   try {
     if (!ctx) {
       ctx = new AudioContext()
@@ -97,8 +102,18 @@ function ready(): number | null {
     }
     // 슬라이더를 옮긴 것이 다음 소리부터 바로 듣긴다.
     master!.gain.value = gain
-    // 처음 몇 번은 아직 잠겨 있을 수 있다. 열릴 때까지 눌러 본다.
-    if (ctx.state === 'suspended') void ctx.resume()
+    /*
+     * 잠겨 있으면 열어 보되 **이번 소리는 버린다.**
+     *
+     * 잠긴 동안에는 시계(currentTime)가 멈춰 있어, 그때 건 소리가 전부 같은 시각에
+     * 줄을 선다. 첫 클릭이나 창으로 돌아온 순간 문이 열리면 그동안 밀린 칩·공개·금고
+     * 소리가 한꺼번에 터졌다 — 판이 끝났는데도 소리가 계속 나는 것처럼 들린 까닭이다.
+     * 지나간 일의 소리는 늦게 나느니 안 나는 편이 맞다.
+     */
+    if (ctx.state !== 'running') {
+      void ctx.resume()
+      return null
+    }
     return ctx.currentTime
   } catch {
     return null
