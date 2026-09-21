@@ -7,7 +7,7 @@
  * 소켓은 앱 전체가 쓰는 그 하나다. 방 코드로 이미 갈라져 있어 대화도 같은 길로 간다.
  */
 
-import { Fragment, useCallback, useEffect, useRef, useState, type FormEvent, type TouchEvent } from 'react'
+import { Fragment, memo, useCallback, useEffect, useRef, useState, type FormEvent, type TouchEvent } from 'react'
 import { CHAT_MAX, type ChatMessage } from '@the-gang/shared'
 
 import { useBackIntercept } from '../lib/back.ts'
@@ -101,15 +101,24 @@ function clock(at: number): string {
   return `${two(when.getHours())}:${two(when.getMinutes())}`
 }
 
-export function Chat({ code }: { code: string }) {
+/**
+ * 받는 것이 방 번호 하나뿐이라 memo 로 부모에서 떼어 둔다. 판 화면은 토큰이 움직일
+ * 때마다 다시 그려지는데, 그때마다 대화 수백 줄을 다시 맞춰 볼 이유가 없다.
+ */
+export const Chat = memo(function Chat({ code }: { code: string }) {
   const me = usePlayerId()
   const [open, setOpen] = useState(false)
   // 펼쳐 둔 채 휴대폰의 뒤로가기를 누르면 판을 떠나는 것이 아니라 대화를 접는다.
   useBackIntercept(open, () => setOpen(false))
   useEscape(open, useCallback(() => setOpen(false), []))
-  const [messages, setMessages] = useState<ChatMessage[]>(() => loadSaved(code).messages)
+  /*
+   * 저장해 둔 대화는 처음 한 번만 읽는다. `useRef(loadSaved(...))` 는 넘긴 값을 렌더마다
+   * 새로 계산하므로, 판 화면이 다시 그려질 때마다 최대 300줄을 파싱하고 있었다.
+   */
+  const [saved] = useState(() => loadSaved(code))
+  const [messages, setMessages] = useState<ChatMessage[]>(saved.messages)
   /** 창이 들고 있는 대화가 어느 방의 것인가. 서버가 건네주는 시각과 맞춰 본다. */
-  const sinceRef = useRef(loadSaved(code).since)
+  const sinceRef = useRef(saved.since)
   const [draft, setDraft] = useState('')
   /** 서버가 거절한 이유. 도배로 막혔을 때가 거의 전부다. */
   const [notice, setNotice] = useState('')
@@ -426,4 +435,4 @@ export function Chat({ code }: { code: string }) {
       </button>
     </>
   )
-}
+})

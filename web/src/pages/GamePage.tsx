@@ -597,6 +597,11 @@ export function GamePage({ spectating = false }: { spectating?: boolean } = {}) 
    * 못박히므로, 누가 토큰을 옮겨 시계가 처음부터 시작하면 화면도 함께 되감긴다.
    */
   const autoIn = game?.autoConfirmIn ?? null
+  /**
+   * 남은 **초**. 밀리초로 들고 있으면 0.1초마다 값이 달라져 판 화면 전체가 초당 열 번
+   * 다시 그려졌다 — 화면에 보이는 숫자는 1초에 한 번만 바뀌는데. 같은 값을 넣으면 React 가
+   * 건너뛰므로, 초로 올려 담기만 해도 다시 그리는 것이 초당 한 번이 된다.
+   */
   const [autoLeft, setAutoLeft] = useState<number | null>(null)
 
   useEffect(() => {
@@ -605,7 +610,7 @@ export function GamePage({ spectating = false }: { spectating?: boolean } = {}) 
       return
     }
     const deadline = Date.now() + autoIn
-    const tick = () => setAutoLeft(Math.max(0, deadline - Date.now()))
+    const tick = () => setAutoLeft(Math.ceil(Math.max(0, deadline - Date.now()) / 1000))
     tick()
     // 초가 바뀌는 순간과 눈금이 어긋나면 숫자가 한 박자 늦게 넘어간다. 촘촘히 센다.
     const timer = setInterval(tick, 100)
@@ -747,9 +752,7 @@ export function GamePage({ spectating = false }: { spectating?: boolean } = {}) 
    * 15초 내내 큰 숫자가 떠 있으면 정작 봐야 할 카드와 토큰을 가린다.
    */
   const countdown =
-    autoLeft !== null && autoLeft > 0 && autoLeft <= AUTO_CONFIRM_COUNTDOWN_MS
-      ? Math.max(1, Math.ceil(autoLeft / 1000))
-      : null
+    autoLeft !== null && autoLeft > 0 && autoLeft * 1000 <= AUTO_CONFIRM_COUNTDOWN_MS ? autoLeft : null
   /*
    * 내 토큰이 날아가는 중이다.
    *
@@ -977,7 +980,7 @@ export function GamePage({ spectating = false }: { spectating?: boolean } = {}) 
           <span className="game-actions__status">
             {game.canConfirm
               ? `확정 ${game.players.filter((p) => p.ready).length} / ${game.players.length}` +
-                (autoLeft !== null ? ` · ${Math.ceil(autoLeft / 1000)}초 뒤 자동 확정` : '')
+                (autoLeft !== null ? ` · ${autoLeft}초 뒤 자동 확정` : '')
               : '모두가 토큰을 가져가면 확정할 수 있습니다'}
           </span>
         )}
