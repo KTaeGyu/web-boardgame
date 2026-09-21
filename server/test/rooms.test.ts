@@ -660,29 +660,24 @@ describe('방 설정', () => {
 })
 
 describe('대화', () => {
-  it('남긴 말에는 자리에 붙는 이름과 같은 이름이 달린다', () => {
+  it('말에는 자리에 붙는 이름과 같은 이름이 달린다', () => {
     const { store } = makeStore()
-    const code = seed(store, ['p1', 'p2'])
+    seed(store, ['p1', 'p2'])
 
     const said = store.addChat('p2', '  왼쪽부터 갈까  ')
     assert.ok(said)
     assert.equal(said.playerId, 'p2')
     assert.equal(said.name, '민수')
     assert.equal(said.text, '왼쪽부터 갈까', '앞뒤 공백은 걸러 낸다')
-    assert.deepEqual(
-      store.chatOf(code).map((message) => message.text),
-      ['왼쪽부터 갈까'],
-    )
   })
 
-  it('빈 말은 남지 않는다', () => {
+  it('빈 말은 만들지 않는다', () => {
     const { store } = makeStore()
-    const code = seed(store, ['p1'])
+    seed(store, ['p1'])
     assert.equal(store.addChat('p1', '   '), null)
-    assert.deepEqual(store.chatOf(code), [])
   })
 
-  it('방에 없는 사람은 남길 수 없다', () => {
+  it('방에 없는 사람은 말할 수 없다', () => {
     const { store } = makeStore()
     seed(store, ['p1'])
     assert.equal(store.addChat('구경꾼', '안녕'), null)
@@ -690,54 +685,19 @@ describe('대화', () => {
 
   it('번호는 방마다 따로 센다 — 옆 방이 번호를 가져가면 사이가 빠진 것처럼 보인다', () => {
     const { store } = makeStore()
-    const first = seed(store, ['p1'])
-    const second = seed(store, ['p2'])
+    seed(store, ['p1'])
+    seed(store, ['p2'])
 
-    store.addChat('p1', '가')
-    store.addChat('p2', '나')
-    store.addChat('p1', '다')
-
-    assert.deepEqual(
-      store.chatOf(first).map((message) => message.id),
-      [1, 2],
-      '한 방 안에서는 번호가 이어져야 「사이가 빠졌다」를 알아볼 수 있다',
+    const ids = [store.addChat('p1', '가'), store.addChat('p2', '나'), store.addChat('p1', '다')].map(
+      (message) => message?.id,
     )
-    assert.deepEqual(
-      store.chatOf(second).map((message) => message.id),
-      [1],
-    )
+    assert.deepEqual(ids, [1, 1, 2], '한 방 안에서는 번호가 이어져야 「사이가 빠졌다」를 알아볼 수 있다')
   })
 
   it('같은 말을 두 번 해도 번호로 갈린다', () => {
     const { store } = makeStore()
-    const code = seed(store, ['p1'])
-    store.addChat('p1', '음')
-    store.addChat('p1', '음')
-    const ids = store.chatOf(code).map((message) => message.id)
-    assert.equal(new Set(ids).size, 2)
-  })
-
-  it('오래된 말은 흘려보낸다 — 방이 무한히 무거워지지 않는다', () => {
-    const { store } = makeStore()
-    const code = seed(store, ['p1'])
-    for (let i = 0; i < 60; i++) store.addChat('p1', `${i}`)
-
-    const kept = store.chatOf(code)
-    assert.equal(kept.length, 50)
-    assert.equal(kept[0].text, '10', '앞에서부터 밀려난다')
-    assert.equal(kept[kept.length - 1].text, '59')
-  })
-
-  it('방이 닫히면 말도 함께 사라진다', () => {
-    const ctx = makeStore()
-    const code = seed(ctx.store, ['p1'])
-    ctx.store.addChat('p1', '먼저 들어가 있을게')
-
-    ctx.store.markDisconnected('p1')
-    ctx.advance(30_000)
-    ctx.store.sweep()
-
-    assert.deepEqual(ctx.store.chatOf(code), [], '방이 없으면 지난 말도 없다')
+    seed(store, ['p1'])
+    assert.notEqual(store.addChat('p1', '음')?.id, store.addChat('p1', '음')?.id)
   })
 })
 
@@ -876,25 +836,6 @@ describe('자리를 비운 방장 넘겨받기', () => {
     assert.equal(store.kick('p2', 'p1', true).ok, true)
 
     assert.equal(store.joinRoom('p1', '태규', code).ok, true, '돌아올 길은 남겨둔다')
-  })
-})
-
-describe('방이 열린 시각', () => {
-  it('번호가 같아도 다른 방이면 시각이 다르다', () => {
-    const ctx = makeStore()
-    const first = seed(ctx.store, ['p1'])
-    const openedFirst = ctx.store.openedAt(first)
-
-    // 마지막 사람이 나가면 방이 닫히고, 그 번호는 다시 쓰일 수 있다.
-    ctx.store.leaveRoom('p1')
-    assert.equal(ctx.store.openedAt(first), 0, '없는 방은 0 이다')
-
-    ctx.advance(60_000)
-    const created = ctx.store.createRoom('p2', '민수')
-    assert.equal(created.ok, true)
-
-    const second = created.ok ? created.value.code : ''
-    assert.notEqual(ctx.store.openedAt(second), openedFirst, '시각이 같으면 창이 두 방을 구별하지 못한다')
   })
 })
 

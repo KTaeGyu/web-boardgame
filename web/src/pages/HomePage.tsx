@@ -8,7 +8,7 @@
  * 로그인한 사람에게는 고를 것이 없다. 그때는 이 화면이 「나」와 「어디로 갈까」를 보인다.
  */
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 
 import { logout, useSession } from '../lib/auth.ts'
@@ -16,6 +16,7 @@ import { getNickname, setNickname as saveNickname } from '../lib/identity.ts'
 import { createRoom } from '../lib/rooms.ts'
 import { startTutorial } from '../lib/solo.ts'
 import { useConnected } from '../lib/socket.ts'
+import { forgetChat } from '../components/Chat.tsx'
 
 /**
  * 연습판에서 쓸 이름.
@@ -28,6 +29,8 @@ const SOLO_NAME = '나'
 
 export function HomePage() {
   const navigate = useNavigate()
+  // 방 밖이다. 앉아 있던 방의 대화는 여기서 버린다 — 다시 들어가면 그때부터 보인다.
+  useEffect(forgetChat, [])
   const me = useSession()
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)

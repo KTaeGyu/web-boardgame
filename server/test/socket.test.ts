@@ -449,6 +449,32 @@ describe('입장 알림', () => {
 })
 
 /**
+ * 대화는 방에 있는 동안만 보인다(2026-09-21). 서버는 쌓지 않으므로 늦게 들어온 사람은
+ * 앞선 말을 받지 않는다 — 들어온 뒤의 말부터 받는다.
+ */
+describe('대화는 들어온 뒤부터', () => {
+  it('늦게 들어온 사람은 지난 말을 받지 않는다', async () => {
+    const host = await client()
+    const room = unwrap(await call<RoomView>(host, 'room:create', identity(`late-host-${seq()}`, '가')))
+    unwrap(await call<null>(host, 'chat:send', { text: '먼저 한 말' }))
+
+    const guest = await client()
+    const got: string[] = []
+    guest.onAny((event: string, payload: { text?: string }) => {
+      if (event.startsWith('chat:')) got.push(`${event} ${payload?.text ?? ''}`)
+    })
+    unwrap(await call<RoomView>(guest, 'room:join', { ...identity(`late-guest-${seq()}`, '나'), code: room.code }))
+
+    // 들어온 뒤의 말이 도착했으면 그 앞에 올 것은 이미 다 왔다.
+    const after = until<ChatMessage>(guest, 'chat:message', (message) => message.text === '나중 말')
+    unwrap(await call<null>(host, 'chat:send', { text: '나중 말' }))
+    await after
+
+    assert.deepEqual(got, ['chat:message 나 님이 입장하셨습니다', 'chat:message 나중 말'])
+  })
+})
+
+/**
  * 감정표현.
  *
  * **자리 위에 뜨는 것은 상태가 아니라 사건이다.** 서버는 「누가 무엇을」만 한 번 쏘고

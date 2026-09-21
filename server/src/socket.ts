@@ -355,10 +355,6 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
       const dressed = store.dressUp(playerId, equippedOf(payload.token))
       ack(dressed ? { ok: true, value: dressed } : result)
       sendRoomList()
-      socket.emit('chat:history', {
-        messages: store.chatOf(result.value.code),
-        since: store.openedAt(result.value.code),
-      })
     })
 
     socket.on('room:join', (payload, ack) => {
@@ -410,12 +406,9 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
       // 알리기 전에 얹는다. 뒤에 얹으면 얼굴 없는 줄이 한 번 지나간다.
       store.dressUp(playerId, equippedOf(payload.token))
       announce(store.view(code) ?? result.value)
-      // 새로고침·재접속도 이 길로 온다. 앞의 흐름이 없으면 대화가 매번 끊긴다.
-      socket.emit('chat:history', { messages: store.chatOf(code), since: store.openedAt(code) })
 
       /*
-       * 들어왔다는 줄을 대화에 남긴다. **지난 흐름을 건넨 뒤에 얹는다** — 먼저 얹으면
-       * 들어온 사람에게는 이력에 한 번, 새 줄로 한 번, 같은 말이 두 줄로 선다.
+       * 들어왔다는 줄을 방에 알린다. 들어온 사람 자신도 받는다 — 그 사람의 대화는 이 줄부터다.
        *
        * 이름은 자리에 붙는 것과 같아야 한다. 동명이인이 있으면 「홍길동」이 아니라
        * 「홍길동 (2)」가 들어온 것이고, 그래야 목록의 누구인지 이어진다.
@@ -618,10 +611,9 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
       ack(result)
       announce(result.value)
 
-      // 들어오자마자 지금 판과 지난 대화를 한 번 건넨다. 다음 동작을 기다릴 이유가 없다.
+      // 들어오자마자 지금 판을 한 번 건넨다. 다음 동작을 기다릴 이유가 없다.
       const game = games.get(code)
       if (game) socket.emit('game:state', game.view())
-      socket.emit('chat:history', { messages: store.chatOf(code), since: store.openedAt(code) })
     })
 
     socket.on('room:leave', (ack) => {

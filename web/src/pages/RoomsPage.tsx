@@ -8,9 +8,12 @@ import { getNickname, getPlayerId } from '../lib/identity.ts'
 import { createRoom } from '../lib/rooms.ts'
 import { call, socket, useConnected, useServerEvent } from '../lib/socket.ts'
 import { useEscapeFallback } from '../lib/useEscape.ts'
+import { forgetChat } from '../components/Chat.tsx'
 
 export function RoomsPage() {
   const navigate = useNavigate()
+  // 방 밖이다. 앉아 있던 방의 대화는 여기서 버린다 — 다시 들어가면 그때부터 보인다.
+  useEffect(forgetChat, [])
   // 방이 닫혀서 밀려온 경우, 왜 닫혔는지 여기서 알려준다.
   const arrivedWith = (useLocation().state as { notice?: string } | null)?.notice ?? ''
   const nickname = getNickname()

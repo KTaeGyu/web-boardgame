@@ -514,9 +514,6 @@ export interface ChatMessage {
 /** 한 줄의 길이. 길어지면 화면이 아니라 대화가 무너진다. */
 export const CHAT_MAX = 200
 
-/** 방이 들고 있는 지난 말의 수. 새로고침한 사람이 흐름을 잡을 만큼만. */
-export const CHAT_KEEP = 50
-
 /** 서버 → 클라이언트. */
 export interface ServerToClientEvents {
   'room:updated': (room: RoomView) => void
@@ -574,15 +571,13 @@ export interface ServerToClientEvents {
    * 남이 내 토큰을 가져간 것과 내가 스스로 놓은 것이 구별되지 않아, 서버가 짚어 준다.
    */
   'game:toast': (payload: { text: string; tone?: 'info' | 'warn' }) => void
-  /** 누군가 한 말. 그 방 전체에 간다. */
-  'chat:message': (message: ChatMessage) => void
   /**
-   * 방에 들어온 사람에게만. 새로고침해도 앞의 흐름이 남는다.
+   * 누군가 한 말. 그 순간 방에 있는 사람에게만 간다.
    *
-   * `since` 는 이 방이 열린 시각이다. 방 번호는 네 자리라 닫힌 방의 번호가 다시 쓰일 수
-   * 있는데, 번호만 보고 「같은 방」이라 여기면 창에 남은 옛 대화가 남의 새 방에 섞인다.
+   * 지난 말을 건네는 길은 없다(2026-09-21) — 서버는 대화를 쌓지 않는다. 대화는 방에 있는
+   * 동안만 보이고, 나갔다 들어오면(새로고침 포함) 들어온 뒤부터 보인다.
    */
-  'chat:history': (payload: { messages: ChatMessage[]; since: number }) => void
+  'chat:message': (message: ChatMessage) => void
   /**
    * 튜토리얼 안내. 스스로 사라지지 않는다 — 읽고 닫을 때까지 판이 멈춰 서 있다.
    *

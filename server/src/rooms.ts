@@ -7,7 +7,6 @@
 
 import {
   type Equipped,
-  CHAT_KEEP,
   CHAT_MAX,
   DEFAULT_SETTINGS,
   GAME_MODES,
@@ -75,8 +74,6 @@ interface Room {
   createdAt: number
   /** 마지막으로 누군가 무언가를 한 시각. 아무 일도 없는 방을 골라내는 기준이다. */
   lastActivityAt: number
-  /** 지난 말. 방과 함께 살고 방과 함께 사라진다. */
-  chat: ChatMessage[]
   /**
    * 자리 없이 보고만 있는 사람들. 방을 살려두지 못한다 —
    * 자리에 앉은 사람이 하나도 없으면 관전자가 남아 있어도 방은 닫힌다.
@@ -173,7 +170,6 @@ export class RoomStore {
       phase: 'lobby',
       createdAt: now,
       lastActivityAt: now,
-      chat: [],
       chatSeq: 0,
       tutorial: false,
       banned: new Set(),
@@ -387,7 +383,10 @@ export class RoomStore {
    * 접속만 걸어두고 떠나면 아무리 연결이 멀쩡해도 방이 정리된다.
    */
   /**
-   * 한 줄을 방에 남긴다. 빈 말과 너무 긴 말은 여기서 걸러 낸다.
+   * 한 줄을 만든다. 빈 말과 너무 긴 말은 여기서 걸러 낸다.
+   *
+   * **서버는 대화를 쌓지 않는다**(2026-09-21). 만들어 그 순간 방에 있는 사람에게 보내고
+   * 끝이다 — 대화는 방에 있는 동안만 보이고, 나갔다 들어오면 들어온 뒤부터 보인다.
    *
    * 이름은 저장하지 않고 남길 때 붙인다 — 자리에 붙는 이름과 같은 규칙(동명이인 구분)으로
    * 지어야 누가 한 말인지 이어지기 때문이다.
@@ -415,8 +414,6 @@ export class RoomStore {
       at: this.now(),
       ...(watcher ? { spectator: true } : {}),
     }
-    room.chat.push(message)
-    if (room.chat.length > CHAT_KEEP) room.chat.splice(0, room.chat.length - CHAT_KEEP)
     return message
   }
 
@@ -441,26 +438,7 @@ export class RoomStore {
       at: this.now(),
       system: true,
     }
-    room.chat.push(message)
-    if (room.chat.length > CHAT_KEEP) room.chat.splice(0, room.chat.length - CHAT_KEEP)
     return message
-  }
-
-  /** 방에 남아 있는 지난 말. 들어온 사람에게 한 번 건넨다. */
-  chatOf(code: string | null): ChatMessage[] {
-    const room = code ? this.rooms.get(code) : undefined
-    return room ? [...room.chat] : []
-  }
-
-  /**
-   * 이 방이 열린 시각.
-   *
-   * 번호가 같아도 다른 방일 수 있다 — 닫힌 방의 번호는 다시 쓰인다. 창이 들고 있는
-   * 옛 대화가 남의 방에 섞이지 않으려면 번호 말고 하나가 더 필요하다.
-   */
-  openedAt(code: string | null): number {
-    const room = code ? this.rooms.get(code) : undefined
-    return room ? room.createdAt : 0
   }
 
   touch(code: string | null): void {
