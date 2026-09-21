@@ -199,10 +199,11 @@ function fake(overrides: Partial<AccountStore> = {}) {
         calls.push('create')
         rows.push({ ...account })
       },
-      saveRecord: async (email, wins, losses) => {
-        calls.push('saveRecord')
+      saveAccount: async (email, changes) => {
+        calls.push(`saveAccount:${Object.keys(changes).sort().join('+')}`)
         const row = rows.find((one) => one.email === email)
-        if (row) Object.assign(row, { wins, losses })
+        if (row && changes.record) Object.assign(row, changes.record)
+        if (row && changes.cosmetics) row.cosmetics = changes.cosmetics
       },
       saveCosmetics: async (email, cosmetics) => {
         calls.push('saveCosmetics')
@@ -216,6 +217,72 @@ function fake(overrides: Partial<AccountStore> = {}) {
 
 describe('밖에 둔 계정', () => {
   const quick = { retryWaitMs: 1, holdMs: 1 }
+
+  /*
+   * 골드는 판 도중에 밖에 쓰지 않는다. 금고가 열릴 때마다 쓰면 다음 라운드의 토큰을
+   * 집는 동안 요청이 몰려 판이 굼떴다. 판이 끝나면(전적을 적을 때) 한 번에 나간다.
+   */
+  it('판 도중에 번 골드는 판이 끝날 때 전적과 한 번에 나간다', async () => {
+    const { store, rows, calls } = fake()
+    const accounts = new Accounts(store, quick)
+    const made = await accounts.signup('tk@example.com', 'pass1234', '태규')
+    assert.equal(made.ok, true)
+    if (!made.ok) return
+    const token = made.value.token
+    calls.length = 0
+
+    accounts.earn(token, 'ROOM:1:1')
+    accounts.earn(token, 'ROOM:1:2')
+    await new Promise((done) => setTimeout(done, 30))
+    assert.deepEqual(calls, [], '판 도중에는 아무것도 쓰지 않는다')
+    const now = accounts.resume(token)
+    assert.equal(now.ok && now.value.cosmetics.earned, 2, '잔액은 메모리에서 바로 오른다')
+
+    accounts.record(token, 'win', 'ROOM:1:win')
+    await new Promise((done) => setTimeout(done, 30))
+    assert.deepEqual(calls, ['saveAccount:cosmetics+record'], '전적과 골드를 한 번에 쓴다')
+    assert.equal(rows[0].cosmetics?.earned, 2)
+    assert.equal(rows[0].wins, 1)
+  })
+
+  it('판 도중에 떠나면 그때까지 번 골드만 쓴다', async () => {
+    const { store, rows, calls } = fake()
+    const accounts = new Accounts(store, quick)
+    const made = await accounts.signup('tk@example.com', 'pass1234', '태규')
+    assert.equal(made.ok, true)
+    if (!made.ok) return
+    calls.length = 0
+
+    accounts.earn(made.value.token, 'ROOM:1:1')
+    accounts.release('tk@example.com')
+    await new Promise((done) => setTimeout(done, 30))
+    assert.deepEqual(calls, ['saveAccount:cosmetics'], '바뀌지 않은 전적은 쓰지 않는다')
+    assert.equal(rows[0].cosmetics?.earned, 1)
+  })
+
+  it('서버를 끌 때 미뤄 둔 골드도 내보낸다', async () => {
+    const { store, rows } = fake()
+    const accounts = new Accounts(store, quick)
+    const made = await accounts.signup('tk@example.com', 'pass1234', '태규')
+    assert.equal(made.ok, true)
+    if (!made.ok) return
+
+    accounts.earn(made.value.token, 'ROOM:1:1')
+    await accounts.stop()
+    assert.equal(rows[0].cosmetics?.earned, 1)
+  })
+
+  it('아무도 내보내 주지 않으면 한도가 지나 스스로 나간다', async () => {
+    const { store, rows } = fake()
+    const accounts = new Accounts(store, { ...quick, goldHoldMs: 5 })
+    const made = await accounts.signup('tk@example.com', 'pass1234', '태규')
+    assert.equal(made.ok, true)
+    if (!made.ok) return
+
+    accounts.earn(made.value.token, 'ROOM:1:1')
+    await new Promise((done) => setTimeout(done, 40))
+    assert.equal(rows[0].cosmetics?.earned, 1)
+  })
 
   it('부팅 때 읽어 온 계정으로 곧바로 로그인된다', async () => {
     const { store, rows } = fake()
@@ -538,7 +605,7 @@ describe('꾸미기 동시 요청', () => {
       loadAll: async () => [],
       has: async () => false,
       create: async () => {},
-      saveRecord: async () => {},
+      saveAccount: async () => {},
       saveCosmetics: async () => {
         await new Promise((done) => setTimeout(done, 5))
       },

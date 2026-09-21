@@ -182,6 +182,7 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
     const view = game.view()
     io.to(code).emit('game:state', view)
     sendToasts(code)
+    if (view.phase === 'gameOver') releaseSeats(code)
     // 혼자 해보는 방이면 여기서 봇이 다음 한 수를 생각한다. 예약은 늘 최신 상태 기준이다.
     tutorials.get(code)?.poke()
 
@@ -301,6 +302,19 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
     return null
   }
 
+  /**
+   * 이 방에 앉은 계정들의 미뤄 둔 골드·전적을 내보낸다.
+   *
+   * 골드는 판 도중에 밖에 쓰지 않는다(`accounts.ts` 의 pendingGold). 판이 끝나거나 접힌
+   * 순간이 내보낼 때다 — 그 둘을 아는 자리가 여기다.
+   */
+  function releaseSeats(code: string): void {
+    for (const player of store.view(code)?.players ?? []) {
+      const email = accountOfPlayer.get(player.id)
+      if (email) accounts.release(email)
+    }
+  }
+
   /** 자리에 차림을 얹고 방에 알린다. 방에 앉아 있지 않으면 아무 일도 하지 않는다. */
   function dressUp(playerId: string, token: unknown): void {
     const room = store.dressUp(playerId, equippedOf(token))
@@ -321,6 +335,7 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
   /** 판을 접고 방은 대기실로 되돌린다. 방 자체는 남는다. */
   function abortGame(code: string, message: string, reason: GameOverReason['reason'] = 'playerLeft'): void {
     if (!games.has(code)) return
+    releaseSeats(code)
     forgetRoom(code)
     io.to(code).emit('game:aborted', { reason, message })
     announce(store.setPhase(code, 'lobby'))
@@ -627,6 +642,9 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
       // 끊길 때 치우는 자리지만, 나가기가 먼저 연결 고리를 끊어 그때는 누구인지 모른다.
       chatRate.delete(playerId)
       emoteAt.delete(playerId)
+      // 판 도중에 떠나도 그동안 연 금고는 남는다. 미뤄 둔 골드를 여기서 내보낸다.
+      const email = accountOfPlayer.get(playerId)
+      if (email) accounts.release(email)
       accountOfPlayer.delete(playerId)
 
       ack({ ok: true, value: null })

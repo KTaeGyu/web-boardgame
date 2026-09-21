@@ -93,6 +93,13 @@ const LOAD_WAIT_MS = 1500
 const DRAIN_MS = 300
 /** 판이 끝나고 이만큼 모았다가 내보낸다. 열 명이 한꺼번에 끝나도 한 줄기로 나간다. */
 const HOLD_MS = 3000
+/**
+ * 판 도중에 번 골드를 끝내 아무도 내보내 주지 않을 때 기다리는 한도.
+ *
+ * 골드는 판이 끝나거나 그 사람이 방을 나갈 때 내보낸다(`release`). 끊긴 채 유예가 지나
+ * 조용히 치워진 사람처럼 그 어느 길에도 안 걸린 것을 여기서 줍는다.
+ */
+const GOLD_HOLD_MS = 10 * 60_000
 
 const wait = (ms: number) => new Promise((done) => setTimeout(done, ms))
 
@@ -108,11 +115,20 @@ export class Accounts {
    * 그러면 같은 이메일로 줄이 둘 생긴다. 차라리 계정 기능을 닫는다. 게스트는 그대로 된다.
    */
   private locked = false
-  /** 아직 밖으로 못 보낸 전적. 이메일로 모아 두므로 같은 사람이 두 판 끝내도 한 번 나간다. */
+  /** 다음에 내보낼 사람들. 이메일로 모아 두므로 같은 사람이 두 판 끝내도 한 번 나간다. */
   private pending = new Set<string>()
-  /** 골드가 늘어 꾸미기 칸을 다시 써야 하는 사람들. 전적과 같은 물길로 나간다. */
+  /** 전적이 바뀌어 밖에 다시 써야 하는 사람들. */
+  private pendingRecord = new Set<string>()
+  /**
+   * 골드가 늘어 꾸미기 칸을 다시 써야 하는 사람들.
+   *
+   * **판 도중에는 내보내지 않는다**(2026-09-21). 금고가 열릴 때마다 쓰면 사람마다 요청이
+   * 몇 건씩, 그것도 다음 라운드의 토큰을 집는 동안 나갔다 — CPU 0.1 개인 서버에서 그 처리가
+   * 판과 같은 CPU 를 나눠 썼다. 잔액은 메모리에서 바로 오르고, 밖에 쓰는 것만 판 뒤로 미룬다.
+   */
   private pendingGold = new Set<string>()
   private drain: ReturnType<typeof setTimeout> | null = null
+  private goldDrain: ReturnType<typeof setTimeout> | null = null
   /**
    * 이메일마다 하나씩. **꾸미기 쓰기를 한 줄로 세운다.**
    *
@@ -124,6 +140,7 @@ export class Accounts {
   private chains = new Map<string, Promise<void>>()
   private retryWaitMs: number
   private holdMs: number
+  private goldHoldMs: number
 
   /**
    * @param timing 기다리는 시간. 테스트가 몇 초를 앉아서 보내지 않게 하려고 열어 두었다 —
@@ -131,11 +148,12 @@ export class Accounts {
    */
   constructor(
     store: AccountStore | null = null,
-    timing: { retryWaitMs?: number; holdMs?: number } = {},
+    timing: { retryWaitMs?: number; holdMs?: number; goldHoldMs?: number } = {},
   ) {
     this.store = store
     this.retryWaitMs = timing.retryWaitMs ?? LOAD_WAIT_MS
     this.holdMs = timing.holdMs ?? HOLD_MS
+    this.goldHoldMs = timing.goldHoldMs ?? GOLD_HOLD_MS
   }
 
   /** 몇 명이 계정을 만들었나. 서버 상태를 볼 때 쓴다. */
@@ -188,8 +206,11 @@ export class Accounts {
   /** 모아 둔 것을 마저 내보내고 시계를 멈춘다. 서버가 닫힐 때 부른다. */
   async stop(): Promise<void> {
     if (this.drain) clearTimeout(this.drain)
+    if (this.goldDrain) clearTimeout(this.goldDrain)
     this.drain = null
-    // 배포마다 서버가 다시 뜬다. 모아 두던 몇 초치(전적·골드)를 버리지 않고 내보낸다.
+    this.goldDrain = null
+    // 배포마다 서버가 다시 뜬다. 판 도중이라 미뤄 둔 골드까지 버리지 않고 내보낸다.
+    for (const email of [...this.pendingRecord, ...this.pendingGold]) this.pending.add(email)
     if (this.pending.size > 0) await this.flush()
   }
 
@@ -296,6 +317,8 @@ export class Accounts {
       wins: account.record.wins + (outcome === 'win' ? 1 : 0),
       losses: account.record.losses + (outcome === 'lose' ? 1 : 0),
     }
+    // 판이 끝났다. 판 도중에 미뤄 둔 골드도 여기서 함께 나간다.
+    this.pendingRecord.add(account.email)
     this.later(account.email)
     return ok({ ...account.record })
   }
@@ -313,10 +336,30 @@ export class Accounts {
     if (!account.counted.has(key)) {
       account.counted.add(key)
       account.cosmetics = { ...account.cosmetics, earned: account.cosmetics.earned + 1 }
-      this.pendingGold.add(account.email)
-      this.later(account.email)
+      this.holdGold(account.email)
     }
     return ok({ ...account.cosmetics })
+  }
+
+  /**
+   * 이 사람의 판이 끝났거나 방을 떠났다. 미뤄 둔 것이 있으면 내보낸다.
+   *
+   * 소켓 쪽이 부른다 — 판이 끝난 것, 접힌 것, 나간 것을 아는 자리가 거기다.
+   */
+  release(email: string): void {
+    if (this.pendingGold.has(email) || this.pendingRecord.has(email)) this.later(email)
+  }
+
+  /** 골드를 미뤄 둔다. 아무도 내보내 주지 않으면 한도가 지나 스스로 나간다. */
+  private holdGold(email: string): void {
+    if (!this.store) return
+    this.pendingGold.add(email)
+    if (this.goldDrain) return
+    this.goldDrain = setTimeout(() => {
+      this.goldDrain = null
+      for (const waiting of this.pendingGold) this.later(waiting)
+    }, this.goldHoldMs)
+    this.goldDrain.unref?.()
   }
 
   /**
@@ -385,6 +428,8 @@ export class Accounts {
           logLine('error', `구매 내역을 남기지 못했다: ${account.email}`, trouble)
           return err('INVALID_SETTINGS', '구매에 실패했습니다. 잠시 뒤에 다시 시도해 주세요.')
         }
+        // 미뤄 둔 골드도 방금 함께 썼다(next.earned). 그 뒤에 번 것은 settle 이 다시 표시한다.
+        this.pendingGold.delete(account.email)
       }
       return ok(this.settle(account, next))
     })
@@ -416,6 +461,7 @@ export class Accounts {
           logLine('error', `차림을 남기지 못했다: ${account.email}`, trouble)
           return err('INVALID_SETTINGS', '지금은 바꿀 수 없습니다. 잠시 뒤에 다시 시도해 주세요.')
         }
+        this.pendingGold.delete(account.email)
       }
       return ok(this.settle(account, next))
     })
@@ -447,23 +493,27 @@ export class Accounts {
     for (const email of going) {
       const account = this.byEmail.get(email)
       if (!account || !this.store) continue
-      try {
-        await this.store.saveRecord(email, account.record.wins, account.record.losses)
-      } catch (trouble) {
-        logLine('error', `전적을 남기지 못했다: ${email}`, trouble)
-      }
-      if (this.pendingGold.delete(email)) {
-        // 구매·장착과 같은 줄에 선다. 따로 쓰면 서로의 값을 덮는다.
-        const store = this.store
-        await this.queue(email, async () => {
-          try {
-            await store.saveCosmetics(email, account.cosmetics)
-          } catch (trouble) {
-            logLine('error', `골드를 남기지 못했다: ${email}`, trouble)
-          }
-          return ok(null)
-        })
-      }
+      // **바뀐 것만, 한 번에 쓴다.** 예전에는 골드만 늘어도 전적까지 따로 한 번 더 썼다.
+      const record = this.pendingRecord.delete(email)
+      const gold = this.pendingGold.delete(email)
+      if (!record && !gold) continue
+
+      // 구매·장착과 같은 줄에 선다. 따로 쓰면 서로의 값(판 번호)을 덮는다.
+      const store = this.store
+      await this.queue(email, async () => {
+        try {
+          await store.saveAccount(email, {
+            ...(record ? { record: { ...account.record } } : {}),
+            ...(gold ? { cosmetics: account.cosmetics } : {}),
+          })
+        } catch (trouble) {
+          logLine('error', `계정을 남기지 못했다: ${email}`, trouble)
+          // 표시를 되살려 둔다. 다음에 판이 끝나거나 떠날 때 다시 나간다.
+          if (record) this.pendingRecord.add(email)
+          if (gold) this.holdGold(email)
+        }
+        return ok(null)
+      })
       await wait(DRAIN_MS)
     }
   }
@@ -477,10 +527,7 @@ export class Accounts {
    */
   private settle(account: Account, next: Cosmetics): Cosmetics {
     const earned = Math.max(next.earned, account.cosmetics.earned)
-    if (earned !== next.earned) {
-      this.pendingGold.add(account.email)
-      this.later(account.email)
-    }
+    if (earned !== next.earned) this.holdGold(account.email)
     account.cosmetics = { ...next, earned }
     return { ...account.cosmetics, owned: [...next.owned], equipped: { ...next.equipped } }
   }

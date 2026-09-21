@@ -52,7 +52,7 @@ const richStore: AccountStore = {
     }),
   has: async () => false,
   create: async () => undefined,
-  saveRecord: async () => undefined,
+  saveAccount: async () => undefined,
   saveCosmetics: async () => undefined,
 }
 let richUsed = 0

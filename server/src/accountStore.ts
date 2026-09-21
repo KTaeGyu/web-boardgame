@@ -67,6 +67,12 @@ export interface StoredAccount {
   cosmetics: Cosmetics | null
 }
 
+/** 한 번에 남길 것. 준 칸만 고친다. */
+export interface AccountChanges {
+  record?: { wins: number; losses: number }
+  cosmetics?: Cosmetics
+}
+
 export interface AccountStore {
   /** 부팅 때 한 번. 실패하면 던진다 — 부르는 쪽이 다시 시도한다. */
   loadAll(): Promise<StoredAccount[]>
@@ -74,8 +80,13 @@ export interface AccountStore {
   has(email: string): Promise<boolean>
   /** 가입. 이것이 성공해야 메모리에 넣는다. */
   create(account: StoredAccount): Promise<void>
-  /** 전적. 뒤에서 보내고 실패는 삼킨다. */
-  saveRecord(email: string, wins: number, losses: number): Promise<void>
+  /**
+   * 전적·골드를 **한 번에** 남긴다. 준 칸만 고친다. 실패는 부르는 쪽이 삼킨다.
+   *
+   * 한 사람의 전적과 골드를 따로 쓰면 요청이 두 배다 — Contentful 은 칸 하나만 고치는
+   * 길이 없어 쓸 때마다 읽고 통째로 올린다.
+   */
+  saveAccount(email: string, changes: AccountChanges): Promise<void>
   /**
    * 코스메틱 차림. **전적과 달리 기다렸다가 성공을 확인한다** — 골드가 걸려 있어
    * 실패를 삼키면 골드는 깎였는데 아이템이 없는 일이 난다.
@@ -195,10 +206,13 @@ class ContentfulAccounts implements AccountStore {
     })
   }
 
-  async saveRecord(email: string, wins: number, losses: number): Promise<void> {
+  async saveAccount(email: string, changes: AccountChanges): Promise<void> {
     await this.patch(email, (fields) => {
-      fields.wins = { [this.locale]: wins }
-      fields.losses = { [this.locale]: losses }
+      if (changes.record) {
+        fields.wins = { [this.locale]: changes.record.wins }
+        fields.losses = { [this.locale]: changes.record.losses }
+      }
+      if (changes.cosmetics) fields.cosmetics = { [this.locale]: changes.cosmetics }
     })
   }
 
