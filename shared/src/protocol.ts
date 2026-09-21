@@ -377,10 +377,11 @@ export interface ClientToServerEvents {
   'auth:resume': (payload: { token: string }, ack: (result: Result<Session>) => void) => void
   'auth:logout': (payload: { token: string }, ack: (result: Result<null>) => void) => void
   /**
-   * 한 판의 끝. 화면이 판정해 보낸다.
+   * 한 판의 끝. 화면은 「지금 세 달라」는 신호만 보낸다.
    *
-   * 서버가 스스로 세지 않는 것은 지금 판의 끝을 아는 자리가 화면 쪽에 흩어져 있어서다
-   * (승·패는 상태에서, 중도포기는 나가는 단추에서). `once` 로 같은 끝을 두 번 세지 않는다.
+   * **`outcome`·`once` 는 서버가 쓰지 않는다**(2026-09-21). 믿으면 열쇠만 바꿔 승수를
+   * 올릴 수 있었다. 서버는 이 사람이 앉은 판이 지금 끝나 있을 때만, 그 판의 결과와
+   * 스스로 만든 열쇠로 한 번 센다. 칸은 옛 화면과 맞물리려고 남겨 두었다.
    */
   'auth:record': (
     payload: { token: string; outcome: PlayOutcome; once: string },
@@ -389,7 +390,8 @@ export interface ClientToServerEvents {
   /**
    * 금고 하나를 열었다. 골드 1 이 쌓인다 — 게임을 끝까지 못 해도 남는다.
    *
-   * 전적과 같은 이유로 화면이 보낸다. `once` 로 같은 금고를 두 번 세지 않는다.
+   * 전적과 같다 — 서버는 이 사람의 판이 지금 금고를 연 쇼다운에 서 있을 때만 세고,
+   * 열쇠(`once`)는 스스로 만든다.
    */
   'auth:vault': (
     payload: { token: string; once: string },

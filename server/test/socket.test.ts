@@ -8,9 +8,11 @@ import assert from 'node:assert/strict'
 import type { AddressInfo } from 'node:net'
 
 import { io as connect, type Socket } from 'socket.io-client'
+import { scryptSync } from 'node:crypto'
+
 import {
   DEFAULT_EQUIPPED,
-  cosmeticOf,
+  EMPTY_COSMETICS,
   emoteOf,
   type ChatMessage,
   type Cosmetics,
@@ -21,14 +23,43 @@ import {
 } from '@the-gang/shared'
 
 import { createApp, type GameApp } from '../src/app.ts'
+import type { AccountStore, StoredAccount } from '../src/accountStore.ts'
 
 let app: GameApp
 let url = ''
 const open: Socket[] = []
 
+/**
+ * 골드를 넉넉히 들고 시작하는 계정들. 비밀번호는 모두 `pass1234` 다.
+ *
+ * 골드는 판에서 금고를 열어야만 쌓인다 — 화면이 「열었다」고 말해도 서버가 판을 보고
+ * 센다. 차림을 사 보는 시험마다 판을 돌릴 수는 없으므로 부팅 때 읽히는 저장소에 둔다.
+ */
+const RICH = 10
+const richStore: AccountStore = {
+  loadAll: async () =>
+    Array.from({ length: RICH }, (_, index): StoredAccount => {
+      const salt = `salt-${index}`
+      return {
+        email: `rich${index}@example.com`,
+        nickname: '태규',
+        passwordHash: scryptSync('pass1234', salt, 32).toString('hex'),
+        passwordSalt: salt,
+        wins: 0,
+        losses: 0,
+        cosmetics: { ...EMPTY_COSMETICS, earned: 10_000 },
+      }
+    }),
+  has: async () => false,
+  create: async () => undefined,
+  saveRecord: async () => undefined,
+  saveCosmetics: async () => undefined,
+}
+let richUsed = 0
+
 before(async () => {
   // 소켓을 계속 열어두는 테스트라 운영 한도(40)에 걸린다. 여기서는 한도를 풀어둔다.
-  app = createApp({ maxConnections: 1000, maxRooms: 1000 })
+  app = createApp({ maxConnections: 1000, maxRooms: 1000, accounts: richStore })
   await new Promise<void>((resolve) => app.http.listen(0, resolve))
   url = `http://localhost:${(app.http.address() as AddressInfo).port}`
 })
@@ -275,6 +306,35 @@ describe('방 설정', () => {
 })
 
 /**
+ * 골드와 승수는 서버가 판을 보고 센다.
+ *
+ * 예전에는 화면이 보낸 열쇠를 그대로 믿어, 로그인한 사람이 열쇠만 바꿔 보내면 골드와
+ * 승수를 얼마든지 올릴 수 있었다(2026-09-21 에 막았다).
+ */
+describe('판 밖에서는 골드도 전적도 쌓이지 않는다', () => {
+  it('열쇠를 바꿔 가며 보내도 세지 않는다', async () => {
+    const socket = await client()
+    const made = unwrap(
+      await call<Session>(socket, 'auth:signup', {
+        email: `cheat-${seq()}@example.com`,
+        password: 'pass1234',
+        nickname: '태규',
+      }),
+    )
+    for (let at = 0; at < 5; at += 1) {
+      assert.equal((await call(socket, 'auth:vault', { token: made.token, once: `forged-${at}` })).ok, false)
+      assert.equal(
+        (await call(socket, 'auth:record', { token: made.token, outcome: 'win', once: `forged-${at}` })).ok,
+        false,
+      )
+    }
+    const now = unwrap(await call<Session>(socket, 'auth:resume', { token: made.token }))
+    assert.equal(now.cosmetics.earned, 0)
+    assert.equal(now.record.wins, 0)
+  })
+})
+
+/**
  * 꾸민 차림이 대기실 줄까지 오는가.
  *
  * **차림 값은 화면이 보내지 않는다.** 표만 보내고 서버가 계정에서 꺼낸다 — 보내게
@@ -282,20 +342,22 @@ describe('방 설정', () => {
  * 그 사람의 차림이 자리에 붙었는가」와 「표가 없으면 안 붙는가」 둘이다.
  */
 describe('장착한 차림이 자리에 붙는다', () => {
-  /** 가입하고 금고를 몇 개 열어 골드를 쌓아 둔 사람 하나. 표를 돌려준다. */
-  async function signedIn(socket: Socket, email: string, wins: number) {
-    const made = unwrap(
-      await call<Session>(socket, 'auth:signup', { email, password: 'pass1234', nickname: '태규' }),
-    )
-    for (let at = 0; at < wins; at += 1) {
-      unwrap(await call(socket, 'auth:vault', { token: made.token, once: `h${at}` }))
-    }
+  /** 로그인한 사람 하나. 골드가 있으면 넉넉히 든 계정을, 없으면 새로 가입한다. 표를 돌려준다. */
+  async function signedIn(socket: Socket, email: string, rich: boolean) {
+    const made = rich
+      ? unwrap(
+          await call<Session>(socket, 'auth:login', {
+            email: `rich${richUsed++}@example.com`,
+            password: 'pass1234',
+          }),
+        )
+      : unwrap(await call<Session>(socket, 'auth:signup', { email, password: 'pass1234', nickname: '태규' }))
     return made.token
   }
 
   it('산 것을 걸치고 방에 들어가면 그 줄에 차림이 실린다', async () => {
     const socket = await client()
-    const token = await signedIn(socket, `dress1-${seq()}@example.com`, cosmeticOf('bat')?.price ?? 0)
+    const token = await signedIn(socket, `dress1-${seq()}@example.com`, true)
 
     unwrap(await call(socket, 'cosmetics:buy', { token, id: 'bat' }))
     unwrap(await call(socket, 'cosmetics:equip', { token, equipped: { avatar: 'bat' } }))
@@ -308,7 +370,7 @@ describe('장착한 차림이 자리에 붙는다', () => {
 
   it('사지 않은 것은 걸쳐지지 않는다 — 그 겹만 기본으로 돌아간다', async () => {
     const socket = await client()
-    const token = await signedIn(socket, `dress2-${seq()}@example.com`, 0)
+    const token = await signedIn(socket, `dress2-${seq()}@example.com`, false)
 
     const worn = unwrap(await call<Cosmetics>(socket, 'cosmetics:equip', { token, equipped: { avatar: 'bat' } }))
     assert.equal(worn.equipped.avatar, DEFAULT_EQUIPPED.avatar)
@@ -324,7 +386,7 @@ describe('장착한 차림이 자리에 붙는다', () => {
 
   it('대기실에 앉은 채로 바꾸면 그 자리에서 갈린다', async () => {
     const host = await client()
-    const token = await signedIn(host, `dress3-${seq()}@example.com`, cosmeticOf('bat')?.price ?? 0)
+    const token = await signedIn(host, `dress3-${seq()}@example.com`, true)
     unwrap(await call(host, 'cosmetics:buy', { token, id: 'mask' }))
 
     unwrap(await call<RoomView>(host, 'room:create', { playerId: 'dresser-02', nickname: '태규', token }))

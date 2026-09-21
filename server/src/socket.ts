@@ -49,14 +49,9 @@ type GameSocket = Socket<ClientToServerEvents, ServerToClientEvents>
 
 const PLAYER_ID_PATTERN = /^[A-Za-z0-9_-]{8,64}$/
 
-/**
- * 「한 번만 센다」의 열쇠. 화면이 보내는 값이라 길이를 묶는다.
- *
- * 계정마다 이 열쇠를 모두 기억하므로, 긴 글자를 거듭 보내면 서버 메모리가 그만큼 찬다.
- * 제대로 된 열쇠는 `방:시각:판` 이라 40자를 넘지 않는다.
- */
-function onceKey(once: unknown): string {
-  return String(once ?? '').slice(0, 64)
+/** 세 달라고 했지만 판이 그 끝에 서 있지 않다. */
+function notNow<T>(): Result<T> {
+  return { ok: false, code: 'GAME_NOT_RUNNING', message: '지금은 셀 판이 없습니다.' }
 }
 
 function fail<T>(message: string): Result<T> {
@@ -670,15 +665,25 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
       ack({ ok: true, value: null })
     })
 
-    socket.on('auth:record', ({ token, outcome, once }, ack) => {
-      if (outcome !== 'win' && outcome !== 'lose') {
-        return ack({ ok: false, code: 'INVALID_SETTINGS', message: '알 수 없는 결과입니다.' })
-      }
-      ack(accounts.record(String(token ?? ''), outcome, onceKey(once)))
+    /*
+     * 전적과 골드는 **화면의 말이 아니라 판을 보고** 센다.
+     *
+     * 예전에는 화면이 보낸 열쇠(`once`)를 그대로 믿어, 로그인한 사람이 열쇠만 바꿔 보내면
+     * 골드와 승수를 얼마든지 올릴 수 있었다. 이제 화면이 보내는 것은 「지금 세 달라」는
+     * 신호뿐이다 — 이 소켓의 사람이 판에 앉아 있고, 그 판이 지금 그 끝에 서 있을 때만
+     * 서버가 열쇠를 만들어 센다. 결과(`outcome`)와 열쇠는 화면이 보내도 쓰지 않는다.
+     */
+    socket.on('auth:record', ({ token }, ack) => {
+      const seat = seatedView()
+      const outcome = seat?.view.phase === 'gameOver' ? seat.view.outcome : null
+      if (!seat || !outcome) return ack(notNow())
+      ack(accounts.record(String(token ?? ''), outcome, `${seat.code}:${seat.view.startedAt}:${outcome}`))
     })
 
-    socket.on('auth:vault', ({ token, once }, ack) => {
-      ack(accounts.earn(String(token ?? ''), onceKey(once)))
+    socket.on('auth:vault', ({ token }, ack) => {
+      const seat = seatedView()
+      if (!seat?.view.showdown?.success) return ack(notNow())
+      ack(accounts.earn(String(token ?? ''), `${seat.code}:${seat.view.startedAt}:${seat.view.heist}`))
     })
 
     socket.on('cosmetics:buy', ({ token, id }, ack) => {
@@ -976,6 +981,18 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
     })
 
     /** 게임 이벤트가 공통으로 밟는 확인 절차. */
+    /**
+     * 이 소켓의 사람이 **자리에 앉아** 있는 판. 관전자와 혼자 해보는 방은 세지 않는다.
+     */
+    function seatedView(): { code: string; view: GameView } | null {
+      const playerId = playerOfSocket.get(socket.id)
+      const code = playerId ? store.codeOf(playerId) : null
+      const game = code ? games.get(code) : null
+      if (!playerId || !code || !game || tutorials.has(code)) return null
+      const view = game.view()
+      return view.players.some((player) => player.id === playerId) ? { code, view } : null
+    }
+
     function withGame(
       ack: (result: Result<null>) => void,
       run: (game: Game, code: string, playerId: string) => void,
