@@ -66,6 +66,15 @@ export function useBackgroundMusic(): void {
     const audio = element()
 
     /*
+     * 꺼져 있으면 곡을 걸지 않는다. `preload = 'auto'` 라 src 를 거는 순간 파일을
+     * 통째로 받기 시작한다 — 음소거한 사람도 첫 화면에서 몇 MB 를 받고 있었다.
+     */
+    if (target <= 0) {
+      glide(0)
+      return
+    }
+
+    /*
      * 곡이 바뀌었을 때만 갈아 끼운다.
      *
      * 같은 곡이면 손대지 않는 것이 중요하다 — 크기를 만질 때마다 다시 걸면 매번
@@ -76,11 +85,6 @@ export function useBackgroundMusic(): void {
       audio.src = file
       // 새 곡은 앞의 크기를 물려받지 않는다. 0 에서 올라와야 갈린 티가 안 난다.
       audio.volume = 0
-    }
-
-    if (target <= 0) {
-      glide(0)
-      return
     }
 
     /*
