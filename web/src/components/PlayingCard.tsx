@@ -35,6 +35,9 @@ export function PlayingCard({
   const suit = card[1] as Suit
   const label = rankLabel(RANK_VALUE[rank])
   if (RED.includes(suit)) classes.push('card--red')
+  // 같은 색끼리도 한 번 더 가른다. 플러시를 셀 때 ♠♣·♥♦ 가 한눈에 섞여 보이지 않게.
+  if (suit === 'c') classes.push('card--club')
+  if (suit === 'd') classes.push('card--diamond')
   // 「잭」이 준 무늬 없는 J. 무늬가 없다는 것이 한눈에 보여야 플러시 착각을 막는다.
   if (card[1] === NO_SUIT) classes.push('card--nosuit')
 
