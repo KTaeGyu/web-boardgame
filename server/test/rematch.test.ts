@@ -2,28 +2,41 @@ import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 
 import { TOKEN_LOCK_MS } from '@the-gang/shared'
-import { Game } from '@the-gang/shared/engine'
+import { Game, type GameOptions } from '@the-gang/shared/engine'
 
 /** 게임이 끝난 판을 만든다. 결과가 승이든 패든 재경기 규칙은 같다. */
-function finishedGame() {
+function finishedGame(options: GameOptions = {}) {
   let clock = 1_000_000
   const ids = ['p1', 'p2', 'p3']
   const game = new Game(
     'TEST',
     ids.map((id) => ({ id, nickname: id, connected: true })),
-    { now: () => clock, rng: mulberry32(99), lockMs: TOKEN_LOCK_MS },
+    { ...options, now: () => clock, rng: mulberry32(99), lockMs: TOKEN_LOCK_MS },
   )
 
+  // 도전자가 걸리면 단계가 늘고 토큰이 붙박이기도 한다. 단계를 보고 그때 할 일을 한다 —
+  // 거절은 흘려보낸다(이 시험이 보는 것은 판의 끝이지 한 수 한 수가 아니다).
   let guard = 0
-  while (!game.isOver && guard++ < 12) {
-    for (let round = 0; round < 4; round++) {
+  while (!game.isOver && guard++ < 200) {
+    const phase = game.view().phase
+    if (phase === 'setup') for (const id of ids) game.submitSetup(id, 0)
+    else if (phase === 'scanning') {
+      for (const id of ids) {
+        game.voteScan(id, 'rank', 14)
+        game.voteScan(id, 'category', 0)
+      }
+    } else if (phase === 'showdown') for (const id of ids) game.continueAfterHeist(id)
+    else {
       ids.forEach((id, index) => {
-        game.takeToken(id, index + 1)
-        clock += TOKEN_LOCK_MS
+        game.discard(id, 0)
+        // 제 번호부터 돌아가며 집는다. 1부터 집으면 뒷사람이 앞사람 것을 뺏는다.
+        for (let step = 0; step < ids.length; step++) {
+          clock += TOKEN_LOCK_MS
+          if (game.takeToken(id, ((index + step) % ids.length) + 1).ok) break
+        }
       })
       for (const id of ids) game.setReady(id, true)
     }
-    if (!game.isOver) for (const id of ids) game.continueAfterHeist(id)
   }
   assert.equal(game.isOver, true, '게임이 끝나지 않았다')
   return { game, ids }
@@ -92,6 +105,16 @@ describe('재경기', () => {
     const before = game.handOf('p1')
     for (const id of ids) game.proposeRematch(id, true)
     assert.notDeepEqual(game.handOf('p1'), before)
+  })
+
+  /*
+   * 다시 시작할 때 뽑기 설정을 빠뜨려, 무작위 세 장으로 시작한 방이 재경기에서는
+   * 고른 한 장만 걸렸다(2026-09-21). 방에서 정한 것은 재경기에도 그대로여야 한다.
+   */
+  it('다시 시작해도 방에서 정한 무작위 도전자 장수가 그대로다', () => {
+    const { game, ids } = finishedGame({ mode: 'custom', pickedChallenges: [], randomChallenges: 3 })
+    for (const id of ids) game.proposeRematch(id, true)
+    assert.equal(game.view().challenges.length, 3)
   })
 })
 

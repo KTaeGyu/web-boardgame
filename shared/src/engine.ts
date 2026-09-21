@@ -155,6 +155,8 @@ export class Game {
   private readonly alarmsToLose: number
   private readonly picked: readonly ChallengeId[]
   private readonly specialistRounds: readonly (SpecialistId | null)[]
+  /** 방에서 정한 뽑기 설정. 재경기에서 뽑는 자리를 다시 세울 때도 이것을 쓴다. */
+  private readonly dealing: ConstructorParameters<typeof ExtraDealer>[4]
   private dealer: ExtraDealer
 
   private seats: Seat[] = []
@@ -239,7 +241,7 @@ export class Game {
       this.mode === 'masterThief' ? ALARMS_TO_LOSE_MASTER : (options.alarmsToLose ?? ALARMS_TO_LOSE)
     this.picked = options.pickedChallenges ?? []
     this.specialistRounds = options.specialistRounds ?? []
-    this.dealer = new ExtraDealer(this.mode, this.rng, this.picked, this.specialistRounds, {
+    this.dealing = {
       random: options.randomChallenges ?? 0,
       onWin: options.randomChallengesOnWin ?? false,
       stay: options.randomChallengesStay ?? false,
@@ -247,7 +249,8 @@ export class Game {
       specialistOnLoss: options.specialistOnLoss ?? true,
       excludedChallenges: options.excludedChallenges ?? [],
       excludedSpecialists: options.excludedSpecialists ?? [],
-    })
+    }
+    this.dealer = this.newDealer()
     this.seats = players.map((player) => ({
       id: player.id,
       nickname: player.nickname,
@@ -755,8 +758,16 @@ export class Game {
     this.alarms = 0
     this.lastSuccess = null
     this.rematchAgreed.clear()
-    this.dealer = new ExtraDealer(this.mode, this.rng, this.picked, this.specialistRounds)
+    this.dealer = this.newDealer()
     this.startHeist()
+  }
+
+  /**
+   * 처음 시작과 재경기가 같은 자리를 지난다. 재경기 쪽이 뽑기 설정을 빠뜨려,
+   * 무작위 세 장으로 시작한 방이 다시 할 때는 고른 것만 걸렸다(2026-09-21).
+   */
+  private newDealer(): ExtraDealer {
+    return new ExtraDealer(this.mode, this.rng, this.picked, this.specialistRounds, this.dealing)
   }
 
   /** 끊긴 사람이 있으면 라운드가 넘어가지 않는다. 그 사실이 화면에 보여야 한다. */
