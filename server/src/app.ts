@@ -33,16 +33,22 @@ export function createApp(limits: ServerLimits = {}): GameApp {
           : callback(new Error(`허용되지 않은 오리진: ${origin}`)),
       credentials: false,
     },
+    /*
+     * 한 번에 받는 크기. 기본 1MB 는 이 게임에 쓸 데가 없다 — 제일 큰 것이 설정 한 벌과
+     * 200자 대화다. 넉넉히 64KB 로 묶어 한 요청이 메모리를 크게 물지 못하게 한다.
+     */
+    maxHttpBufferSize: 64_000,
   })
 
   const game = attachGameServer(io, limits)
   const store = game.store
 
   const close = () =>
-    new Promise<void>((resolve) => {
-      game.stop()
-      io.close(() => http.close(() => resolve()))
-    })
+    // 모아 둔 계정 쓰기를 먼저 내보낸다. 넘어져도 닫는 것은 마저 닫는다.
+    game
+      .stop()
+      .catch(() => undefined)
+      .then(() => new Promise<void>((resolve) => io.close(() => http.close(() => resolve()))))
 
   return { http, io, store, close }
 }

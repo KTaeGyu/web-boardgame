@@ -49,6 +49,16 @@ type GameSocket = Socket<ClientToServerEvents, ServerToClientEvents>
 
 const PLAYER_ID_PATTERN = /^[A-Za-z0-9_-]{8,64}$/
 
+/**
+ * 「한 번만 센다」의 열쇠. 화면이 보내는 값이라 길이를 묶는다.
+ *
+ * 계정마다 이 열쇠를 모두 기억하므로, 긴 글자를 거듭 보내면 서버 메모리가 그만큼 찬다.
+ * 제대로 된 열쇠는 `방:시각:판` 이라 40자를 넘지 않는다.
+ */
+function onceKey(once: unknown): string {
+  return String(once ?? '').slice(0, 64)
+}
+
 function fail<T>(message: string): Result<T> {
   return { ok: false, code: 'INVALID_NICKNAME', message }
 }
@@ -114,7 +124,7 @@ export interface ServerLimits {
   accounts?: AccountStore | null
 }
 
-export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { store: RoomStore; stop: () => void } {
+export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { store: RoomStore; stop: () => Promise<void> } {
   const maxConnections = limits.maxConnections ?? MAX_CONNECTIONS
   const store = new RoomStore({
     makeCode: uniqueRoomCode,
@@ -565,6 +575,9 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
       const { room, closedCode } = store.leaveRoom(playerId)
       if (code) socket.leave(code)
       unbind(socket.id, playerId)
+      // 끊길 때 치우는 자리지만, 나가기가 먼저 연결 고리를 끊어 그때는 누구인지 모른다.
+      chatRate.delete(playerId)
+      emoteAt.delete(playerId)
 
       ack({ ok: true, value: null })
       if (code) leftRoom(code, playerId)
@@ -661,11 +674,11 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
       if (outcome !== 'win' && outcome !== 'lose') {
         return ack({ ok: false, code: 'INVALID_SETTINGS', message: '알 수 없는 결과입니다.' })
       }
-      ack(accounts.record(String(token ?? ''), outcome, String(once ?? '')))
+      ack(accounts.record(String(token ?? ''), outcome, onceKey(once)))
     })
 
     socket.on('auth:vault', ({ token, once }, ack) => {
-      ack(accounts.earn(String(token ?? ''), String(once ?? '')))
+      ack(accounts.earn(String(token ?? ''), onceKey(once)))
     })
 
     socket.on('cosmetics:buy', ({ token, id }, ack) => {
@@ -994,8 +1007,14 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
 
     playerOfSocket.set(socket.id, playerId)
     socketOfPlayer.set(playerId, socket.id)
+    /*
+     * 앞서 있던 방에서는 빠진다. 다른 방으로 옮겨 가도 옛 방의 상태·대화가 계속 따라와
+     * 새 방 화면에 섞였다. 소켓 자신의 방(socket.id)은 개인 전송 통로라 남긴다.
+     */
+    for (const joined of socket.rooms) {
+      if (joined !== socket.id && joined !== code) socket.leave(joined)
+    }
     socket.join(code)
-    socket.leave(LOBBY_WATCHERS)
   }
 
   function unbind(socketId: string, playerId: string | undefined) {
@@ -1034,7 +1053,7 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
       unlockTimers.clear()
       for (const timer of autoTimers.values()) clearTimeout(timer)
       autoTimers.clear()
-      accounts.stop()
+      return accounts.stop()
     },
   }
 }

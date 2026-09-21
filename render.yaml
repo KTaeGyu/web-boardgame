@@ -14,7 +14,10 @@ services:
     plan: free
     # 저장소 뿌리에서 설치한다. 작업공간(workspaces)이라 shared 가 함께 이어져야 한다.
     buildCommand: npm install
-    startCommand: npm start --workspace @the-gang/server
+    # npm 을 거치지 않고 node 를 바로 띄운다. npm 이 부모로 남아 수십 MB 를 따로 들고,
+    # 배포 교체의 SIGTERM 도 한 다리 건너 전해진다(그러면 모아 둔 골드를 못 내보낸다).
+    # 힙 상한은 512MB 인스턴스 안에서 GC 가 제때 돌게 하려는 것이다.
+    startCommand: cd server && exec node --max-old-space-size=384 src/index.ts
     # 잠든 인스턴스를 깨우고, 새 배포가 실제로 떴는지 판정하는 자리.
     healthCheckPath: /healthz
     envVars:

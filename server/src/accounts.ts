@@ -186,9 +186,11 @@ export class Accounts {
   }
 
   /** 모아 둔 것을 마저 내보내고 시계를 멈춘다. 서버가 닫힐 때 부른다. */
-  stop(): void {
+  async stop(): Promise<void> {
     if (this.drain) clearTimeout(this.drain)
     this.drain = null
+    // 배포마다 서버가 다시 뜬다. 모아 두던 몇 초치(전적·골드)를 버리지 않고 내보낸다.
+    if (this.pending.size > 0) await this.flush()
   }
 
   async signup(rawEmail: string, password: string, rawNickname: string): Promise<Result<Session>> {
