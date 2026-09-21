@@ -50,7 +50,6 @@ import { useScrollLock } from '../lib/useScrollLock.ts'
 const CLOSED_MESSAGE: Record<string, string> = {
   empty: '방에 아무도 남지 않아 닫혔습니다.',
   idle: '30분 동안 아무 움직임이 없어 방이 닫혔습니다.',
-  rematchDeclined: '재경기를 원하지 않는 사람이 있어 방이 닫혔습니다.',
   hostClosed: '방장이 방을 닫았습니다.',
 }
 
@@ -1451,6 +1450,15 @@ function Showdown({
               <button type="button" className="btn" onClick={() => void leave(navigate)}>
                 방 나가기
               </button>
+              {/*
+                설정을 바꿔 한 판 더 하려면 대기실이 필요하다. 끝난 판이라 잃을 것이 없어
+                판 도중의 「로비로」와 달리 되묻지 않는다. 모두를 옮기는 일이라 방장만 누른다.
+              */}
+              {iAmHost && (
+                <button type="button" className="btn" onClick={() => void call('game:toLobby')}>
+                  대기실로
+                </button>
+              )}
               <button
                 type="button"
                 className="btn btn--primary"
@@ -1472,7 +1480,7 @@ function Showdown({
         <div className="modal-backdrop">
           <div className="modal" role="dialog" aria-modal="true">
             <h2 className="modal__title">재경기 제안이 들어왔습니다</h2>
-            <p className="modal__body">같은 사람들과 처음부터 다시 합니다. 한 명이라도 거절하면 방이 닫힙니다.</p>
+            <p className="modal__body">같은 사람들과 처음부터 다시 합니다. 한 명이라도 거절하면 모두 대기실로 돌아갑니다.</p>
             <div className="btn-row">
               <button
                 type="button"

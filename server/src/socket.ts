@@ -14,6 +14,7 @@ import {
   sanitizeEquipped,
   type Equipped,
   type ClientToServerEvents,
+  type GameOverReason,
   type GameView,
   type Identity,
   type Result,
@@ -276,7 +277,7 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
   }
 
   /** 판을 접고 방은 대기실로 되돌린다. 방 자체는 남는다. */
-  function abortGame(code: string, message: string, reason: 'playerLeft' | 'hostClosed' = 'playerLeft'): void {
+  function abortGame(code: string, message: string, reason: GameOverReason['reason'] = 'playerLeft'): void {
     if (!games.has(code)) return
     forgetRoom(code)
     io.to(code).emit('game:aborted', { reason, message })
@@ -800,7 +801,11 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
       }
 
       ack({ ok: true, value: null })
-      abortGame(code, '방장이 판을 접었습니다. 모두 대기실로 돌아갑니다.', 'hostClosed')
+      // 끝난 판에서 누르면 접는 것이 아니다 — 결과 창의 「대기실로」가 이 길로 온다.
+      const message = games.get(code)?.isOver
+        ? '방장이 모두를 대기실로 불렀습니다.'
+        : '방장이 판을 접었습니다. 모두 대기실로 돌아갑니다.'
+      abortGame(code, message, 'hostClosed')
     })
 
     socket.on('game:take', ({ token }, ack) => {
@@ -912,19 +917,14 @@ export function attachGameServer(io: GameServer, limits: ServerLimits = {}): { s
 
         if (result.value === 'declined') {
           /*
-           * 한 명이라도 거절하면 방을 접는다. 남은 사람끼리 어색하게 기다리지 않도록.
+           * 한 명이라도 거절하면 **모두 대기실로 돌아간다**(2026-09-21). 예전에는 방을
+           * 닫았는데, 설정을 바꿔 한 판 더 하려던 사람들까지 방을 새로 파고 다시 모여야 했다.
            *
-           * **방까지 지운다.** 예전에는 판만 지우고 방을 `playing` 인 채로 남겼는데,
-           * 그러면 `room:closed` 를 놓친 사람이 다시 들어올 때 **방은 있고 판만 없는**
-           * 자리에 떨어진다 — 대기실로 돌려보내지도(단계가 lobby 가 아니라서),
-           * 판을 보내주지도 못해 화면이 「테이블을 차리는 중」에서 영영 멈춘다
-           * (2026-09-03). 새로고침·재접속·잠깐 끊겼다 붙은 휴대폰이 모두 이 길로 온다.
+           * **판만 지우고 방을 `playing` 으로 남기면 안 된다**(2026-09-03). 다시 들어오는
+           * 사람이 방은 있고 판만 없는 자리에 떨어져 「테이블을 차리는 중」에서 멈춘다.
+           * `abortGame` 이 단계까지 대기실로 돌린다.
            */
-          forgetRoom(code)
-          store.closeRoom(code)
-          io.to(code).emit('room:closed', { reason: 'rematchDeclined' })
-          // 접힌 방이 목록에 남아 있으면 눌러 들어갔다가 같은 자리에 빠진다.
-          sendRoomList()
+          abortGame(code, '재경기를 원하지 않는 사람이 있어 대기실로 돌아갑니다.', 'rematchDeclined')
           return
         }
         if (result.value === 'restart') announce(store.setPhase(code, 'playing'))

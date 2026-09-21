@@ -47,7 +47,6 @@ import { useEscapeFallback } from '../lib/useEscape.ts'
 const CLOSED_MESSAGE: Record<string, string> = {
   empty: '방에 아무도 남지 않아 닫혔습니다.',
   idle: '30분 동안 아무 움직임이 없어 방이 닫혔습니다.',
-  rematchDeclined: '재경기를 원하지 않는 사람이 있어 방이 닫혔습니다.',
   hostClosed: '방장이 방을 닫았습니다.',
 }
 

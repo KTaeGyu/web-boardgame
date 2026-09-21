@@ -420,40 +420,49 @@ describe('판이 도는 중의 이탈', () => {
 describe('재경기를 거절하면', () => {
   /** 금고 하나로 끝나는 판을 세운다. 거절 뒤의 뒷정리를 보려는 것이지 규칙을 보려는 것이 아니다. */
   /*
-   * 방까지 접혀야 한다.
+   * 방은 남고 모두 대기실로 돌아간다(2026-09-21). 예전에는 방을 닫았다.
    *
-   * 예전에는 판만 지우고 방을 `playing` 인 채로 남겼다. 그러면 room:closed 를 놓친
-   * 사람이 다시 들어올 때 **방은 있고 판만 없는** 자리에 떨어져, 화면이 「테이블을
-   * 차리는 중」에서 영영 멈췄다(2026-09-03). 새로고침·재접속이 모두 이 길로 온다.
+   * **단계까지 대기실이어야 한다.** 판만 지우고 방을 `playing` 인 채로 남기면, 다시
+   * 들어오는 사람이 **방은 있고 판만 없는** 자리에 떨어져 화면이 「테이블을 차리는 중」
+   * 에서 영영 멈춘다(2026-09-03). 새로고침·재접속이 모두 이 길로 온다.
    */
-  it('방이 남지 않는다 — 다시 들어오려 해도 없는 방이다', async () => {
+  it('방은 남고 모두 대기실로 돌아간다', async () => {
     const { people, host, guests, code } = await playToGameOver()
 
-    const closed = until<{ reason: string }>(people[2].socket, 'room:closed', () => true)
+    const aborted = until<{ reason: string }>(people[2].socket, 'game:aborted', () => true)
     unwrap(await call<null>(host.socket, 'game:rematch', { agree: true }))
     unwrap(await call<null>(guests[0].socket, 'game:rematch', { agree: false }))
-    assert.equal((await closed).reason, 'rematchDeclined')
+    assert.equal((await aborted).reason, 'rematchDeclined')
 
-    assert.equal(app.store.view(code), null, '방이 남아 있으면 좀비 방이 된다')
-
-    const back = await call<unknown>(people[2].socket, 'room:join', {
-      playerId: people[2].playerId,
-      nickname: people[2].nickname,
-      code,
-    })
-    assert.equal(back.ok, false)
-    if (!back.ok) assert.equal(back.code, 'ROOM_NOT_FOUND')
+    const room = app.store.view(code)
+    assert.equal(room?.phase, 'lobby', '판 없이 playing 으로 남으면 좀비 방이 된다')
+    assert.equal(room?.players.length, people.length, '자리는 그대로다')
   })
 
-  it('접힌 방은 목록에서도 사라진다', async () => {
+  /* 결과 창의 「대기실로」. 재경기를 제안하고 거절하는 어색한 길을 밟지 않아도 된다. */
+  it('끝난 판에서 방장이 부르면 재경기 물음 없이 모두 대기실로 간다', async () => {
+    const { people, host, guests, code } = await playToGameOver()
+
+    const denied = await call<null>(guests[0].socket, 'game:toLobby')
+    assert.equal(denied.ok, false, '모두를 옮기는 일이라 방장만 한다')
+
+    const aborted = until<{ reason: string; message: string }>(people[2].socket, 'game:aborted', () => true)
+    unwrap(await call<null>(host.socket, 'game:toLobby'))
+    const payload = await aborted
+    assert.equal(payload.reason, 'hostClosed')
+    assert.doesNotMatch(payload.message, /접었/, '끝난 판은 접는 것이 아니다')
+    assert.equal(app.store.view(code)?.phase, 'lobby')
+  })
+
+  it('목록에는 대기 중인 방으로 선다', async () => {
     const { host, guests, code } = await playToGameOver()
     unwrap(await call<null>(host.socket, 'game:rematch', { agree: true }))
     unwrap(await call<null>(guests[0].socket, 'game:rematch', { agree: false }))
     await new Promise((resolve) => setTimeout(resolve, 100))
     assert.equal(
-      app.store.list().some((room) => room.code === code),
-      false,
-      '목록에 남으면 눌러 들어갔다가 같은 자리에 빠진다',
+      app.store.list().find((room) => room.code === code)?.phase,
+      'lobby',
+      '판이 도는 방으로 남으면 눌러 들어갔다가 판 없는 자리에 빠진다',
     )
   })
 })
@@ -581,16 +590,18 @@ describe('관전', () => {
     assert.equal(watcher.hands.length, 0, '이어 봐도 손패는 가지 않는다')
   })
 
-  it('한 명이라도 거절하면 구경꾼도 함께 나온다', async () => {
+  it('한 명이라도 거절하면 구경꾼은 구경 자리에 남는다', async () => {
     const { host, guests, code } = await playToGameOver()
     const watcher = await watcherFor(code, 'watchB')
 
-    const closed = until<{ reason: string }>(watcher.socket, 'room:closed', () => true, 4000)
+    const aborted = until<{ reason: string }>(watcher.socket, 'game:aborted', () => true, 4000)
     unwrap(await call<null>(host.socket, 'game:rematch', { agree: true }))
     unwrap(await call<null>(guests[0].socket, 'game:rematch', { agree: false }))
 
-    assert.equal((await closed).reason, 'rematchDeclined')
-    assert.equal(app.store.view(code), null, '방이 없으니 남을 자리도 없다')
+    assert.equal((await aborted).reason, 'rematchDeclined')
+    const room = app.store.view(code)
+    assert.equal(room?.phase, 'lobby')
+    assert.deepEqual(room?.spectators.map((one) => one.id), [watcher.playerId])
   })
 
   it('누가 나가 판이 접히면 구경꾼은 구경 자리에 남는다', async () => {

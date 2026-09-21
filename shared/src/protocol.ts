@@ -417,7 +417,7 @@ export interface ClientToServerEvents {
   'game:ready': (payload: { ready: boolean }, ack: (result: Result<null>) => void) => void
   /** 쇼다운을 보고 다음 판으로 넘어간다. 모두가 눌러야 넘어간다. */
   'game:continue': (ack: (result: Result<null>) => void) => void
-  /** 게임이 끝난 뒤 재경기. 한 명이라도 거절하면 방이 닫힌다. */
+  /** 게임이 끝난 뒤 재경기. 한 명이라도 거절하면 모두 대기실로 돌아간다. */
   'game:rematch': (payload: { agree: boolean }, ack: (result: Result<null>) => void) => void
   /** 방장이 판을 접고 모두를 대기실로 되돌린다. 방은 그대로 남는다. */
   'game:toLobby': (ack: (result: Result<null>) => void) => void
@@ -509,7 +509,7 @@ export const CHAT_KEEP = 50
 /** 서버 → 클라이언트. */
 export interface ServerToClientEvents {
   'room:updated': (room: RoomView) => void
-  'room:closed': (payload: { reason: 'empty' | 'hostClosed' | 'rematchDeclined' | 'idle' }) => void
+  'room:closed': (payload: { reason: 'empty' | 'hostClosed' | 'idle' }) => void
   /** 내보내진 사람에게만. 방이 닫힌 것과 구별해야 안내가 맞는다. */
   'room:kicked': (payload: { message: string }) => void
   /**

@@ -236,6 +236,6 @@ export interface GameView {
 
 /** 판이 끝나고 다음 판으로 넘어가기 전에 다들 결과를 볼 시간이 필요하다. */
 export interface GameOverReason {
-  reason: 'playerLeft' | 'hostClosed'
+  reason: 'playerLeft' | 'hostClosed' | 'rematchDeclined'
   message: string
 }
