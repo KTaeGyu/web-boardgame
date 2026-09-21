@@ -1140,6 +1140,9 @@ export class Game {
       lockedTokens: this.tokenNumbers.filter(
         (token) => this.isLocked(token, now) || (stuck.includes(token) && this.holders.has(token)),
       ),
+      lockLeft: this.tokenNumbers
+        .filter((token) => this.isLocked(token, now))
+        .map((token) => ({ token, ms: (this.lockedUntil.get(token) ?? now) - now })),
       stuckTokens: stuck,
       canConfirm: this.phase === 'picking' && this.everyoneHasToken(),
       autoConfirmIn: this.autoAt === null ? null : Math.max(0, this.autoAt - now),

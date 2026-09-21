@@ -217,6 +217,19 @@ describe('토큰 잠금', () => {
     assert.equal(ctx.game.takeToken('p3', 3).ok, true)
   })
 
+  /* 화면은 이 값으로 스스로 잠금을 푼다. 서버의 「풀렸다」 재전송을 기다리지 않는다. */
+  it('잠긴 토큰마다 남은 시간을 싣고, 다 지나면 뺀다', () => {
+    const ctx = makeGame(3)
+    ctx.game.takeToken('p1', 2)
+    assert.deepEqual(ctx.game.view().lockLeft, [{ token: 2, ms: TOKEN_LOCK_MS }])
+
+    ctx.advance(200)
+    assert.deepEqual(ctx.game.view().lockLeft, [{ token: 2, ms: TOKEN_LOCK_MS - 200 }])
+
+    ctx.advance(TOKEN_LOCK_MS)
+    assert.deepEqual(ctx.game.view().lockLeft, [])
+  })
+
   it('중앙으로 돌아가는 토큰도 날아가는 동안 잠긴다', () => {
     const ctx = makeGame(3)
     ctx.game.takeToken('p1', 1)

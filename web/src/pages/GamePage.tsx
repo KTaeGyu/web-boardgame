@@ -617,6 +617,36 @@ export function GamePage({ spectating = false }: { spectating?: boolean } = {}) 
     return () => clearInterval(timer)
   }, [autoIn])
 
+  /*
+   * 날아가는 토큰의 잠금을 이 화면이 스스로 푼다.
+   *
+   * 서버는 상태마다 「몇 ms 뒤에 풀리는가」를 싣는다. 받은 순간부터 세어 그때 풀면, 서버의
+   * 「풀렸다」 재전송을 기다리던 한 번의 왕복만큼 다음 손이 빨라진다. 재전송은 그대로 온다 —
+   * 이미 풀린 뒤라 같은 것을 한 번 더 확인할 뿐이다. 붙박이 잠금은 시간으로 풀리지 않아
+   * `lockLeft` 에 없고, 그래서 끝까지 잠긴 채로 남는다.
+   */
+  const lockDeadlines = useMemo(() => {
+    const arrived = Date.now()
+    return new Map((game?.lockLeft ?? []).map((lock) => [lock.token, arrived + lock.ms]))
+  }, [game])
+  const [lockClock, setLockClock] = useState(0)
+  useEffect(() => {
+    const now = Date.now()
+    const waiting = [...lockDeadlines.values()].filter((at) => at > now)
+    if (waiting.length === 0) return
+    const timer = setTimeout(() => setLockClock((count) => count + 1), Math.min(...waiting) - now + 5)
+    return () => clearTimeout(timer)
+  }, [lockDeadlines, lockClock])
+  const lockedTokens = useMemo(() => {
+    const now = Date.now()
+    return (game?.lockedTokens ?? []).filter((token) => {
+      const until = lockDeadlines.get(token)
+      return until === undefined || until > now
+    })
+    // lockClock 이 바뀌는 것이 「시간이 흘렀다」는 신호다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [game, lockDeadlines, lockClock])
+
   /**
    * 감지기가 터지면 한 번 크게 알린다.
    *
@@ -687,11 +717,13 @@ export function GamePage({ spectating = false }: { spectating?: boolean } = {}) 
   }
 
   async function take(token: number) {
+    /*
+     * 소리는 누른 순간에 낸다. 서버 확정을 기다렸다 내면 한 번 오가는 만큼(0.1초 남짓)
+     * 눌렀는데 아무 일도 없는 틈이 생겼다. 토큰이 움직이는 것은 여전히 확정 뒤다.
+     */
+    sfx('take')
     const result = await call<null>('game:take', { token })
-    if (result.ok) {
-      sfx('take')
-      return
-    }
+    if (result.ok) return
     // 거절은 조용히 씹지 않는다. 눌렀는데 아무 일도 안 일어나는 게 제일 나쁘다.
     sfx('deny')
     setRejected(token)
@@ -761,7 +793,7 @@ export function GamePage({ spectating = false }: { spectating?: boolean } = {}) 
    * 손이 도착하는 순간 잠금도 함께 풀린다.
    */
   const flying =
-    picking && me?.currentToken != null && game.lockedTokens.includes(me.currentToken)
+    picking && me?.currentToken != null && lockedTokens.includes(me.currentToken)
   /*
    * 방장에게는 나가기 대신 「로비로」가 있다. 정말 나가려면 대기실에서 한 번 더 눌러야 한다.
    * 튜토리얼은 만든 사람이 곧 방장이지만 돌아갈 대기실이 없다 — 혼자였으므로 그냥 나간다.
@@ -846,7 +878,7 @@ export function GamePage({ spectating = false }: { spectating?: boolean } = {}) 
               phase={game.phase}
               holeCount={game.holeCount}
               emote={emotes.live[player.id]}
-              lockedTokens={game.lockedTokens}
+              lockedTokens={lockedTokens}
               stuckTokens={game.stuckTokens}
               rejected={rejected}
               busy={flying}
@@ -888,7 +920,7 @@ export function GamePage({ spectating = false }: { spectating?: boolean } = {}) 
                 key={token}
                 value={token}
                 round={game.round}
-                locked={game.lockedTokens.includes(token)}
+                locked={lockedTokens.includes(token)}
                 stuck={game.stuckTokens.includes(token)}
                 busy={flying}
                 innerRef={tokenRef(token)}
@@ -953,7 +985,7 @@ export function GamePage({ spectating = false }: { spectating?: boolean } = {}) 
               player={me}
               round={game.round}
               phase={game.phase}
-              lockedTokens={game.lockedTokens}
+              lockedTokens={lockedTokens}
               stuckTokens={game.stuckTokens}
               rejected={rejected}
               busy={flying}
