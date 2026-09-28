@@ -42,8 +42,48 @@ const guards: Guard[] = []
 let unwinding = 0
 let listening = false
 
-function push(): void {
+/*
+ * 걷어내기로 했지만 아직 back 을 부르지 않은 칸 수.
+ *
+ * **걷어내기와 쌓기가 한 틱에 겹치면 back 을 부르지 않고 칸을 물려준다**(2026-09-28).
+ * `back()` 은 부른 순간의 칸을 기준으로 목적지를 정하고 나중에 움직이므로, 바로 뒤에
+ * `pushState` 가 오면 새 칸이 아니라 **그 아래 페이지 칸까지 두 칸** 내려간다. 가드는
+ * 앞쪽(forward)에 떨어져 아무것도 지키지 못하고, 페이지 칸이 맨 위에 드러난다.
+ * 판 화면이 확인창에 지킴을 넘길 때가 그렇고, 개발 모드는 효과를 두 번 돌려 모든 가드가
+ * 그랬다 — 그 상태로 「대기실로」를 누르면 대기실 밑에 게임 주소가 깔려, 뒤로가기 한 번에
+ * 게임 화면과 대기실을 끝없이 오갔다.
+ */
+let releasing = 0
+let flushScheduled = false
+
+/** 맨 위가 우리 칸인가. 라우터가 옮겨 간 뒤라면 걷어낼 칸도, 물려받을 칸도 없다. */
+function guardOnTop(): boolean {
+  const state = window.history.state as Record<string, unknown> | null
+  return Boolean(state?.[MARK])
+}
+
+function acquire(): void {
+  if (releasing > 0 && guardOnTop()) {
+    releasing -= 1
+    return
+  }
   window.history.pushState({ [MARK]: true }, '')
+}
+
+function release(): void {
+  if (!guardOnTop()) return
+  releasing += 1
+  if (flushScheduled) return
+  flushScheduled = true
+  // 같은 커밋의 다른 효과가 이 칸을 물려받을 기회를 준 뒤에 걷어낸다.
+  queueMicrotask(() => {
+    flushScheduled = false
+    const count = releasing
+    releasing = 0
+    if (count === 0 || !guardOnTop()) return
+    unwinding += 1
+    window.history.go(-count)
+  })
 }
 
 function onPop(): void {
@@ -73,7 +113,7 @@ export function useBackIntercept(active: boolean, onBack: () => void): void {
 
     const guard: Guard = { onBack: () => handler.current(), held: true }
     guards.push(guard)
-    push()
+    acquire()
     if (!listening) {
       window.addEventListener('popstate', onPop)
       listening = true
@@ -88,11 +128,7 @@ export function useBackIntercept(active: boolean, onBack: () => void): void {
        * 라우터가 화면을 옮기면서 정리하는 경우에는 맨 위가 이미 라우터의 칸이므로
        * 건드리지 않는다 — 여기서 back 을 부르면 방금 한 이동이 취소된다.
        */
-      const state = window.history.state as Record<string, unknown> | null
-      if (guard.held && state?.[MARK]) {
-        unwinding += 1
-        window.history.back()
-      }
+      if (guard.held) release()
     }
   }, [active])
 }
