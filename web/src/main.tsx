@@ -6,6 +6,7 @@ import { App } from './App.tsx'
 import './lib/devlog.ts'
 import './styles.css'
 import './game.css'
+import './pandemic.css'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
