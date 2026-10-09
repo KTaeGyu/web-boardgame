@@ -21,9 +21,6 @@ const GIVE_UP_S = 300
 /** 화면을 덮는 곳. 여기서는 서버 없이 할 수 있는 일이 없다. */
 const BLOCKED = new Set(['/', '/rooms'])
 
-/** 서버를 부르지 않는 곳. 끊겨 있어도 알릴 것이 없다. */
-const OFFLINE = new Set(['/pandemic'])
-
 function elapsed(seconds: number): string {
   if (seconds < 60) return `${seconds}초`
   return `${Math.floor(seconds / 60)}분 ${seconds % 60}초`
@@ -49,7 +46,7 @@ export function ServerGate() {
     return () => clearInterval(timer)
   }, [connected])
 
-  if (connected || OFFLINE.has(pathname)) return null
+  if (connected) return null
 
   if (!BLOCKED.has(pathname)) {
     return <div className="conn">서버와 연결이 끊겼습니다. 다시 붙는 중…</div>

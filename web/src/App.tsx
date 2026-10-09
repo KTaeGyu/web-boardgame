@@ -17,7 +17,6 @@ import { RoomsPage } from './pages/RoomsPage.tsx'
 import { GamePage } from './pages/GamePage.tsx'
 import { LooksPage } from './pages/LooksPage.tsx'
 import { HistoryPage } from './pages/HistoryPage.tsx'
-import { PandemicPage } from './pages/PandemicPage.tsx'
 import { useBackgroundMusic } from './lib/music.ts'
 import { useClickSound } from './lib/sfx.ts'
 import { useServerEvent } from './lib/socket.ts'
@@ -68,8 +67,6 @@ export function App() {
         <Route path="/rooms/:code/game" element={<GamePage />} />
         {/* 자리 없이 보기만 하는 길. 같은 화면이되 내 자리와 단추가 없다. */}
         <Route path="/rooms/:code/watch" element={<GamePage spectating />} />
-        {/* 더 갱과 상관없는 기록 한 장. 어디에서도 이어 주지 않는다. */}
-        <Route path="/pandemic" element={<PandemicPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       <Tools />
