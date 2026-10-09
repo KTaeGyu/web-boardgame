@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>팬데믹 레거시 시즌 1</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <!--
+      더 갱에서 고른 테마를 그대로 따른다(index.html 과 같은 열쇠). 이 화면에는 바꾸는
+      단추가 없으므로 여기서 한 번 정하면 끝이다.
+    -->
+    <script>
+      (function () {
+        var saved = null
+        try {
+          saved = localStorage.getItem('the-gang:theme')
+        } catch (error) {
+          /* 시크릿 창 등에서 막힐 수 있다. 그때는 기기 설정을 따른다. */
+        }
+        var dark = saved ? saved === 'dark' : !window.matchMedia('(prefers-color-scheme: light)').matches
+        document.documentElement.dataset.theme = dark ? 'dark' : 'light'
+      })()
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/pandemic-main.tsx"></script>
+  </body>
+</html>

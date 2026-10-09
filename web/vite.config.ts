@@ -59,4 +59,17 @@ export default defineConfig({
   // 공용 패키지는 빌드된 산출물이 아니라 소스 .ts 다. 미리 번들하면 수정이 반영되지 않는다.
   optimizeDeps: { exclude: ['@the-gang/shared'] },
   server: { port: 5173 },
+  /*
+   * 들머리가 둘이다. /pandemic 은 더 갱과 상관없는 한 장이라 따로 묶는다 — 한 묶음이면
+   * 그 한 장이 게임 전체와 소켓을 끌고 온다. 주소는 vercel.json 이 pandemic.html 로 잇는다
+   * (개발 서버에는 그 길이 없어 /pandemic.html 로 연다).
+   */
+  build: {
+    rollupOptions: {
+      input: {
+        main: join(ROOT, 'web', 'index.html'),
+        pandemic: join(ROOT, 'web', 'pandemic.html'),
+      },
+    },
+  },
 })

@@ -4,7 +4,10 @@
   "installCommand": "npm install",
   "buildCommand": "npm run build --workspace @the-gang/web",
   "outputDirectory": "web/dist",
-  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }],
+  "rewrites": [
+    { "source": "/pandemic", "destination": "/pandemic.html" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ],
   "headers": [
     {
       "source": "/assets/(.*)",
