@@ -278,13 +278,6 @@
     <div class="countdown" id="countdown"></div>
   </section>
 
-  <!-- 갤러리 -->
-  <section class="fade">
-    <p class="eyebrow">Gallery</p>
-    <h2>우리의 순간</h2>
-    <div class="gallery" id="gallery"></div>
-  </section>
-
   <!-- 오시는 길 -->
   <section class="fade">
     <p class="eyebrow">Location</p>
@@ -549,8 +542,6 @@ function scene(name, viewBox) {
 
 const VIEW = { cover: '0 0 300 400', closing: '0 25 300 375', tile: '0 78 300 300' };
 document.querySelectorAll('.art[data-scene]').forEach(el => { el.innerHTML = scene(el.dataset.scene, VIEW[el.dataset.scene] || VIEW.cover); });
-const gal = document.getElementById('gallery');
-WEDDING.galleryScenes.forEach(n => gal.insertAdjacentHTML('beforeend', `<div class="art">${scene(n, VIEW.tile)}</div>`));
 
 /* 약도 칸 미리보기 (내 브라우저에서만 · 저장 안 됨) */
 document.querySelectorAll('.photo-slot input[type=file]').forEach(inp => {
