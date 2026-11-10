@@ -6,6 +6,7 @@
   "outputDirectory": "web/dist",
   "rewrites": [
     { "source": "/pandemic", "destination": "/pandemic.html" },
+    { "source": "/wedding", "destination": "/wedding.html" },
     { "source": "/(.*)", "destination": "/index.html" }
   ],
   "headers": [

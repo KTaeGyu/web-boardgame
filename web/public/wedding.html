@@ -1,0 +1,642 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>우리 결혼합니다</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #faf7f2;
+    --paper: #ffffff;
+    --ink: #3d3a36;
+    --muted: #8a847c;
+    --accent: #b08d6e;
+    --accent-soft: #efe5da;
+    --line: #e6ddd2;
+    --slot: #f1ece5;
+    --slot-ink: #b3aaa0;
+    --sun: #c0645a;
+    --sat: #5a7ec0;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #1c1a18; --paper: #242120; --ink: #ece6de; --muted: #a59d93;
+      --accent: #d2b394; --accent-soft: #3a322b; --line: #3a3531;
+      --slot: #2e2a27; --slot-ink: #6f675f; --sun: #e08a80; --sat: #8aa8e0;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #1c1a18; --paper: #242120; --ink: #ece6de; --muted: #a59d93;
+    --accent: #d2b394; --accent-soft: #3a322b; --line: #3a3531;
+    --slot: #2e2a27; --slot-ink: #6f675f; --sun: #e08a80; --sat: #8aa8e0;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Gowun Batang", "Nanum Myeongjo", serif;
+    line-height: 1.9;
+    word-break: keep-all;
+  }
+  .wrap {
+    max-width: 440px;
+    margin: 0 auto;
+    background: var(--paper);
+    min-height: 100vh;
+    overflow: hidden;
+  }
+  section { padding: 64px 28px; text-align: center; }
+  section + section { border-top: 1px solid var(--line); }
+
+  .eyebrow {
+    font-family: "Cormorant Garamond", serif;
+    font-style: italic;
+    letter-spacing: .18em;
+    color: var(--accent);
+    font-size: 15px;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+  h2 { font-size: 20px; font-weight: 700; margin-bottom: 28px; letter-spacing: .04em; }
+  .muted { color: var(--muted); font-size: 14px; }
+
+  /* ── 사진 자리 ───────────────────────── */
+  .photo-slot {
+    position: relative;
+    background: var(--slot);
+    border: 1.5px dashed var(--slot-ink);
+    color: var(--slot-ink);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 6px;
+    font-size: 13px;
+    cursor: pointer;
+    overflow: hidden;
+  }
+  .photo-slot svg { width: 30px; height: 30px; stroke: currentColor; fill: none; stroke-width: 1.4; }
+  .photo-slot img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .photo-slot.filled { border: none; }
+  .photo-slot.filled > :not(img) { display: none; }
+  .photo-slot input { display: none; }
+
+  /* ── 폴리곤 그림 (사진 대신) ───────────────────────── */
+  .art { overflow: hidden; background: var(--slot); }
+  .art svg { display: block; width: 100%; height: 100%; }
+
+  /* ── 표지 ───────────────────────── */
+  .cover { padding: 0 0 48px; }
+  .cover .art { aspect-ratio: 3 / 4; width: 100%; }
+  .cover .date-en {
+    font-family: "Cormorant Garamond", serif;
+    font-size: 15px; letter-spacing: .3em; color: var(--accent);
+    margin: 36px 0 12px;
+  }
+  .cover .names { font-size: 26px; letter-spacing: .08em; }
+  .cover .names .amp { font-family: "Cormorant Garamond", serif; font-style: italic; color: var(--accent); margin: 0 10px; }
+  .cover .when { margin-top: 14px; font-size: 15px; color: var(--muted); }
+
+  /* ── 인사말 ───────────────────────── */
+  .greeting p { font-size: 15.5px; }
+  .greeting .poem { color: var(--muted); font-size: 14px; margin-bottom: 36px; }
+  .parents { margin-top: 40px; font-size: 15.5px; line-height: 2.3; }
+  .parents b { font-weight: 700; margin-left: 4px; }
+  .parents .rel { color: var(--muted); font-size: 13px; margin: 0 6px; }
+  .contact-btn {
+    margin-top: 28px;
+    display: inline-block;
+    padding: 10px 26px;
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    background: transparent;
+    border-radius: 999px;
+    font: inherit; font-size: 14px;
+    cursor: pointer;
+  }
+
+  /* ── 달력 ───────────────────────── */
+  .cal-head { font-size: 17px; margin-bottom: 6px; }
+  .cal {
+    display: grid; grid-template-columns: repeat(7, 1fr);
+    gap: 4px 0; margin: 24px auto 0; max-width: 320px; font-size: 14px;
+    border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
+    padding: 16px 0;
+  }
+  .cal .dow { color: var(--muted); font-size: 12px; padding-bottom: 6px; }
+  .cal span { height: 36px; display: flex; align-items: center; justify-content: center; }
+  .cal .sun { color: var(--sun); }
+  .cal .sat { color: var(--sat); }
+  .cal .day.on {
+    background: var(--accent); color: var(--paper);
+    border-radius: 50%; width: 36px; margin: 0 auto;
+  }
+  .dday { margin-top: 26px; font-size: 15px; }
+  .dday b { color: var(--accent); }
+  .countdown { display: flex; justify-content: center; gap: 14px; margin-top: 18px; }
+  .countdown div { min-width: 52px; }
+  .countdown strong { display: block; font-size: 22px; font-family: "Cormorant Garamond", serif; font-weight: 500; }
+  .countdown small { color: var(--muted); font-size: 11px; letter-spacing: .1em; }
+
+  /* ── 갤러리 ───────────────────────── */
+  .gallery { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+  .gallery .art { aspect-ratio: 1; }
+
+  /* ── 오시는 길 ───────────────────────── */
+  .venue-name { font-size: 18px; font-weight: 700; }
+  .venue-addr { margin: 4px 0 22px; }
+  .map-slot { aspect-ratio: 4 / 3; width: 100%; border-radius: 6px; }
+  .map-links { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 10px; }
+  .map-links a {
+    display: block; padding: 10px 0; font-size: 13px;
+    border: 1px solid var(--line); border-radius: 6px;
+    color: var(--ink); text-decoration: none;
+  }
+  .guide { text-align: left; margin-top: 32px; }
+  .guide dt { font-weight: 700; font-size: 15px; color: var(--accent); margin-top: 18px; }
+  .guide dd { font-size: 14px; color: var(--ink); }
+
+  /* ── 마음 전하실 곳 ───────────────────────── */
+  details {
+    text-align: left; border: 1px solid var(--line); border-radius: 8px;
+    margin-top: 12px; overflow: hidden;
+  }
+  summary {
+    list-style: none; cursor: pointer; padding: 14px 18px;
+    background: var(--accent-soft); font-size: 15px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary::after { content: "＋"; color: var(--accent); }
+  details[open] summary::after { content: "－"; }
+  .acct { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 14px 18px; font-size: 14px; }
+  .acct + .acct { border-top: 1px solid var(--line); }
+  .acct .who { color: var(--muted); font-size: 12px; }
+  .acct button {
+    flex-shrink: 0; font: inherit; font-size: 12px; padding: 6px 12px;
+    border: 1px solid var(--line); background: var(--paper); color: var(--ink);
+    border-radius: 6px; cursor: pointer;
+  }
+
+  /* ── 마무리 ───────────────────────── */
+  .closing { padding-bottom: 80px; }
+  .closing .art { aspect-ratio: 4 / 5; width: 72%; margin: 0 auto 32px; border-radius: 120px 120px 6px 6px; }
+  .share { display: flex; gap: 8px; justify-content: center; margin-top: 28px; flex-wrap: wrap; }
+  .share button {
+    font: inherit; font-size: 14px; padding: 10px 20px; border-radius: 999px;
+    border: 1px solid var(--accent); background: var(--accent); color: var(--paper); cursor: pointer;
+  }
+  .share button.ghost { background: transparent; color: var(--accent); }
+
+  /* ── 연락처 모달 · 토스트 ───────────────────────── */
+  dialog {
+    border: none; border-radius: 12px; padding: 28px 24px; width: min(360px, calc(100% - 32px));
+    background: var(--paper); color: var(--ink); margin: auto;
+  }
+  dialog::backdrop { background: rgba(0,0,0,.45); }
+  dialog h3 { font-size: 16px; margin-bottom: 12px; text-align: center; }
+  dialog ul { list-style: none; margin-bottom: 18px; }
+  dialog li { display: flex; justify-content: space-between; padding: 8px 0; font-size: 14px; border-bottom: 1px solid var(--line); }
+  dialog li a { color: var(--accent); text-decoration: none; }
+  dialog .close { display: block; margin: 8px auto 0; }
+  .toast {
+    position: fixed; left: 50%; bottom: 32px; transform: translateX(-50%) translateY(20px);
+    background: var(--ink); color: var(--paper); padding: 10px 20px; border-radius: 999px;
+    font-size: 13px; opacity: 0; transition: .25s; pointer-events: none; z-index: 10;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  .fade { opacity: 0; transform: translateY(18px); transition: opacity .9s ease, transform .9s ease; }
+  .fade.in { opacity: 1; transform: none; }
+  @media (prefers-reduced-motion: reduce) { .fade { opacity: 1; transform: none; transition: none; } }
+
+  /* ── PDF(인쇄) ───────────────────────── */
+  .print-only { display: none; }
+  /* 인쇄 모드는 html.printing 으로 건다 — 화면에서 잰 높이가 인쇄 높이와 같아야 한 장에 딱 맞는다 */
+  @media print { html, body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+  html.printing, html.printing body { background: #fff; }
+  html.printing .wrap { min-height: 0; max-width: 440px; }
+  html.printing .fade { opacity: 1 !important; transform: none !important; transition: none !important; }
+  html.printing :is(.contact-btn, .share, .map-links, .acct button, .countdown, .dday, .map-slot, .toast, dialog) { display: none !important; }
+  html.printing summary::after { content: none; }
+  html.printing .print-only { display: block; }
+  .print-contacts { margin-top: 28px; text-align: left; font-size: 14px; }
+  .print-contacts h3 { font-size: 14px; color: var(--accent); margin: 12px 0 4px; }
+  .print-contacts li { list-style: none; display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid var(--line); }
+</style>
+</head>
+<body>
+<!--
+  ✏️ 고치는 곳
+   1) 아래 <script> 맨 위 WEDDING 값 (날짜·이름·장소·계좌)
+   2) 웨딩 사진 자리는 지금 폴리곤 캐릭터 그림이다 (class="art").
+      실제 사진으로 바꿀 때는 그 div 안에 <img src="사진.jpg" alt="" style="width:100%;height:100%;object-fit:cover">
+      를 넣고 data-scene 속성을 지우면 된다. 갤러리는 WEDDING.galleryScenes 를 비우고 img 를 넣는다.
+-->
+<div class="wrap">
+
+  <!-- 표지 -->
+  <section class="cover">
+    <div class="art" data-scene="cover"></div>
+    <p class="date-en" data-bind="dateEn"></p>
+    <p class="names"><span data-bind="groom"></span><span class="amp">&amp;</span><span data-bind="bride"></span></p>
+    <p class="when" data-bind="whenKo"></p>
+    <p class="muted" data-bind="venueFull"></p>
+  </section>
+
+  <!-- 인사말 -->
+  <section class="greeting fade">
+    <p class="eyebrow">Invitation</p>
+    <h2>소중한 분들을 초대합니다</h2>
+    <p class="poem">
+      서로가 마주보며 다져온 사랑을<br>
+      이제 함께 한 곳을 바라보며<br>
+      걸어갈 수 있는 큰 사랑으로 키우고자 합니다.
+    </p>
+    <p>
+      저희 두 사람이 사랑의 이름으로<br>
+      지켜나갈 수 있게 앞날을<br>
+      축복해 주시면 감사하겠습니다.
+    </p>
+    <div class="parents">
+      <div><span data-bind="groomFather"></span> · <span data-bind="groomMother"></span><span class="rel">의 아들</span><b data-bind="groom"></b></div>
+      <div><span data-bind="brideFather"></span> · <span data-bind="brideMother"></span><span class="rel">의 딸</span><b data-bind="bride"></b></div>
+    </div>
+    <button class="contact-btn" type="button" id="openContact">연락하기</button>
+    <div class="print-only print-contacts" id="printContacts"></div>
+  </section>
+
+  <!-- 예식 일시 -->
+  <section class="fade">
+    <p class="eyebrow">Wedding Day</p>
+    <p class="cal-head" data-bind="whenKo"></p>
+    <div class="cal" id="cal"></div>
+    <p class="dday" id="dday"></p>
+    <div class="countdown" id="countdown"></div>
+  </section>
+
+  <!-- 갤러리 -->
+  <section class="fade">
+    <p class="eyebrow">Gallery</p>
+    <h2>우리의 순간</h2>
+    <div class="gallery" id="gallery"></div>
+  </section>
+
+  <!-- 오시는 길 -->
+  <section class="fade">
+    <p class="eyebrow">Location</p>
+    <h2>오시는 길</h2>
+    <p class="venue-name" data-bind="venue"></p>
+    <p class="venue-addr muted" data-bind="address"></p>
+    <label class="photo-slot map-slot">
+      <svg viewBox="0 0 24 24"><path d="M12 21s-7-6.2-7-11a7 7 0 0114 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>
+      <span>약도 이미지 자리</span>
+      <input type="file" accept="image/*">
+    </label>
+    <div class="map-links">
+      <a id="naverMap" target="_blank" rel="noopener">네이버 지도</a>
+      <a id="kakaoMap" target="_blank" rel="noopener">카카오맵</a>
+      <a id="tmap" target="_blank" rel="noopener">티맵</a>
+    </div>
+    <dl class="guide" id="guide"></dl>
+  </section>
+
+  <!-- 마음 전하실 곳 -->
+  <section class="fade">
+    <p class="eyebrow">Account</p>
+    <h2>마음 전하실 곳</h2>
+    <p class="muted" style="margin-bottom:20px">참석이 어려우신 분들을 위해 기재했습니다.<br>너그러운 마음으로 양해 부탁드립니다.</p>
+    <details>
+      <summary>신랑측 계좌번호</summary>
+      <div id="acctGroom"></div>
+    </details>
+    <details>
+      <summary>신부측 계좌번호</summary>
+      <div id="acctBride"></div>
+    </details>
+  </section>
+
+  <!-- 마무리 -->
+  <section class="closing fade">
+    <div class="art" data-scene="closing"></div>
+    <p>
+      장담하건대, 세상이 다 겨울이어도<br>
+      우리 사랑은 늘 봄처럼 따뜻하고<br>
+      간혹, 여름처럼 뜨거울 겁니다.
+    </p>
+    <p class="muted" style="margin-top:8px">— 이수동, 「사랑가」</p>
+    <div class="share">
+      <button type="button" id="copyLink">링크 복사</button>
+      <button type="button" class="ghost" id="addCal">캘린더에 추가</button>
+    </div>
+  </section>
+</div>
+
+<dialog id="contact">
+  <h3>신랑측</h3>
+  <ul id="contactGroom"></ul>
+  <h3>신부측</h3>
+  <ul id="contactBride"></ul>
+  <button class="contact-btn close" type="button" id="closeContact">닫기</button>
+</dialog>
+<div class="toast" id="toast"></div>
+
+<script>
+/* 빌드가 wedding-data.json 을 이 자리에 넣는다. null 이면 견본 값으로 그린다. */
+const DATA = {"_안내": {"date": "예식 일시 — 2027-05-15T12:30 꼴 (24시간)", "phone": "010-1234-5678 꼴", "bank/account/holder": "계좌를 안 싣는 사람은 셋 다 비워 두면 그 줄이 빠진다", "빈 값": "비워 둔 연락처·계좌·교통 안내는 화면에서 빠진다"}, "date": "2027-05-15T12:30", "groom": {"name": "김태하", "phone": "010-9733-1677", "bank": "우리은행", "account": "1002-682-098982", "holder": "김태하", "father": {"name": "김서진", "phone": "010-6125-1677"}, "mother": {"name": "김용서", "phone": "010-5122-1677"}}, "bride": {"name": "최민서", "phone": "010-2415-6112", "bank": "카카오뱅크", "account": "3333-01-1234567", "holder": "최민서", "father": {"name": "최대성", "phone": "010-1125-6112"}, "mother": {"name": "박여주", "phone": "010-1451-6112"}}, "venue": {"name": "더채플웨딩홀", "hall": "3층 그랜드홀", "address": "서울특별시 동대문구 이문로 107"}, "guide": {"subway": "1호선 외대앞역 1번 출구 도보 5분", "bus": "외대앞역 정류장 하차 — 간선 273, 지선 1222", "car": "건물 지하 주차장 이용 (2시간 무료)"}};
+
+const SAMPLE = {
+  date: '2027-05-15T12:30',
+  groom: { name: '신랑이름', phone: '010-0000-0000', bank: '○○은행', account: '000-0000-0000', holder: '신랑이름',
+           father: { name: '아버지', phone: '010-0000-0000', bank: '○○은행', account: '000-0000-0000', holder: '아버지' },
+           mother: { name: '어머니', phone: '010-0000-0000' } },
+  bride: { name: '신부이름', phone: '010-0000-0000', bank: '○○은행', account: '000-0000-0000', holder: '신부이름',
+           father: { name: '아버지', phone: '010-0000-0000' },
+           mother: { name: '어머니', phone: '010-0000-0000', bank: '○○은행', account: '000-0000-0000', holder: '어머니' } },
+  venue: { name: '○○웨딩홀', hall: '○층 ○○홀', address: '서울특별시 ○○구 ○○로 123' },
+  guide: { subway: '○호선 ○○역 ○번 출구 도보 5분', bus: '○○정류장 하차', car: '건물 내 주차장 이용' },
+};
+const RAW = DATA || SAMPLE;
+
+/* JSON 을 화면이 쓰는 꼴로 — 빈 값은 그 줄을 안 그린다 */
+const has = v => typeof v === 'string' && v.trim() !== '';
+function side(p, me) {
+  const people = [[me, p], [`${me} 아버지`, p.father || {}], [`${me} 어머니`, p.mother || {}]];
+  return {
+    contacts: people.filter(([, x]) => has(x.phone)).map(([w, x]) => [w, x.phone]),
+    accounts: people.filter(([, x]) => has(x.account)).map(([w, x]) => [w, x.bank || '', x.account, x.holder || x.name || '']),
+  };
+}
+const G = side(RAW.groom, '신랑'), B = side(RAW.bride, '신부');
+const WEDDING = {
+  date: RAW.date,
+  groom: RAW.groom.name, bride: RAW.bride.name,
+  groomFather: RAW.groom.father?.name || '', groomMother: RAW.groom.mother?.name || '',
+  brideFather: RAW.bride.father?.name || '', brideMother: RAW.bride.mother?.name || '',
+  venue: [RAW.venue.name, RAW.venue.hall].filter(has).join(' '),
+  address: RAW.venue.address,
+  // 갤러리 그림 9칸 — 고를 수 있는 배경: spring sea night forest lilac sunset snow gold mint cover closing
+  galleryScenes: ['spring', 'sea', 'night', 'forest', 'lilac', 'sunset', 'snow', 'gold', 'mint'],
+  contacts: { groom: G.contacts, bride: B.contacts },
+  accounts: { groom: G.accounts, bride: B.accounts },
+  guide: [['지하철', RAW.guide?.subway], ['버스', RAW.guide?.bus], ['자가용', RAW.guide?.car]].filter(([, v]) => has(v)),
+};
+
+const d = new Date(WEDDING.date);
+const DOW = ['일', '월', '화', '수', '목', '금', '토'];
+const pad = n => String(n).padStart(2, '0');
+const hour = d.getHours(), min = d.getMinutes();
+const timeKo = `${hour < 12 ? '오전' : '오후'} ${hour % 12 || 12}시${min ? ' ' + min + '분' : ''}`;
+
+const binds = {
+  ...WEDDING,
+  dateEn: `${d.getFullYear()}. ${pad(d.getMonth() + 1)}. ${pad(d.getDate())}`,
+  whenKo: `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일 ${DOW[d.getDay()]}요일 ${timeKo}`,
+  venueFull: WEDDING.venue,
+};
+document.querySelectorAll('[data-bind]').forEach(el => { el.textContent = binds[el.dataset.bind] ?? ''; });
+
+/* 달력 */
+const cal = document.getElementById('cal');
+DOW.forEach((w, i) => cal.insertAdjacentHTML('beforeend', `<span class="dow ${i === 0 ? 'sun' : i === 6 ? 'sat' : ''}">${w}</span>`));
+const first = new Date(d.getFullYear(), d.getMonth(), 1).getDay();
+const last = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+for (let i = 0; i < first; i++) cal.insertAdjacentHTML('beforeend', '<span></span>');
+for (let day = 1; day <= last; day++) {
+  const w = (first + day - 1) % 7;
+  const cls = ['day', w === 0 ? 'sun' : w === 6 ? 'sat' : '', day === d.getDate() ? 'on' : ''].join(' ');
+  cal.insertAdjacentHTML('beforeend', `<span class="${cls}">${day}</span>`);
+}
+
+/* D-day */
+function tick() {
+  const diff = d - new Date();
+  const now = new Date();
+  const days = Math.round((new Date(d.getFullYear(), d.getMonth(), d.getDate()) - new Date(now.getFullYear(), now.getMonth(), now.getDate())) / 864e5);
+  const dd = document.getElementById('dday');
+  const name = `${WEDDING.groom} ♥ ${WEDDING.bride}`;
+  dd.innerHTML = days > 0 ? `${name}의 결혼식이 <b>${days}일</b> 남았습니다.`
+               : days === 0 ? `오늘, ${name}이 <b>결혼합니다</b>.`
+               : `${name}이 결혼한 지 <b>${-days}일</b>째입니다.`;
+  const s = Math.max(0, Math.floor(diff / 1000));
+  const parts = [[Math.floor(s / 86400), 'DAYS'], [Math.floor(s / 3600) % 24, 'HOUR'], [Math.floor(s / 60) % 60, 'MIN'], [s % 60, 'SEC']];
+  document.getElementById('countdown').innerHTML = parts.map(([v, l]) => `<div><strong>${pad(v)}</strong><small>${l}</small></div>`).join('');
+}
+tick(); setInterval(tick, 1000);
+
+/* ── 폴리곤 캐릭터 그림 ───────────────────────── */
+const SCENES = {
+  cover:   { sky: ['#f6d8c8', '#fbeee6'], ground: '#e8cdb8', prop: 'heart',  seed: 7 },
+  closing: { sky: ['#f2a67e', '#f9d9b9'], ground: '#d9a585', prop: 'sun',    seed: 21 },
+  spring:  { sky: ['#f7cfd8', '#fdf0f2'], ground: '#cfe1c0', prop: 'petals', seed: 3 },
+  sea:     { sky: ['#a9d3e8', '#e5f3f8'], ground: '#ecdcc0', prop: 'sun',    seed: 11 },
+  night:   { sky: ['#2c3561', '#5b5f93'], ground: '#3b3f63', prop: 'moon',   seed: 5, flip: true },
+  forest:  { sky: ['#bcd7b4', '#eef5e6'], ground: '#8fb27f', prop: 'petals', seed: 17 },
+  lilac:   { sky: ['#cdbfe6', '#f1ecf9'], ground: '#d9cbe8', prop: 'heart',  seed: 29, flip: true },
+  sunset:  { sky: ['#e98f7a', '#f8cf9f'], ground: '#c98a6e', prop: 'sun',    seed: 13 },
+  snow:    { sky: ['#cfdbe6', '#f6f9fb'], ground: '#ffffff', prop: 'snow',   seed: 41, flip: true },
+  gold:    { sky: ['#e8d3a6', '#faf2df'], ground: '#dcc293', prop: 'heart',  seed: 33 },
+  mint:    { sky: ['#b9e2d6', '#eef8f4'], ground: '#cfe7dc', prop: 'petals', seed: 9, flip: true },
+};
+
+const rng = seed => () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+const hex2rgb = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+const mix = (a, b, t, j = 0) => { const A = hex2rgb(a), B = hex2rgb(b); return `rgb(${A.map((v, i) => Math.max(0, Math.min(255, Math.round(v + (B[i] - v) * t + j)))).join(',')})`; };
+
+/* 하늘 — 흔들린 격자를 삼각형으로 쪼갠다 */
+function lowPolySky(s, r) {
+  const cols = 6, rows = 9, W = 300, H = 400, pts = [];
+  for (let y = 0; y <= rows; y++) {
+    pts.push([]);
+    for (let x = 0; x <= cols; x++) {
+      const edgeX = x === 0 || x === cols, edgeY = y === 0 || y === rows;
+      pts[y].push([x * W / cols + (edgeX ? 0 : (r() - .5) * 36), y * H / rows + (edgeY ? 0 : (r() - .5) * 30)]);
+    }
+  }
+  let out = '';
+  for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) {
+    const a = pts[y][x], b = pts[y][x + 1], c = pts[y + 1][x], d2 = pts[y + 1][x + 1];
+    const tris = r() > .5 ? [[a, b, c], [b, d2, c]] : [[a, b, d2], [a, d2, c]];
+    tris.forEach(t => {
+      const cy = (t[0][1] + t[1][1] + t[2][1]) / 3;
+      const fill = mix(s.sky[0], s.sky[1], cy / H, (r() - .5) * 18);
+      out += `<polygon points="${t.map(p => p.map(n => n.toFixed(1)).join(',')).join(' ')}" fill="${fill}" stroke="${fill}" stroke-width=".6"/>`;
+    });
+  }
+  return out;
+}
+
+function props(s, r) {
+  switch (s.prop) {
+    case 'heart':
+      return `<g transform="translate(150 58)"><polygon points="0,14 -22,-4 -16,-16 -6,-16 0,-8" fill="#e58a96"/><polygon points="0,14 22,-4 16,-16 6,-16 0,-8" fill="#d06f7d"/><polygon points="-22,-4 -16,-16 -10,-6" fill="#f0a6b0"/></g>`;
+    case 'sun':
+      return `<polygon points="232,48 252,56 260,76 252,96 232,104 212,96 204,76 212,56" fill="#fff4d6" opacity=".85"/><polygon points="232,48 252,56 260,76 232,76" fill="#ffffff" opacity=".5"/>`;
+    case 'moon':
+      let st = '';
+      for (let i = 0; i < 14; i++) { const x = r() * 300, y = r() * 170, k = 1.5 + r() * 2; st += `<polygon points="${x},${y - k} ${x + k},${y} ${x},${y + k} ${x - k},${y}" fill="#fff8e1" opacity="${.5 + r() * .5}"/>`; }
+      return st + `<polygon points="236,44 254,52 262,72 254,92 236,100 248,84 250,62" fill="#fff3c8"/>`;
+    case 'petals': {
+      let p = '';
+      for (let i = 0; i < 16; i++) { const x = r() * 300, y = r() * 330, k = 3 + r() * 4, rot = r() * 360; p += `<polygon transform="rotate(${rot} ${x} ${y})" points="${x},${y - k} ${x + k * .7},${y} ${x},${y + k} ${x - k * .7},${y}" fill="${r() > .5 ? '#f3a9b6' : '#fbd3da'}" opacity=".9"/>`; }
+      return p;
+    }
+    case 'snow': {
+      let p = '';
+      for (let i = 0; i < 26; i++) { const x = r() * 300, y = r() * 360, k = 1.5 + r() * 2.5; p += `<polygon points="${x},${y - k} ${x + k},${y} ${x},${y + k} ${x - k},${y}" fill="#ffffff" opacity=".9"/>`; }
+      return p;
+    }
+  }
+  return '';
+}
+
+const SKIN = '#f0c9a8', SKIN2 = '#e2b590';
+const COUPLE = `
+  <polygon points="60,372 240,372 270,388 30,388" fill="#000" opacity=".08"/>
+  <!-- 신부 베일·뒷머리 -->
+  <polygon points="176,112 214,112 240,336 166,336" fill="#ffffff" opacity=".5"/>
+  <polygon points="168,130 190,104 212,126 216,190 166,190" fill="#5a3a2a"/>
+  <!-- 신랑 -->
+  <polygon points="92,285 108,285 106,365 90,365" fill="#2b3550"/>
+  <polygon points="112,285 128,285 130,365 114,365" fill="#232c44"/>
+  <polygon points="86,365 106,365 106,372 80,372" fill="#1c1c22"/>
+  <polygon points="114,365 134,365 140,372 114,372" fill="#1c1c22"/>
+  <polygon points="80,168 110,160 110,292 86,292" fill="#36426c"/>
+  <polygon points="110,160 140,168 134,292 110,292" fill="#2b3558"/>
+  <polygon points="100,164 120,164 110,206" fill="#f6f3ee"/>
+  <polygon points="104,166 110,171 104,176" fill="#b0503f"/><polygon points="116,166 110,171 116,176" fill="#923d30"/>
+  <polygon points="96,180 104,178 102,190" fill="#f0a6b0"/>
+  <polygon points="80,168 68,242 78,246 92,182" fill="#2f3a60"/>
+  <polygon points="68,242 78,246 75,254 66,250" fill="${SKIN}"/>
+  <polygon points="140,168 156,220 148,226 130,182" fill="#2b3558"/>
+  <polygon points="104,148 116,148 116,164 104,164" fill="${SKIN2}"/>
+  <polygon points="110,104 132,116 134,140 120,156 100,156 86,140 88,116" fill="${SKIN}"/>
+  <polygon points="110,104 132,116 134,140 120,156 112,132" fill="${SKIN2}"/>
+  <polygon points="85,126 88,110 104,97 124,99 135,112 135,126 126,112 104,115" fill="#2a211c"/>
+  <polygon points="98,131 103,129 103,135" fill="#2a211c"/><polygon points="117,129 122,131 117,135" fill="#2a211c"/>
+  <polygon points="104,144 116,144 110,148" fill="#c46a5e"/>
+  <!-- 신부 -->
+  <polygon points="176,212 190,212 190,368 146,368" fill="#ffffff"/>
+  <polygon points="190,212 206,212 238,368 190,368" fill="#e9e4de"/>
+  <polygon points="190,214 170,368 210,368" fill="#f5f2ee"/>
+  <polygon points="174,168 206,168 204,214 176,214" fill="#faf7f2"/>
+  <polygon points="190,168 206,168 204,214 190,214" fill="#e8e2da"/>
+  <polygon points="174,170 150,222 158,228 180,186" fill="${SKIN}"/>
+  <polygon points="146,218 160,216 162,230 148,232" fill="${SKIN}"/>
+  <polygon points="206,170 214,214 205,218 200,184" fill="${SKIN2}"/>
+  <polygon points="198,214 208,206 220,214 216,228 202,229" fill="#e8a0a8"/>
+  <polygon points="208,206 220,214 211,218" fill="#d4808c"/>
+  <polygon points="198,214 205,220 202,229" fill="#f3c0c6"/>
+  <polygon points="202,229 209,244 216,228" fill="#7a9a6a"/>
+  <polygon points="185,150 195,150 195,168 185,168" fill="${SKIN2}"/>
+  <polygon points="190,108 210,118 212,140 200,156 180,156 168,140 170,118" fill="${SKIN}"/>
+  <polygon points="190,108 210,118 212,140 200,156 192,132" fill="${SKIN2}"/>
+  <polygon points="167,134 170,114 186,101 205,103 215,118 213,136 202,116 182,119" fill="#5a3a2a"/>
+  <polygon points="180,104 190,96 200,104 190,109" fill="#ffffff"/>
+  <polygon points="178,133 183,131 183,137" fill="#2a211c"/><polygon points="197,131 202,133 197,137" fill="#2a211c"/>
+  <polygon points="173,141 179,140 177,145" fill="#f0a0a0" opacity=".7"/><polygon points="201,140 207,141 203,145" fill="#f0a0a0" opacity=".7"/>
+  <polygon points="185,146 195,146 190,150" fill="#c4505e"/>`;
+
+function scene(name, viewBox) {
+  const s = SCENES[name], r = rng(s.seed);
+  const ground = `<polygon points="0,330 80,318 160,326 230,314 300,324 300,400 0,400" fill="${s.ground}"/><polygon points="80,318 160,326 120,400 0,400 0,330" fill="${mix(s.ground, '#000000', .06)}"/>`;
+  const couple = s.flip ? `<g transform="translate(300 0) scale(-1 1)">${COUPLE}</g>` : COUPLE;
+  return `<svg viewBox="${viewBox}" preserveAspectRatio="xMidYMid slice" role="img" aria-label="신랑과 신부 폴리곤 캐릭터">${lowPolySky(s, r)}${props(s, r)}${ground}${couple}</svg>`;
+}
+
+const VIEW = { cover: '0 0 300 400', closing: '0 25 300 375', tile: '0 78 300 300' };
+document.querySelectorAll('.art[data-scene]').forEach(el => { el.innerHTML = scene(el.dataset.scene, VIEW[el.dataset.scene] || VIEW.cover); });
+const gal = document.getElementById('gallery');
+WEDDING.galleryScenes.forEach(n => gal.insertAdjacentHTML('beforeend', `<div class="art">${scene(n, VIEW.tile)}</div>`));
+
+/* 약도 칸 미리보기 (내 브라우저에서만 · 저장 안 됨) */
+document.querySelectorAll('.photo-slot input[type=file]').forEach(inp => {
+  inp.addEventListener('change', () => {
+    const f = inp.files[0]; if (!f) return;
+    const slot = inp.closest('.photo-slot');
+    slot.querySelector('img')?.remove();
+    const img = new Image(); img.alt = ''; img.src = URL.createObjectURL(f);
+    slot.prepend(img); slot.classList.add('filled');
+  });
+});
+
+/* 지도 링크 */
+const q = encodeURIComponent(WEDDING.address);
+document.getElementById('naverMap').href = `https://map.naver.com/p/search/${q}`;
+document.getElementById('kakaoMap').href = `https://map.kakao.com/?q=${q}`;
+document.getElementById('tmap').href = `https://tmap.life/search?query=${q}`;
+document.getElementById('guide').innerHTML = WEDDING.guide.map(([t, v]) => `<dt>${t}</dt><dd>${v}</dd>`).join('');
+
+/* 계좌 */
+const toast = msg => { const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 1800); };
+const copy = async (text, msg) => {
+  try { await navigator.clipboard.writeText(text); }
+  catch { const ta = Object.assign(document.createElement('textarea'), { value: text }); document.body.append(ta); ta.select(); document.execCommand('copy'); ta.remove(); }
+  toast(msg);
+};
+const renderAcct = (id, list) => {
+  const box = document.getElementById(id);
+  list.forEach(([who, bank, num, holder]) => {
+    const row = document.createElement('div'); row.className = 'acct';
+    row.innerHTML = `<div><div class="who">${who}</div>${bank} ${num}<div class="who">${holder}</div></div><button type="button">복사</button>`;
+    row.querySelector('button').onclick = () => copy(`${bank} ${num}`, '계좌번호를 복사했습니다');
+    box.append(row);
+  });
+};
+renderAcct('acctGroom', WEDDING.accounts.groom);
+renderAcct('acctBride', WEDDING.accounts.bride);
+
+/* 연락처 */
+const renderContact = (id, list) => {
+  document.getElementById(id).innerHTML = list.map(([who, tel]) => {
+    const t = tel.replace(/-/g, '');
+    return `<li><span>${who}</span><span><a href="tel:${t}">전화</a> · <a href="sms:${t}">문자</a></span></li>`;
+  }).join('');
+};
+renderContact('contactGroom', WEDDING.contacts.groom);
+renderContact('contactBride', WEDDING.contacts.bride);
+const dlg = document.getElementById('contact');
+document.getElementById('openContact').onclick = () => dlg.showModal();
+document.getElementById('closeContact').onclick = () => dlg.close();
+
+/* 공유 · 캘린더 */
+document.getElementById('copyLink').onclick = () => copy(location.href, '링크를 복사했습니다');
+document.getElementById('addCal').onclick = () => {
+  const fmt = x => `${x.getUTCFullYear()}${pad(x.getUTCMonth() + 1)}${pad(x.getUTCDate())}T${pad(x.getUTCHours())}${pad(x.getUTCMinutes())}00Z`;
+  const end = new Date(d.getTime() + 2 * 3600e3);
+  const ics = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//wedding//KO', 'BEGIN:VEVENT',
+    `UID:${d.getTime()}@wedding`, `DTSTAMP:${fmt(new Date())}`, `DTSTART:${fmt(d)}`, `DTEND:${fmt(end)}`,
+    `SUMMARY:${WEDDING.groom} ♥ ${WEDDING.bride} 결혼식`, `LOCATION:${WEDDING.venue}, ${WEDDING.address}`,
+    'END:VEVENT', 'END:VCALENDAR'].join('\r\n');
+  const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(new Blob([ics], { type: 'text/calendar' })), download: 'wedding.ics' });
+  a.click();
+};
+
+/* PDF(인쇄) — 연락처를 펼쳐 싣고, 계좌를 열고, 한 장짜리 긴 쪽으로 */
+document.getElementById('printContacts').innerHTML = [['신랑측', WEDDING.contacts.groom], ['신부측', WEDDING.contacts.bride]]
+  .filter(([, l]) => l.length)
+  .map(([t, l]) => `<h3>${t} 연락처</h3><ul>${l.map(([w, p]) => `<li><span>${w}</span><span>${p}</span></li>`).join('')}</ul>`).join('');
+function preparePrint() {
+  document.documentElement.classList.add('printing');
+  document.documentElement.dataset.theme = 'light';
+  document.querySelectorAll('details').forEach(el => { el.open = true; });
+  document.querySelectorAll('.fade').forEach(el => el.classList.add('in'));
+}
+window.addEventListener('beforeprint', preparePrint);
+if (location.search.includes('print')) {
+  preparePrint();
+  const pageStyle = document.createElement('style');
+  document.head.append(pageStyle);
+  const fit = () => { pageStyle.textContent = `@page { size: 440px ${document.querySelector('.wrap').scrollHeight + 2}px; margin: 0; }`; };
+  fit();
+  document.fonts.ready.then(fit);
+}
+
+/* 스크롤 등장 */
+const io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } }), { threshold: .15 });
+document.querySelectorAll('.fade').forEach(el => io.observe(el));
+</script>
+</body>
+</html>
